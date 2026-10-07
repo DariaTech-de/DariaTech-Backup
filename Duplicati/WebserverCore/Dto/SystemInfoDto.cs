@@ -302,6 +302,7 @@ public sealed record SystemInfoDto
         /// </summary>
         /// <param name="data">The license data to map.</param>
         /// <returns>The mapped DTO.</returns>
+#if !DARIATECH_OSS_ONLY
         public static LicenseStatusDto Map(Proprietary.LicenseChecker.LicenseData? data)
             => data != null
                 ? new LicenseStatusDto
@@ -322,6 +323,7 @@ public sealed record SystemInfoDto
                     ExpiresWithGraceAt = null,
                     Features = null
                 };
+#endif
     }
 
     /// <summary>

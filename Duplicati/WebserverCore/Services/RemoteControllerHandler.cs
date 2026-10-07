@@ -135,7 +135,9 @@ public class RemoteControllerHandler(Connection connection, IHttpClientFactory h
                 if (newLicenseKey != currentLicenseKey)
                 {
                     connection.ApplicationSettings.ClientLicenseKey = newLicenseKey;
+#if !DARIATECH_OSS_ONLY
                     Duplicati.Proprietary.LicenseChecker.LicenseHelper.SetRemoteClientLicenseKey(newLicenseKey);
+#endif
                 }
 
                 var backupConfigs = message.ControlRequestMessage.Parameters

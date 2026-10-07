@@ -10,7 +10,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../../proprietary/LoaderHelper/Duplicati.Proprietary.LoaderHelper.csproj" />
+    <ProjectReference Include="../Utility/Duplicati.Library.Utility.csproj" />
+    <ProjectReference Include="../../../proprietary/LoaderHelper/Duplicati.Proprietary.LoaderHelper.csproj" Condition="'$(DariaTechOssOnly)' != 'true'" />
     <ProjectReference Include="../Interface/Duplicati.Library.Interface.csproj" />
   </ItemGroup>
 

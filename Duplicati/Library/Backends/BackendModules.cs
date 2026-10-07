@@ -94,7 +94,9 @@ public static class BackendModules
         new Backend.Filejump(),
         new Backend.DrimeCloud.DrimeBackend(),
     }
+#if !DARIATECH_OSS_ONLY
     .Concat(Proprietary.LoaderHelper.BackendModules.LicensedBackendModules)
+#endif
 
     .WhereNotNull()
     .ToList();

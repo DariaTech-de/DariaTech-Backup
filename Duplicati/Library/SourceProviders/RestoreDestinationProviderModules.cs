@@ -58,7 +58,11 @@ public static class RestoreDestinationProviderModules
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static IReadOnlyList<IRestoreDestinationProviderModule> LoadProprietaryModules()
     {
+#if DARIATECH_OSS_ONLY
+        return Array.Empty<IRestoreDestinationProviderModule>();
+#else
         return Proprietary.LoaderHelper.RestoreDestinationProviderModules.LicensedRestoreDestinationProviderModules.WhereNotNull().ToList();
+#endif
     }
 
     /// <summary>

@@ -58,7 +58,11 @@ public static class SourceProviderModules
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static IReadOnlyList<ISourceProviderModule> LoadProprietaryModules()
     {
+#if DARIATECH_OSS_ONLY
+        return Array.Empty<ISourceProviderModule>();
+#else
         return Proprietary.LoaderHelper.SourceProviderModules.LicensedSourceProviderModules.WhereNotNull().ToList();
+#endif
     }
 
     /// <summary>

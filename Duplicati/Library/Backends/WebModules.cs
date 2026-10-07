@@ -58,7 +58,11 @@ public static class WebModules
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static IReadOnlyList<IWebModule> LoadProprietaryModules()
     {
+#if DARIATECH_OSS_ONLY
+        return Array.Empty<IWebModule>();
+#else
         return Proprietary.LoaderHelper.WebModules.LicensedWebModules.WhereNotNull().ToList();
+#endif
     }
 
     /// <summary>

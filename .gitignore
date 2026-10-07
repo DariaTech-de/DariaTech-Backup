@@ -22,3 +22,12 @@ ReleaseBuilder/build-temp/
 ReleaseBuilder/Resources/Windows/TrayIcon/binfiles.wxs
 ReleaseBuilder/Resources/Windows/Agent/binfiles.wxs
 Tools/MacOSPhotosNative/build/
+
+# DariaTech local credentials and generated test/build output
+.env
+.env.*
+!.env.example
+.secrets/
+**/TestResults/
+artifacts/
+keys/

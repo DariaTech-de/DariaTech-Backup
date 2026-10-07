@@ -1,0 +1,7 @@
+<Project>
+  <PropertyGroup>
+    <!-- Upstream default is preserved. DariaTech release builds opt into OSS-only. -->
+    <DariaTechOssOnly Condition="'$(DariaTechOssOnly)' == ''">false</DariaTechOssOnly>
+    <DefineConstants Condition="'$(DariaTechOssOnly)' == 'true'">$(DefineConstants);DARIATECH_OSS_ONLY</DefineConstants>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,2117 @@
+[
+  {
+    "path": "BuildTools/LicenseUpdater/LicenseUpdater.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [],
+    "packages": []
+  },
+  {
+    "path": "Duplicati/Agent/Duplicati.Agent.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\Server\\Duplicati.Server.csproj",
+      "..\\Library\\RemoteControl\\Duplicati.Library.RemoteControl.csproj"
+    ],
+    "packages": [
+      {
+        "name": "System.CommandLine",
+        "version": "2.0.0"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/CommandLine/BackendTester/Duplicati.CommandLine.BackendTester.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Library\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\..\\Library\\DynamicLoader\\Duplicati.Library.DynamicLoader.csproj",
+      "..\\..\\Library\\AutoUpdater\\Duplicati.Library.AutoUpdater.csproj",
+      "..\\..\\License\\Duplicati.License.csproj",
+      "..\\..\\Library\\Modules\\Builtin\\Duplicati.Library.Modules.Builtin.csproj",
+      "..\\..\\Library\\Backend\\OAuthHelper\\Duplicati.Library.OAuthHelper.csproj",
+      "..\\..\\Library\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\Library\\Logging\\Duplicati.Library.Logging.csproj",
+      "..\\..\\Library\\Common\\Duplicati.Library.Common.csproj",
+      "..\\..\\Library\\SQLiteHelper\\Duplicati.Library.SQLiteHelper.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Duplicati/CommandLine/BackendTool/Duplicati.CommandLine.BackendTool.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Library\\DynamicLoader\\Duplicati.Library.DynamicLoader.csproj",
+      "..\\..\\Library\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\..\\Library\\AutoUpdater\\Duplicati.Library.AutoUpdater.csproj",
+      "..\\..\\License\\Duplicati.License.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Duplicati/CommandLine/CLI/Duplicati.CommandLine.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Library\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\..\\Library\\Common\\Duplicati.Library.Common.csproj",
+      "..\\..\\Library\\DynamicLoader\\Duplicati.Library.DynamicLoader.csproj",
+      "..\\..\\Library\\Logging\\Duplicati.Library.Logging.csproj",
+      "..\\..\\Library\\Main\\Duplicati.Library.Main.csproj",
+      "..\\..\\License\\Duplicati.License.csproj",
+      "..\\BackendTool\\Duplicati.CommandLine.BackendTool.csproj",
+      "..\\BackendTester\\Duplicati.CommandLine.BackendTester.csproj",
+      "..\\..\\Library\\AutoUpdater\\Duplicati.Library.AutoUpdater.csproj",
+      "..\\..\\Library\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\RecoveryTool\\Duplicati.CommandLine.RecoveryTool.csproj",
+      "..\\..\\Library\\UsageReporter\\Duplicati.Library.UsageReporter.csproj",
+      "..\\..\\Tools\\Duplicati.Tools.csproj",
+      "..\\..\\Library\\Crashlog\\Duplicati.Library.Crashlog.csproj"
+    ],
+    "packages": [
+      {
+        "name": "StreamJsonRpc",
+        "version": "2.25.29"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/CommandLine/ConfigureTool/Duplicati.CommandLine.ConfigureTool.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Library\\Certificates\\Duplicati.Library.Certificates.csproj",
+      "..\\..\\Library\\RestAPI\\Duplicati.Library.RestAPI.csproj",
+      "..\\..\\Library\\SQLiteHelper\\Duplicati.Library.SQLiteHelper.csproj",
+      "..\\..\\Library\\AutoUpdater\\Duplicati.Library.AutoUpdater.csproj",
+      "..\\..\\Library\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\..\\Library\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Server\\Duplicati.Server.csproj"
+    ],
+    "packages": [
+      {
+        "name": "System.CommandLine",
+        "version": "2.0.0"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/CommandLine/DatabaseTool/Duplicati.CommandLine.DatabaseTool.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "../../Library/DynamicLoader/Duplicati.Library.DynamicLoader.csproj",
+      "../../Library/Main/Duplicati.Library.Main.csproj",
+      "../../Library/RestAPI/Duplicati.Library.RestAPI.csproj",
+      "../../Library/SourceProvider/Builtin/Duplicati.Library.SourceProvider.Builtin.csproj",
+      "../../Library/SourceProviders/Duplicati.Library.SourceProviders.csproj",
+      "../../Library/Utility/Duplicati.Library.Utility.csproj"
+    ],
+    "packages": [
+      {
+        "name": "System.CommandLine",
+        "version": "2.0.0"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/CommandLine/RecoveryTool/Duplicati.CommandLine.RecoveryTool.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Library\\AutoUpdater\\Duplicati.Library.AutoUpdater.csproj",
+      "..\\..\\Library\\DynamicLoader\\Duplicati.Library.DynamicLoader.csproj",
+      "..\\..\\Library\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\..\\Library\\Main\\Duplicati.Library.Main.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Duplicati/CommandLine/SecretTool/Duplicati.CommandLine.SecretTool.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Library\\DynamicLoader\\Duplicati.Library.DynamicLoader.csproj",
+      "..\\..\\Library\\Utility\\Duplicati.Library.Utility.csproj"
+    ],
+    "packages": [
+      {
+        "name": "System.CommandLine",
+        "version": "2.0.0"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/CommandLine/ServerUtil/Duplicati.CommandLine.ServerUtil.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Server\\Duplicati.Server.csproj"
+    ],
+    "packages": [
+      {
+        "name": "System.CommandLine",
+        "version": "2.0.0"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/CommandLine/SourceTool/Duplicati.CommandLine.SourceTool.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "../../Library/DynamicLoader/Duplicati.Library.DynamicLoader.csproj",
+      "../../Library/SourceProvider/Builtin/Duplicati.Library.SourceProvider.Builtin.csproj",
+      "../../Library/SourceProviders/Duplicati.Library.SourceProviders.csproj",
+      "../../Library/Utility/Duplicati.Library.Utility.csproj"
+    ],
+    "packages": [
+      {
+        "name": "System.CommandLine",
+        "version": "2.0.0"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/GUI/Duplicati.GUI.TrayIcon/Duplicati.GUI.TrayIcon.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Library\\Backend\\OAuthHelper\\Duplicati.Library.OAuthHelper.csproj",
+      "..\\..\\Library\\Common\\Duplicati.Library.Common.csproj",
+      "..\\..\\Server\\Duplicati.Server.csproj",
+      "..\\..\\Server\\Duplicati.Server.Serialization\\Duplicati.Server.Serialization.csproj",
+      "..\\..\\Library\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\..\\Library\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\CommandLine\\CLI\\Duplicati.CommandLine.csproj",
+      "..\\..\\CommandLine\\BackendTester\\Duplicati.CommandLine.BackendTester.csproj",
+      "..\\..\\CommandLine\\BackendTool\\Duplicati.CommandLine.BackendTool.csproj",
+      "..\\..\\Library\\SQLiteHelper\\Duplicati.Library.SQLiteHelper.csproj",
+      "..\\..\\Library\\DynamicLoader\\Duplicati.Library.DynamicLoader.csproj",
+      "..\\..\\Library\\Logging\\Duplicati.Library.Logging.csproj",
+      "..\\..\\Library\\Main\\Duplicati.Library.Main.csproj",
+      "..\\..\\License\\Duplicati.License.csproj",
+      "..\\..\\Library\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\Library\\AutoUpdater\\Duplicati.Library.AutoUpdater.csproj",
+      "..\\..\\CommandLine\\RecoveryTool\\Duplicati.CommandLine.RecoveryTool.csproj",
+      "..\\..\\Library\\UsageReporter\\Duplicati.Library.UsageReporter.csproj",
+      "..\\..\\Tools\\Duplicati.Tools.csproj"
+    ],
+    "packages": [
+      {
+        "name": "Avalonia",
+        "version": "12.1.3"
+      },
+      {
+        "name": "Avalonia.Desktop",
+        "version": "12.1.3"
+      },
+      {
+        "name": "Tmds.DBus.Protocol",
+        "version": "0.94.1"
+      },
+      {
+        "name": "Avalonia.Themes.Fluent",
+        "version": "12.1.3"
+      },
+      {
+        "name": "Avalonia.Diagnostics",
+        "version": "11.3.13"
+      },
+      {
+        "name": "RumpSharp",
+        "version": "1.0.1"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/AutoUpdater/Duplicati.Library.AutoUpdater.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\License\\Duplicati.License.csproj",
+      "..\\Compression\\Duplicati.Library.Compression.csproj",
+      "..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\Utility\\Duplicati.Library.Utility.csproj"
+    ],
+    "packages": [
+      {
+        "name": "Newtonsoft.Json",
+        "version": "13.0.4"
+      },
+      {
+        "name": "JsonSignature",
+        "version": "1.0.0"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/Backend/AliyunOSS/Duplicati.Library.Backend.AliyunOSS.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Common\\Duplicati.Library.Common.csproj",
+      "..\\..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\Logging\\Duplicati.Library.Logging.csproj",
+      "..\\..\\Utility\\Duplicati.Library.Utility.csproj"
+    ],
+    "packages": [
+      {
+        "name": "Aliyun.OSS.SDK.NetCore",
+        "version": "2.14.1"
+      },
+      {
+        "name": "Newtonsoft.Json",
+        "version": "13.0.4"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/Backend/AzureBlob/Duplicati.Library.Backend.AzureBlob.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\Utility\\Duplicati.Library.Utility.csproj"
+    ],
+    "packages": [
+      {
+        "name": "Azure.Storage.Blobs",
+        "version": "12.29.1"
+      },
+      {
+        "name": "Azure.Storage.Common",
+        "version": "12.28.0"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/Backend/Backblaze/Duplicati.Library.Backend.Backblaze.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\..\\Backend\\OAuthHelper\\Duplicati.Library.OAuthHelper.csproj"
+    ],
+    "packages": [
+      {
+        "name": "Newtonsoft.Json",
+        "version": "13.0.4"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/Backend/Box/Duplicati.Library.Backend.Box.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\..\\Logging\\Duplicati.Library.Logging.csproj",
+      "..\\..\\Backend\\OAuthHelper\\Duplicati.Library.OAuthHelper.csproj"
+    ],
+    "packages": [
+      {
+        "name": "Newtonsoft.Json",
+        "version": "13.0.4"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/Backend/DrimeCloud/Duplicati.Library.Backend.DrimeCloud.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\..\\AutoUpdater\\Duplicati.Library.AutoUpdater.csproj",
+      "..\\..\\Common\\Duplicati.Library.Common.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Duplicati/Library/Backend/Dropbox/Duplicati.Library.Backend.Dropbox.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\..\\Backend\\OAuthHelper\\Duplicati.Library.OAuthHelper.csproj"
+    ],
+    "packages": [
+      {
+        "name": "Newtonsoft.Json",
+        "version": "13.0.4"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/Backend/Duplicati/Duplicati.Library.Backend.Duplicati.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\..\\Snapshots\\Duplicati.Library.Snapshots.csproj",
+      "..\\S3\\Duplicati.Library.Backend.S3.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Duplicati/Library/Backend/FTP/Duplicati.Library.Backend.FTP.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\Utility\\Duplicati.Library.Utility.csproj"
+    ],
+    "packages": [
+      {
+        "name": "FluentFTP",
+        "version": "54.2.0"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/Backend/File/Duplicati.Library.Backend.File.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\..\\Snapshots\\Duplicati.Library.Snapshots.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Duplicati/Library/Backend/Filejump/Duplicati.Library.Backend.Filejump.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\..\\AutoUpdater\\Duplicati.Library.AutoUpdater.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Duplicati/Library/Backend/Filen/Duplicati.Library.Backend.Filen.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\..\\Logging\\Duplicati.Library.Logging.csproj",
+      "..\\..\\Backend\\OAuthHelper\\Duplicati.Library.OAuthHelper.csproj"
+    ],
+    "packages": [
+      {
+        "name": "Newtonsoft.Json",
+        "version": "13.0.4"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/Backend/GoogleServices/Duplicati.Library.Backend.GoogleServices.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\..\\Backend\\OAuthHelper\\Duplicati.Library.OAuthHelper.csproj"
+    ],
+    "packages": [
+      {
+        "name": "Newtonsoft.Json",
+        "version": "13.0.4"
+      },
+      {
+        "name": "Google.Apis.Auth",
+        "version": "1.75.0"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/Backend/Idrivee2/Duplicati.Library.Backend.Idrivee2.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\SourceProvider\\Builtin\\Duplicati.Library.SourceProvider.Builtin.csproj",
+      "..\\..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\S3\\Duplicati.Library.Backend.S3.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Duplicati/Library/Backend/Jottacloud/Duplicati.Library.Backend.Jottacloud.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\..\\Backend\\OAuthHelper\\Duplicati.Library.OAuthHelper.csproj"
+    ],
+    "packages": [
+      {
+        "name": "Newtonsoft.Json",
+        "version": "13.0.4"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/Backend/Mega/Duplicati.Library.Backend.Mega.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\Utility\\Duplicati.Library.Utility.csproj"
+    ],
+    "packages": [
+      {
+        "name": "MegaApiClient",
+        "version": "1.10.4"
+      },
+      {
+        "name": "Otp.NET",
+        "version": "1.4.0"
+      },
+      {
+        "name": "Newtonsoft.Json",
+        "version": "13.0.4"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/Backend/MovistarCloud/Duplicati.Library.Backend.MovistarCloud.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\..\\Logging\\Duplicati.Library.Logging.csproj"
+    ],
+    "packages": [
+      {
+        "name": "Newtonsoft.Json",
+        "version": "13.0.4"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/Backend/OAuthHelper/Duplicati.Library.OAuthHelper.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\Utility\\Duplicati.Library.Utility.csproj"
+    ],
+    "packages": [
+      {
+        "name": "Newtonsoft.Json",
+        "version": "13.0.4"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/Backend/OneDrive/Duplicati.Library.Backend.OneDrive.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\..\\Logging\\Duplicati.Library.Logging.csproj",
+      "..\\..\\Backend\\OAuthHelper\\Duplicati.Library.OAuthHelper.csproj"
+    ],
+    "packages": [
+      {
+        "name": "Newtonsoft.Json",
+        "version": "13.0.4"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/Backend/OpenStack/Duplicati.Library.Backend.OpenStack.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\..\\Backend\\OAuthHelper\\Duplicati.Library.OAuthHelper.csproj"
+    ],
+    "packages": [
+      {
+        "name": "Newtonsoft.Json",
+        "version": "13.0.4"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/Backend/Rclone/Duplicati.Library.Backend.Rclone.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\Utility\\Duplicati.Library.Utility.csproj"
+    ],
+    "packages": [
+      {
+        "name": "Newtonsoft.Json",
+        "version": "13.0.4"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/Backend/S3/Duplicati.Library.Backend.S3.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\SourceProvider\\Builtin\\Duplicati.Library.SourceProvider.Builtin.csproj",
+      "..\\..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\..\\Logging\\Duplicati.Library.Logging.csproj"
+    ],
+    "packages": [
+      {
+        "name": "AWSSDK.Core",
+        "version": "4.0.100.5"
+      },
+      {
+        "name": "AWSSDK.IdentityManagement",
+        "version": "4.0.100.4"
+      },
+      {
+        "name": "AWSSDK.S3",
+        "version": "4.0.100.3"
+      },
+      {
+        "name": "Minio",
+        "version": "6.0.0"
+      },
+      {
+        "name": "System.Reactive",
+        "version": "7.0.0"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/Backend/SMB/Duplicati.Library.Backend.SMB.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\..\\SourceProvider\\Builtin\\Duplicati.Library.SourceProvider.Builtin.csproj"
+    ],
+    "packages": [
+      {
+        "name": "SMBLibrary",
+        "version": "1.5.4"
+      },
+      {
+        "name": "SMBLibrary.Win32",
+        "version": "1.5.4"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/Backend/SSHv2/Duplicati.Library.Backend.SSHv2.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\SourceProvider\\Builtin\\Duplicati.Library.SourceProvider.Builtin.csproj",
+      "..\\..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\Utility\\Duplicati.Library.Utility.csproj"
+    ],
+    "packages": [
+      {
+        "name": "SSH.NET",
+        "version": "2026.0.0"
+      },
+      {
+        "name": "SshNet.Agent",
+        "version": "2024.2.0.1"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/Backend/SharePoint/Duplicati.Library.Backend.SharePoint.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\Utility\\Duplicati.Library.Utility.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Duplicati/Library/Backend/Storj/Duplicati.Library.Backend.Storj.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Common\\Duplicati.Library.Common.csproj",
+      "..\\..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\Utility\\Duplicati.Library.Utility.csproj"
+    ],
+    "packages": [
+      {
+        "name": "SQLitePCLRaw.bundle_e_sqlite3",
+        "version": "3.0.5"
+      },
+      {
+        "name": "SQLitePCLRaw.lib.e_sqlite3",
+        "version": "3.53.3"
+      },
+      {
+        "name": "sqlite-net-pcl",
+        "version": "1.9.172"
+      },
+      {
+        "name": "Newtonsoft.Json",
+        "version": "13.0.4"
+      },
+      {
+        "name": "uplink.NET",
+        "version": "2.14.3623"
+      },
+      {
+        "name": "uplink.NET.Win",
+        "version": "2.14.3623"
+      },
+      {
+        "name": "uplink.NET.Linux",
+        "version": "2.14.3623"
+      },
+      {
+        "name": "uplink.NET.Mac",
+        "version": "2.13.3484"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/Backend/TahoeLAFS/Duplicati.Library.Backend.TahoeLAFS.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\Utility\\Duplicati.Library.Utility.csproj"
+    ],
+    "packages": [
+      {
+        "name": "Newtonsoft.Json",
+        "version": "13.0.4"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/Backend/TencentCOS/Duplicati.Library.Backend.TencentCOS.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Common\\Duplicati.Library.Common.csproj",
+      "..\\..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\Logging\\Duplicati.Library.Logging.csproj",
+      "..\\..\\Utility\\Duplicati.Library.Utility.csproj"
+    ],
+    "packages": [
+      {
+        "name": "Tencent.QCloud.Cos.Sdk",
+        "version": "5.4.11"
+      },
+      {
+        "name": "Newtonsoft.Json",
+        "version": "13.0.4"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/Backend/WEBDAV/Duplicati.Library.Backend.WEBDAV.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\Utility\\Duplicati.Library.Utility.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Duplicati/Library/Backend/pCloud/Duplicati.Library.Backend.pCloud.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "../OAuthHelper/Duplicati.Library.OAuthHelper.csproj",
+      "..\\..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\Utility\\Duplicati.Library.Utility.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Duplicati/Library/Backends/Duplicati.Library.Backends.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\Backend\\DrimeCloud\\Duplicati.Library.Backend.DrimeCloud.csproj",
+      "..\\Backend\\Filejump\\Duplicati.Library.Backend.Filejump.csproj",
+      "..\\Backend\\Filen\\Duplicati.Library.Backend.Filen.csproj",
+      "..\\Backend\\AzureBlob\\Duplicati.Library.Backend.AzureBlob.csproj",
+      "..\\Backend\\Backblaze\\Duplicati.Library.Backend.Backblaze.csproj",
+      "..\\Backend\\Box\\Duplicati.Library.Backend.Box.csproj",
+      "..\\Backend\\SMB\\Duplicati.Library.Backend.SMB.csproj",
+      "..\\Backend\\Duplicati\\Duplicati.Library.Backend.Duplicati.csproj",
+      "..\\Backend\\Dropbox\\Duplicati.Library.Backend.Dropbox.csproj",
+      "..\\Backend\\File\\Duplicati.Library.Backend.File.csproj",
+      "..\\Backend\\FTP\\Duplicati.Library.Backend.FTP.csproj",
+      "..\\Backend\\GoogleServices\\Duplicati.Library.Backend.GoogleServices.csproj",
+      "..\\Backend\\Idrivee2\\Duplicati.Library.Backend.Idrivee2.csproj",
+      "..\\Backend\\Jottacloud\\Duplicati.Library.Backend.Jottacloud.csproj",
+      "..\\Backend\\Mega\\Duplicati.Library.Backend.Mega.csproj",
+      "..\\Backend\\MovistarCloud\\Duplicati.Library.Backend.MovistarCloud.csproj",
+      "..\\Backend\\OneDrive\\Duplicati.Library.Backend.OneDrive.csproj",
+      "..\\Backend\\OpenStack\\Duplicati.Library.Backend.OpenStack.csproj",
+      "..\\Backend\\pCloud\\Duplicati.Library.Backend.pCloud.csproj",
+      "..\\Backend\\Rclone\\Duplicati.Library.Backend.Rclone.csproj",
+      "..\\Backend\\S3\\Duplicati.Library.Backend.S3.csproj",
+      "..\\Backend\\SharePoint\\Duplicati.Library.Backend.SharePoint.csproj",
+      "..\\Backend\\SSHv2\\Duplicati.Library.Backend.SSHv2.csproj",
+      "..\\Backend\\Storj\\Duplicati.Library.Backend.Storj.csproj",
+      "..\\Backend\\TahoeLAFS\\Duplicati.Library.Backend.TahoeLAFS.csproj",
+      "..\\Backend\\TencentCOS\\Duplicati.Library.Backend.TencentCOS.csproj",
+      "..\\Backend\\WEBDAV\\Duplicati.Library.Backend.WEBDAV.csproj",
+      "..\\Backend\\AliyunOSS\\Duplicati.Library.Backend.AliyunOSS.csproj",
+      "../../../proprietary/LoaderHelper/Duplicati.Proprietary.LoaderHelper.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Duplicati/Library/Certificates/Duplicati.Library.Certificates.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\AutoUpdater\\Duplicati.Library.AutoUpdater.csproj",
+      "..\\Common\\Duplicati.Library.Common.csproj",
+      "..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\Logging\\Duplicati.Library.Logging.csproj"
+    ],
+    "packages": [
+      {
+        "name": "SharpAESCrypt",
+        "version": "3.0.0"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/Common/Duplicati.Library.Common.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\Logging\\Duplicati.Library.Logging.csproj"
+    ],
+    "packages": [
+      {
+        "name": "Newtonsoft.Json",
+        "version": "13.0.4"
+      },
+      {
+        "name": "System.IO.FileSystem.AccessControl",
+        "version": "5.0.0"
+      },
+      {
+        "name": "Mono.Unix",
+        "version": "7.1.0-final.1.21458.1"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/Compression/Duplicati.Library.Compression.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\Logging\\Duplicati.Library.Logging.csproj"
+    ],
+    "packages": [
+      {
+        "name": "sharpcompress",
+        "version": "0.50.4"
+      },
+      {
+        "name": "ZstdSharp.Port",
+        "version": "0.8.8"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/Crashlog/Duplicati.Library.Crashlog.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [],
+    "packages": []
+  },
+  {
+    "path": "Duplicati/Library/DynamicLoader/Duplicati.Library.DynamicLoader.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\Logging\\Duplicati.Library.Logging.csproj",
+      "..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\Compression\\Duplicati.Library.Compression.csproj",
+      "..\\Backends\\Duplicati.Library.Backends.csproj",
+      "..\\Encryption\\Duplicati.Library.Encryption.csproj",
+      "..\\Parity\\Duplicati.Library.Parity.csproj",
+      "..\\AutoUpdater\\Duplicati.Library.AutoUpdater.csproj",
+      "..\\SecretProvider\\Duplicati.Library.SecretProvider.csproj",
+      "..\\SourceProviders\\Duplicati.Library.SourceProviders.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Duplicati/Library/Encryption/Duplicati.Library.Encryption.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\Utility\\Duplicati.Library.Utility.csproj"
+    ],
+    "packages": [
+      {
+        "name": "SharpAESCrypt",
+        "version": "3.0.0"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/Interface/Duplicati.Library.Interface.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\PackageRef\\Duplicati.PackageRef.csproj",
+      "..\\Localization\\Duplicati.Library.Localization.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Duplicati/Library/Localization/Duplicati.Library.Localization.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\Logging\\Duplicati.Library.Logging.csproj"
+    ],
+    "packages": [
+      {
+        "name": "NGettext",
+        "version": "0.6.7"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/Logging/Duplicati.Library.Logging.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [],
+    "packages": []
+  },
+  {
+    "path": "Duplicati/Library/Main/Duplicati.Library.Main.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\License\\Duplicati.License.csproj",
+      "..\\Compression\\Duplicati.Library.Compression.csproj",
+      "..\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\DynamicLoader\\Duplicati.Library.DynamicLoader.csproj",
+      "..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\Logging\\Duplicati.Library.Logging.csproj",
+      "..\\Snapshots\\Duplicati.Library.Snapshots.csproj",
+      "..\\SQLiteHelper\\Duplicati.Library.SQLiteHelper.csproj",
+      "..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\UsageReporter\\Duplicati.Library.UsageReporter.csproj",
+      "..\\ResultSerialization\\Duplicati.Library.ResultSerialization.csproj",
+      "..\\SourceProvider\\Builtin\\Duplicati.Library.SourceProvider.Builtin.csproj"
+    ],
+    "packages": [
+      {
+        "name": "Microsoft.CodeAnalysis.BannedApiAnalyzers",
+        "version": "4.14.0"
+      },
+      {
+        "name": "CoCoL",
+        "version": "1.8.4"
+      },
+      {
+        "name": "Newtonsoft.Json",
+        "version": "13.0.4"
+      },
+      {
+        "name": "StreamJsonRpc",
+        "version": "2.25.29"
+      },
+      {
+        "name": "System.CommandLine",
+        "version": "2.0.0"
+      },
+      {
+        "name": "Tmds.DBus.Protocol",
+        "version": "0.94.1"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/Modules/Builtin/Duplicati.Library.Modules.Builtin.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Logging\\Duplicati.Library.Logging.csproj",
+      "..\\..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Snapshots\\Duplicati.Library.Snapshots.csproj",
+      "..\\..\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\ResultSerialization\\Duplicati.Library.ResultSerialization.csproj",
+      "..\\..\\Backend\\OAuthHelper\\Duplicati.Library.OAuthHelper.csproj"
+    ],
+    "packages": [
+      {
+        "name": "System.Drawing.Common",
+        "version": "10.0.0"
+      },
+      {
+        "name": "Artalk.Xmpp",
+        "version": "1.0.5"
+      },
+      {
+        "name": "DnsClient",
+        "version": "1.8.0"
+      },
+      {
+        "name": "Handlebars.Net",
+        "version": "2.4.3"
+      },
+      {
+        "name": "Newtonsoft.Json",
+        "version": "13.0.4"
+      },
+      {
+        "name": "MailKit",
+        "version": "4.17.0"
+      },
+      {
+        "name": "MimeKit",
+        "version": "4.17.0"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/Parity/Duplicati.Library.Parity.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\Utility\\Duplicati.Library.Utility.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Duplicati/Library/RemoteControl/Duplicati.Library.RemoteControl.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\Logging\\Duplicati.Library.Logging.csproj",
+      "..\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\Encryption\\Duplicati.Library.Encryption.csproj",
+      "..\\Main\\Duplicati.Library.Main.csproj"
+    ],
+    "packages": [
+      {
+        "name": "jose-jwt",
+        "version": "5.3.0"
+      },
+      {
+        "name": "Websocket.Client",
+        "version": "5.5.0"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/RestAPI/Duplicati.Library.RestAPI.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\CommandLine\\CLI\\Duplicati.CommandLine.csproj",
+      "..\\Common\\Duplicati.Library.Common.csproj",
+      "..\\Encryption\\Duplicati.Library.Encryption.csproj",
+      "..\\Main\\Duplicati.Library.Main.csproj",
+      "..\\Snapshots\\Duplicati.Library.Snapshots.csproj",
+      "..\\SQLiteHelper\\Duplicati.Library.SQLiteHelper.csproj",
+      "..\\..\\Server\\Duplicati.Server.Serialization\\Duplicati.Server.Serialization.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Duplicati/Library/ResultSerialization/Duplicati.Library.ResultSerialization.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\Utility\\Duplicati.Library.Utility.csproj"
+    ],
+    "packages": [
+      {
+        "name": "Newtonsoft.Json",
+        "version": "13.0.4"
+      },
+      {
+        "name": "Handlebars.Net",
+        "version": "2.4.3"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/SQLiteHelper/Duplicati.Library.SQLiteHelper.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\Logging\\Duplicati.Library.Logging.csproj",
+      "..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\Localization\\Duplicati.Library.Localization.csproj"
+    ],
+    "packages": [
+      {
+        "name": "Microsoft.Data.Sqlite",
+        "version": "10.0.10"
+      },
+      {
+        "name": "SQLitePCLRaw.bundle_e_sqlite3",
+        "version": "3.0.5"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/SecretProvider/Duplicati.Library.SecretProvider.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\Utility\\Duplicati.Library.Utility.csproj"
+    ],
+    "packages": [
+      {
+        "name": "AWSSDK.SecretsManager.Caching",
+        "version": "2.0.0"
+      },
+      {
+        "name": "AWSSDK.SecretsManager",
+        "version": "4.0.100.3"
+      },
+      {
+        "name": "AWSSDK.Core",
+        "version": "4.0.100.5"
+      },
+      {
+        "name": "Azure.Identity",
+        "version": "1.21.0"
+      },
+      {
+        "name": "Azure.Security.KeyVault.Secrets",
+        "version": "4.11.0"
+      },
+      {
+        "name": "Azure.Core",
+        "version": "1.55.0"
+      },
+      {
+        "name": "Google.Apis.Auth",
+        "version": "1.75.0"
+      },
+      {
+        "name": "Google.Cloud.SecretManager.V1",
+        "version": "2.6.0"
+      },
+      {
+        "name": "SharpAESCrypt",
+        "version": "3.0.0"
+      },
+      {
+        "name": "VaultSharp",
+        "version": "1.17.5.1"
+      },
+      {
+        "name": "Meziantou.Framework.Win32.CredentialManager",
+        "version": "1.7.4"
+      },
+      {
+        "name": "Tmds.DBus.Protocol",
+        "version": "0.94.1"
+      },
+      {
+        "name": "System.Security.Cryptography.Pkcs",
+        "version": "10.0.0"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/Snapshots/Duplicati.Library.Snapshots.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\AutoUpdater\\Duplicati.Library.AutoUpdater.csproj",
+      "..\\Common\\Duplicati.Library.Common.csproj",
+      "..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\Logging\\Duplicati.Library.Logging.csproj",
+      "..\\Utility\\Duplicati.Library.Utility.csproj"
+    ],
+    "packages": [
+      {
+        "name": "Newtonsoft.Json",
+        "version": "13.0.4"
+      },
+      {
+        "name": "Microsoft.Management.Infrastructure",
+        "version": "3.0.0"
+      },
+      {
+        "name": "Microsoft.Win32.SystemEvents",
+        "version": "10.0.0"
+      },
+      {
+        "name": "AlphaVSS",
+        "version": "2.0.3"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/SourceProvider/Builtin/Duplicati.Library.SourceProvider.Builtin.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\..\\Snapshots\\Duplicati.Library.Snapshots.csproj"
+    ],
+    "packages": [
+      {
+        "name": "System.IO.Pipelines",
+        "version": "10.0.0"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/SourceProviders/Duplicati.Library.SourceProviders.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "../Utility/Duplicati.Library.Utility.csproj",
+      "../../../proprietary/LoaderHelper/Duplicati.Proprietary.LoaderHelper.csproj",
+      "../Interface/Duplicati.Library.Interface.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Duplicati/Library/UsageReporter/Duplicati.Library.UsageReporter.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\AutoUpdater\\Duplicati.Library.AutoUpdater.csproj",
+      "..\\Logging\\Duplicati.Library.Logging.csproj",
+      "..\\Utility\\Duplicati.Library.Utility.csproj"
+    ],
+    "packages": [
+      {
+        "name": "CoCoL",
+        "version": "1.8.4"
+      },
+      {
+        "name": "Newtonsoft.Json",
+        "version": "13.0.4"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/Utility/Duplicati.Library.Utility.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\Common\\Duplicati.Library.Common.csproj",
+      "..\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\Localization\\Duplicati.Library.Localization.csproj"
+    ],
+    "packages": [
+      {
+        "name": "Duplicati.StreamUtil",
+        "version": "1.0.5"
+      },
+      {
+        "name": "Microsoft.Extensions.Http",
+        "version": "10.0.11"
+      },
+      {
+        "name": "Microsoft.Management.Infrastructure",
+        "version": "3.0.0"
+      },
+      {
+        "name": "System.CommandLine",
+        "version": "2.0.0"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Library/WindowsModules/Duplicati.Library.WindowsModules.csproj",
+    "targets": [
+      "net10.0-windows10.0.17763.0"
+    ],
+    "references": [
+      "..\\Interface\\Duplicati.Library.Interface.csproj"
+    ],
+    "packages": [
+      {
+        "name": "Microsoft.Management.Infrastructure",
+        "version": "3.0.0"
+      },
+      {
+        "name": "Microsoft.Toolkit.Uwp.Notifications",
+        "version": "7.1.3"
+      },
+      {
+        "name": "System.Drawing.Common",
+        "version": "10.0.0"
+      },
+      {
+        "name": "Vanara.PInvoke.VssApi",
+        "version": "5.0.7"
+      },
+      {
+        "name": "Vanara.PInvoke.Kernel32",
+        "version": "5.0.7"
+      },
+      {
+        "name": "Vanara.PInvoke.Security",
+        "version": "5.0.7"
+      },
+      {
+        "name": "Vanara.PInvoke.User32",
+        "version": "5.0.7"
+      },
+      {
+        "name": "Vanara.Security",
+        "version": "5.0.7"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/License/Duplicati.License.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\Library\\Common\\Duplicati.Library.Common.csproj",
+      "..\\Library\\Utility\\Duplicati.Library.Utility.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Duplicati/PackageRef/Duplicati.PackageRef.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [],
+    "packages": [
+      {
+        "name": "Microsoft.Extensions.Caching.Memory",
+        "version": "10.0.11"
+      },
+      {
+        "name": "Microsoft.Extensions.Logging.Abstractions",
+        "version": "10.0.11"
+      },
+      {
+        "name": "Microsoft.IdentityModel.Abstractions",
+        "version": "8.22.0"
+      },
+      {
+        "name": "BouncyCastle.Cryptography",
+        "version": "2.7.0"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Server/Duplicati.Server.Serialization/Duplicati.Server.Serialization.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Library\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Library\\Utility\\Duplicati.Library.Utility.csproj"
+    ],
+    "packages": [
+      {
+        "name": "Newtonsoft.Json",
+        "version": "13.0.4"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Server/Duplicati.Server.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\Library\\RestAPI\\Duplicati.Library.RestAPI.csproj",
+      "..\\CommandLine\\BackendTester\\Duplicati.CommandLine.BackendTester.csproj",
+      "..\\CommandLine\\CLI\\Duplicati.CommandLine.csproj",
+      "..\\Library\\Backend\\OAuthHelper\\Duplicati.Library.OAuthHelper.csproj",
+      "..\\Library\\DynamicLoader\\Duplicati.Library.DynamicLoader.csproj",
+      "..\\Library\\Encryption\\Duplicati.Library.Encryption.csproj",
+      "..\\Library\\Logging\\Duplicati.Library.Logging.csproj",
+      "..\\Library\\Main\\Duplicati.Library.Main.csproj",
+      "..\\Library\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\License\\Duplicati.License.csproj",
+      "..\\WebserverCore\\Duplicati.WebserverCore.csproj",
+      "Duplicati.Server.Serialization\\Duplicati.Server.Serialization.csproj",
+      "..\\CommandLine\\BackendTool\\Duplicati.CommandLine.BackendTool.csproj",
+      "..\\Library\\SQLiteHelper\\Duplicati.Library.SQLiteHelper.csproj",
+      "..\\Library\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\CommandLine\\RecoveryTool\\Duplicati.CommandLine.RecoveryTool.csproj",
+      "..\\Library\\UsageReporter\\Duplicati.Library.UsageReporter.csproj",
+      "..\\Tools\\Duplicati.Tools.csproj",
+      "..\\Library\\Crashlog\\Duplicati.Library.Crashlog.csproj",
+      "..\\Library\\Certificates\\Duplicati.Library.Certificates.csproj"
+    ],
+    "packages": [
+      {
+        "name": "Microsoft.Win32.SystemEvents",
+        "version": "10.0.0"
+      },
+      {
+        "name": "System.Diagnostics.EventLog",
+        "version": "10.0.0"
+      },
+      {
+        "name": "Newtonsoft.Json",
+        "version": "13.0.4"
+      },
+      {
+        "name": "System.Drawing.Common",
+        "version": "10.0.0"
+      },
+      {
+        "name": "System.Security.Principal.Windows",
+        "version": "5.0.0"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/Service/Duplicati.Service.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\Library\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\Server\\Duplicati.Server.csproj",
+      "..\\Agent\\Duplicati.Agent.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Duplicati/ShellExtension/Duplicati.ShellExtension.csproj",
+    "targets": [
+      "net10.0-windows7.0"
+    ],
+    "references": [],
+    "packages": []
+  },
+  {
+    "path": "Duplicati/Tools/Duplicati.Tools.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [],
+    "packages": []
+  },
+  {
+    "path": "Duplicati/UnitTest/Duplicati.UnitTest.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "../CommandLine/DatabaseTool/Duplicati.CommandLine.DatabaseTool.csproj",
+      "..\\CommandLine\\ServerUtil\\Duplicati.CommandLine.ServerUtil.csproj",
+      "..\\CommandLine\\BackendTester\\Duplicati.CommandLine.BackendTester.csproj",
+      "..\\CommandLine\\CLI\\Duplicati.CommandLine.csproj",
+      "..\\Library\\Backend\\OAuthHelper\\Duplicati.Library.OAuthHelper.csproj",
+      "..\\Library\\Compression\\Duplicati.Library.Compression.csproj",
+      "..\\Library\\DynamicLoader\\Duplicati.Library.DynamicLoader.csproj",
+      "..\\Library\\Logging\\Duplicati.Library.Logging.csproj",
+      "..\\Library\\Main\\Duplicati.Library.Main.csproj",
+      "..\\Library\\Parity\\Duplicati.Library.Parity.csproj",
+      "..\\Library\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\License\\Duplicati.License.csproj",
+      "..\\Server\\Duplicati.Server.Serialization\\Duplicati.Server.Serialization.csproj",
+      "..\\Server\\Duplicati.Server.csproj",
+      "..\\CommandLine\\BackendTool\\Duplicati.CommandLine.BackendTool.csproj",
+      "..\\Library\\Snapshots\\Duplicati.Library.Snapshots.csproj",
+      "..\\Library\\SQLiteHelper\\Duplicati.Library.SQLiteHelper.csproj",
+      "..\\Library\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\Library\\AutoUpdater\\Duplicati.Library.AutoUpdater.csproj",
+      "..\\CommandLine\\RecoveryTool\\Duplicati.CommandLine.RecoveryTool.csproj",
+      "..\\Library\\UsageReporter\\Duplicati.Library.UsageReporter.csproj",
+      "..\\Tools\\Duplicati.Tools.csproj",
+      "..\\..\\Tools\\RemoteSynchronization\\RemoteSynchronization.csproj",
+      "..\\..\\proprietary\\DiskImage\\Duplicati.Proprietary.DiskImage.csproj",
+      "..\\WebserverCore\\Duplicati.WebserverCore.csproj",
+      "..\\Library\\Certificates\\Duplicati.Library.Certificates.csproj",
+      "..\\GUI\\Duplicati.GUI.TrayIcon\\Duplicati.GUI.TrayIcon.csproj"
+    ],
+    "packages": [
+      {
+        "name": "coverlet.collector",
+        "version": "6.0.4"
+      },
+      {
+        "name": "nunit",
+        "version": "4.3.2"
+      },
+      {
+        "name": "NUnit3TestAdapter",
+        "version": "5.0.0"
+      },
+      {
+        "name": "Microsoft.NET.Test.Sdk",
+        "version": "17.14.1"
+      },
+      {
+        "name": "Testcontainers",
+        "version": "3.4.0"
+      },
+      {
+        "name": "TestContainers.Container.Abstractions",
+        "version": "1.5.4"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/WebserverCore/Duplicati.WebserverCore.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\Library\\RestAPI\\Duplicati.Library.RestAPI.csproj",
+      "..\\Library\\RemoteControl\\Duplicati.Library.RemoteControl.csproj"
+    ],
+    "packages": [
+      {
+        "name": "Microsoft.AspNetCore.HostFiltering",
+        "version": "2.3.0"
+      },
+      {
+        "name": "Microsoft.AspNetCore.Authentication.JwtBearer",
+        "version": "10.0.10"
+      },
+      {
+        "name": "Microsoft.IdentityModel.Tokens",
+        "version": "8.22.0"
+      },
+      {
+        "name": "System.IdentityModel.Tokens.Jwt",
+        "version": "8.22.0"
+      },
+      {
+        "name": "Swashbuckle.AspNetCore",
+        "version": "10.2.3"
+      }
+    ]
+  },
+  {
+    "path": "Duplicati/WindowsService/Duplicati.WindowsService.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\Library\\AutoUpdater\\Duplicati.Library.AutoUpdater.csproj",
+      "..\\Library\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\Server\\Duplicati.Server.csproj",
+      "..\\Agent\\Duplicati.Agent.csproj"
+    ],
+    "packages": [
+      {
+        "name": "System.ServiceProcess.ServiceController",
+        "version": "10.0.0"
+      }
+    ]
+  },
+  {
+    "path": "Executables/Duplicati.Agent/Duplicati.Agent.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "../../Duplicati/Agent/Duplicati.Agent.csproj",
+      "../../Duplicati/Library/Crashlog/Duplicati.Library.Crashlog.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Executables/Duplicati.CommandLine/Duplicati.CommandLine.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Duplicati\\CommandLine\\CLI\\Duplicati.CommandLine.csproj",
+      "..\\..\\Duplicati\\Library\\Crashlog\\Duplicati.Library.Crashlog.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Executables/Duplicati.CommandLine.AutoTuneTool/Duplicati.CommandLine.AutoTuneTool.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Tools\\AutoTune\\AutoTune.csproj",
+      "..\\..\\Duplicati\\Library\\Crashlog\\Duplicati.Library.Crashlog.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Executables/Duplicati.CommandLine.AutoUpdater/Duplicati.CommandLine.AutoUpdater.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Duplicati\\Library\\AutoUpdater\\Duplicati.Library.AutoUpdater.csproj",
+      "..\\..\\Duplicati\\Library\\Crashlog\\Duplicati.Library.Crashlog.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Executables/Duplicati.CommandLine.BackendTester/Duplicati.CommandLine.BackendTester.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Duplicati\\CommandLine\\BackendTester\\Duplicati.CommandLine.BackendTester.csproj",
+      "..\\..\\Duplicati\\Library\\Crashlog\\Duplicati.Library.Crashlog.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Executables/Duplicati.CommandLine.BackendTool/Duplicati.CommandLine.BackendTool.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Duplicati\\CommandLine\\BackendTool\\Duplicati.CommandLine.BackendTool.csproj",
+      "..\\..\\Duplicati\\Library\\Crashlog\\Duplicati.Library.Crashlog.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Executables/Duplicati.CommandLine.ConfigureTool/Duplicati.CommandLine.ConfigureTool.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Duplicati\\CommandLine\\ConfigureTool\\Duplicati.CommandLine.ConfigureTool.csproj",
+      "..\\..\\Duplicati\\Library\\Crashlog\\Duplicati.Library.Crashlog.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Executables/Duplicati.CommandLine.DatabaseTool/Duplicati.CommandLine.DatabaseTool.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Duplicati\\Library\\Crashlog\\Duplicati.Library.Crashlog.csproj",
+      "..\\..\\Duplicati\\CommandLine\\DatabaseTool\\Duplicati.CommandLine.DatabaseTool.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Executables/Duplicati.CommandLine.RecoveryTool/Duplicati.CommandLine.RecoveryTool.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Duplicati\\CommandLine\\RecoveryTool\\Duplicati.CommandLine.RecoveryTool.csproj",
+      "..\\..\\Duplicati\\Library\\Crashlog\\Duplicati.Library.Crashlog.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Executables/Duplicati.CommandLine.SecretTool/Duplicati.CommandLine.SecretTool.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Duplicati\\CommandLine\\SecretTool\\Duplicati.CommandLine.SecretTool.csproj",
+      "..\\..\\Duplicati\\Library\\Crashlog\\Duplicati.Library.Crashlog.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Executables/Duplicati.CommandLine.ServerUtil/Duplicati.CommandLine.ServerUtil.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Duplicati\\CommandLine\\ServerUtil\\Duplicati.CommandLine.ServerUtil.csproj",
+      "..\\..\\Duplicati\\Library\\Crashlog\\Duplicati.Library.Crashlog.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Executables/Duplicati.CommandLine.SharpAESCrypt/Duplicati.CommandLine.SharpAESCrypt.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Duplicati\\Library\\Encryption\\Duplicati.Library.Encryption.csproj",
+      "..\\..\\Duplicati\\Library\\Crashlog\\Duplicati.Library.Crashlog.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Executables/Duplicati.CommandLine.Snapshots/Duplicati.CommandLine.Snapshots.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Duplicati\\Library\\Snapshots\\Duplicati.Library.Snapshots.csproj",
+      "..\\..\\Duplicati\\Library\\Crashlog\\Duplicati.Library.Crashlog.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Executables/Duplicati.CommandLine.SourceTool/Duplicati.CommandLine.SourceTool.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Duplicati\\Library\\Crashlog\\Duplicati.Library.Crashlog.csproj",
+      "..\\..\\Duplicati\\CommandLine\\SourceTool\\Duplicati.CommandLine.SourceTool.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Executables/Duplicati.CommandLine.SyncTool/Duplicati.CommandLine.SyncTool.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Duplicati\\Library\\Crashlog\\Duplicati.Library.Crashlog.csproj",
+      "..\\..\\Tools\\RemoteSynchronization\\RemoteSynchronization.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Executables/Duplicati.GUI.TrayIcon/Duplicati.GUI.TrayIcon.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Duplicati\\GUI\\Duplicati.GUI.TrayIcon\\Duplicati.GUI.TrayIcon.csproj",
+      "..\\..\\Duplicati\\Library\\Crashlog\\Duplicati.Library.Crashlog.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Executables/Duplicati.Server/Duplicati.Server.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Duplicati\\Server\\Duplicati.Server.csproj",
+      "..\\..\\Duplicati\\Library\\Crashlog\\Duplicati.Library.Crashlog.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Executables/Duplicati.Service/Duplicati.Service.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Duplicati\\Service\\Duplicati.Service.csproj",
+      "..\\..\\Duplicati\\Library\\Crashlog\\Duplicati.Library.Crashlog.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Executables/Duplicati.WindowsModulesLoader/Duplicati.WindowsModulesLoader.csproj",
+    "targets": [
+      "net10.0-windows10.0.17763.0"
+    ],
+    "references": [
+      "..\\..\\Duplicati\\Library\\WindowsModules\\Duplicati.Library.WindowsModules.csproj",
+      "..\\..\\Duplicati\\Library\\Snapshots\\Duplicati.Library.Snapshots.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Executables/Duplicati.WindowsService/Duplicati.WindowsService.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Duplicati\\WindowsService\\Duplicati.WindowsService.csproj",
+      "..\\..\\Duplicati\\Library\\Crashlog\\Duplicati.Library.Crashlog.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "LiveTests/Duplicati.Backend.Tests/Duplicati.Backend.Tests.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Duplicati\\CommandLine\\BackendTester\\Duplicati.CommandLine.BackendTester.csproj"
+    ],
+    "packages": [
+      {
+        "name": "Microsoft.Extensions.Logging",
+        "version": "10.0.11"
+      },
+      {
+        "name": "Microsoft.Extensions.Logging.Console",
+        "version": "10.0.0"
+      },
+      {
+        "name": "Microsoft.NET.Test.Sdk",
+        "version": "17.3.2"
+      },
+      {
+        "name": "MSTest.TestAdapter",
+        "version": "2.2.10"
+      },
+      {
+        "name": "MSTest.TestFramework",
+        "version": "2.2.10"
+      },
+      {
+        "name": "Testcontainers",
+        "version": "3.4.0"
+      },
+      {
+        "name": "TestContainers.Container.Abstractions",
+        "version": "1.5.4"
+      }
+    ]
+  },
+  {
+    "path": "ReleaseBuilder/ReleaseBuilder.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\Duplicati\\Library\\AutoUpdater\\Duplicati.Library.AutoUpdater.csproj"
+    ],
+    "packages": [
+      {
+        "name": "AWSSDK.Core",
+        "version": "4.0.100.5"
+      },
+      {
+        "name": "AWSSDK.S3",
+        "version": "4.0.100.3"
+      },
+      {
+        "name": "SharpAESCrypt",
+        "version": "2.0.3"
+      },
+      {
+        "name": "System.CommandLine",
+        "version": "2.0.0"
+      }
+    ]
+  },
+  {
+    "path": "Tools/AutoTune/AutoTune.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Duplicati\\Library\\Main\\Duplicati.Library.Main.csproj",
+      "..\\TestDataGenerator\\TestDataGenerator.csproj"
+    ],
+    "packages": [
+      {
+        "name": "System.CommandLine",
+        "version": "2.0.0"
+      }
+    ]
+  },
+  {
+    "path": "Tools/RemoteSynchronization/RemoteSynchronization.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Duplicati\\Library\\Main\\Duplicati.Library.Main.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "Tools/TestDataGenerator/TestDataGenerator.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [],
+    "packages": [
+      {
+        "name": "System.CommandLine",
+        "version": "2.0.0"
+      }
+    ]
+  },
+  {
+    "path": "Tools/ZipFileDebugger/ZipFileDebugger.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Duplicati\\Library\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Duplicati\\Library\\Compression\\Duplicati.Library.Compression.csproj",
+      "..\\..\\Duplicati\\Library\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\..\\Duplicati\\Library\\Logging\\Duplicati.Library.Logging.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "WebserverCore.Client.UsageExample/WebserverCore.Client.UsageExample.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\Duplicati\\WebserverCore\\Duplicati.WebserverCore.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "proprietary/DiskImage/Duplicati.Proprietary.DiskImage.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "..\\..\\Duplicati\\Library\\Interface\\Duplicati.Library.Interface.csproj",
+      "..\\..\\Duplicati\\Library\\Common\\Duplicati.Library.Common.csproj",
+      "..\\..\\Duplicati\\Library\\Utility\\Duplicati.Library.Utility.csproj",
+      "..\\..\\Duplicati\\Library\\Localization\\Duplicati.Library.Localization.csproj",
+      "..\\..\\Duplicati\\Library\\Logging\\Duplicati.Library.Logging.csproj",
+      "..\\..\\Duplicati\\Library\\Snapshots\\Duplicati.Library.Snapshots.csproj"
+    ],
+    "packages": [
+      {
+        "name": "Vanara.PInvoke.Kernel32",
+        "version": "5.0.7"
+      }
+    ]
+  },
+  {
+    "path": "proprietary/GoogleWorkspace/Duplicati.Proprietary.GoogleWorkspace.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "../../Duplicati/Library/AutoUpdater/Duplicati.Library.AutoUpdater.csproj",
+      "../../Duplicati/Library/Utility/Duplicati.Library.Utility.csproj",
+      "../LicenseChecker/Duplicati.Proprietary.LicenseChecker.csproj"
+    ],
+    "packages": [
+      {
+        "name": "Google.Apis.Gmail.v1",
+        "version": "1.68.0.3427"
+      },
+      {
+        "name": "Google.Apis.Admin.Directory.directory_v1",
+        "version": "1.68.0.3428"
+      },
+      {
+        "name": "Google.Apis.Calendar.v3",
+        "version": "1.68.0.3430"
+      },
+      {
+        "name": "Google.Apis.Drive.v3",
+        "version": "1.68.0.3428"
+      },
+      {
+        "name": "Google.Apis.PeopleService.v1",
+        "version": "1.69.0.3785"
+      },
+      {
+        "name": "Google.Apis.Tasks.v1",
+        "version": "1.68.0.3435"
+      },
+      {
+        "name": "Google.Apis.Keep.v1",
+        "version": "1.69.0.3729"
+      },
+      {
+        "name": "Google.Apis.GroupsSettings.v1",
+        "version": "1.68.0.2366"
+      },
+      {
+        "name": "Google.Apis.HangoutsChat.v1",
+        "version": "1.68.0.3393"
+      },
+      {
+        "name": "Google.Apis.Auth",
+        "version": "1.75.0"
+      }
+    ]
+  },
+  {
+    "path": "proprietary/LicenseChecker/Duplicati.Proprietary.LicenseChecker.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "../../Duplicati/Library/AutoUpdater/Duplicati.Library.AutoUpdater.csproj",
+      "../../Duplicati/Library/Utility/Duplicati.Library.Utility.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "proprietary/LoaderHelper/Duplicati.Proprietary.LoaderHelper.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "../../Duplicati/Library/AutoUpdater/Duplicati.Library.AutoUpdater.csproj",
+      "../../Duplicati/Library/Utility/Duplicati.Library.Utility.csproj",
+      "../LicenseChecker/Duplicati.Proprietary.LicenseChecker.csproj",
+      "../Office365/Duplicati.Proprietary.Office365.csproj",
+      "../GoogleWorkspace/Duplicati.Proprietary.GoogleWorkspace.csproj",
+      "../DiskImage/Duplicati.Proprietary.DiskImage.csproj"
+    ],
+    "packages": []
+  },
+  {
+    "path": "proprietary/Office365/Duplicati.Proprietary.Office365.csproj",
+    "targets": [
+      "net10.0"
+    ],
+    "references": [
+      "../../Duplicati/Library/AutoUpdater/Duplicati.Library.AutoUpdater.csproj",
+      "../../Duplicati/Library/Utility/Duplicati.Library.Utility.csproj",
+      "../LicenseChecker/Duplicati.Proprietary.LicenseChecker.csproj"
+    ],
+    "packages": [
+      {
+        "name": "MimeKit",
+        "version": "4.17.0"
+      },
+      {
+        "name": "jose-jwt",
+        "version": "5.3.0"
+      }
+    ]
+  }
+]

@@ -283,7 +283,9 @@ public class RemoteControllerService(Connection connection, IRemoteControllerHan
         connection.ApplicationSettings.RemoteControlStorageApiKey = string.Empty;
         connection.ApplicationSettings.RemoteControlStorageEndpointUrl = string.Empty;
         connection.ApplicationSettings.ClientLicenseKey = string.Empty;
+#if !DARIATECH_OSS_ONLY
         Duplicati.Proprietary.LicenseChecker.LicenseHelper.SetRemoteClientLicenseKey(null);
+#endif
         // Only the console-enforced confidential or protected information flag is cleared; the operator's own setting survives unregistering
         connection.ApplicationSettings.ReducedReportingSetByConsole = false;
 

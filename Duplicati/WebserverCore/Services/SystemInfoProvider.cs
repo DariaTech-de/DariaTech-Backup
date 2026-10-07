@@ -400,7 +400,9 @@ public class SystemInfoProvider(IApplicationSettings applicationSettings, Connec
             LogLevels = systeminfo.LogLevels,
             SpecialFolders = systeminfo.SpecialFolders,
             APIExtensions = SupportedAPIExtensions
+#if !DARIATECH_OSS_ONLY
                 .Concat(Proprietary.LoaderHelper.Configuration.LicensedAPIExtensions)
+#endif
                 .Where(ext => !disabledAPIExtensions.Contains(ext)).ToArray(),
             APIScopes = APIScopes,
             BrowserLocale = new SystemInfoDto.LocaleDto()
@@ -415,8 +417,16 @@ public class SystemInfoProvider(IApplicationSettings applicationSettings, Connec
             DefaultOAuthURL = AuthIdOptionsHelper.DUPLICATI_OAUTH_SERVICE,
             DefaultOAuthURLv2 = AuthIdOptionsHelper.DUPLICATI_OAUTH_SERVICE_NEW,
             PowerModeProviders = systeminfo.PowerModeProviders,
+#if DARIATECH_OSS_ONLY
+            LocalLicenseStatus = null,
+#else
             LocalLicenseStatus = SystemInfoDto.LicenseStatusDto.Map(Proprietary.LicenseChecker.LicenseHelper.GetLocalLicenseData()),
+#endif
+#if DARIATECH_OSS_ONLY
+            RemoteLicenseStatus = null,
+#else
             RemoteLicenseStatus = SystemInfoDto.LicenseStatusDto.Map(Proprietary.LicenseChecker.LicenseHelper.GetRemoteLicenseData())
+#endif
         };
     }
 }
