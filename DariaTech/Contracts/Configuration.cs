@@ -29,7 +29,7 @@ public static class ConfigurationPolicy
   if(uri.Scheme=="ssh"&&(!d.BackendOptions.TryGetValue("ssh-fingerprint",out var fp)||!Text(fp,200)))return false;
   if(d.BackendOptions.ContainsKey("ssh-keyfile"))return false; // Central configuration cannot read arbitrary private keys from the device.
   if(d.Schedule is {} s&&(s.RepeatHours is <1 or >8760||s.Days is null||s.Days.Length is <1 or >7||s.Days.Any(x=>!Enum.IsDefined(x))||s.Days.Distinct().Count()!=s.Days.Length||s.Start.Year is <2020 or >2100))return false;
-  return true;
+  return System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(d).Length<=80000;
  }
  private static bool PathText(string? s)=>Text(s,1000)&& (s!.StartsWith('/')||Regex.IsMatch(s,@"^[A-Za-z]:[\\/]"));
  private static bool Text(string? s,int max)=>!string.IsNullOrWhiteSpace(s)&&s.Length<=max&&!s.Any(char.IsControl);

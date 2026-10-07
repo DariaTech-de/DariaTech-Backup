@@ -26,6 +26,7 @@ public sealed class PostgresTests
   connection=Environment.GetEnvironmentVariable("DARIATECH_TEST_DATABASE")??throw new InvalidOperationException("DARIATECH_TEST_DATABASE must point to a dedicated PostgreSQL test database");
   directory=Path.Combine(Path.GetTempPath(),"dariatech-tests-"+Guid.NewGuid());Directory.CreateDirectory(directory);
   File.WriteAllText(Path.Combine(directory,"master.key"),Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)));
+  using(var signing=System.Security.Cryptography.ECDsa.Create(System.Security.Cryptography.ECCurve.NamedCurves.nistP256))File.WriteAllText(Path.Combine(directory,"commands.pem"),signing.ExportPkcs8PrivateKeyPem());
   await using var db=Db();await db.Database.MigrateAsync();factory=new TestFactory(connection,directory);
  }
  [SetUp]public void ResetHost(){factory?.Dispose();factory=new TestFactory(connection,directory);}
@@ -161,11 +162,30 @@ public sealed class PostgresTests
   using var forbidden=await foreign.PostAsJsonAsync($"/api/v1/agent/configurations/{job.Id}/receipt",new ConfigurationReceipt(2,"7","Applied"));Assert.That(forbidden.StatusCode,Is.EqualTo(HttpStatusCode.NotFound));
   revision.EncryptedConfiguration="tampered";Assert.ThrowsAsync<InvalidOperationException>(async()=>await db.SaveChangesAsync());
  }
+
+ [Test]public async Task RestoreRequiresIndependentApprovalAndCommandsAreDeviceBound()
+ {
+  var(t,site)=await Customer();using var agent=factory.CreateClient(new(){BaseAddress=new Uri("https://localhost")});
+  using var enrolled=await agent.PostAsJsonAsync("/api/v1/agent/enroll",new EnrollmentRequest(await Token(t,site),"Remote","Windows","0.1.0"));var identity=(await enrolled.Content.ReadFromJsonAsync<EnrollmentResponse>())!;
+  agent.DefaultRequestHeaders.Authorization=new("Bearer",identity.Credential);agent.DefaultRequestHeaders.Add("X-Device-Id",identity.DeviceId.ToString());
+  await using var db=Db();var job=new BackupJob{TenantId=t.Id,DeviceId=identity.DeviceId,LocalId="1",Name="Remote"};db.Jobs.Add(job);await db.SaveChangesAsync();
+  using var admin=await Login(UserRole.SuperAdmin);using var csrf=System.Text.Json.JsonDocument.Parse(await admin.GetStringAsync("/api/v1/management/csrf"));admin.DefaultRequestHeaders.Add("X-CSRF-Token",csrf.RootElement.GetProperty("token").GetString());
+  using var created=await admin.PostAsJsonAsync("/api/v1/management/commands",new CommandInput(job.Id,RemoteAction.Restore,new(DateTimeOffset.UtcNow.AddDays(-1),["C:\\Data\\file"],"recovery-1"),15));Assert.That(created.StatusCode,Is.EqualTo(HttpStatusCode.Created));
+  using var doc=System.Text.Json.JsonDocument.Parse(await created.Content.ReadAsStringAsync());var id=doc.RootElement.GetProperty("id").GetGuid();
+  Assert.That(await agent.GetFromJsonAsync<SignedCommand[]>("/api/v1/agent/commands"),Is.Empty);
+  using var self=await admin.PostAsync($"/api/v1/management/commands/{id}/approve",null);Assert.That(self.StatusCode,Is.EqualTo(HttpStatusCode.Conflict));
+  using var second=await Login(UserRole.Administrator);using var secondCsrf=System.Text.Json.JsonDocument.Parse(await second.GetStringAsync("/api/v1/management/csrf"));second.DefaultRequestHeaders.Add("X-CSRF-Token",secondCsrf.RootElement.GetProperty("token").GetString());using var approved=await second.PostAsync($"/api/v1/management/commands/{id}/approve",null);Assert.That(approved.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  var envelopes=await agent.GetFromJsonAsync<SignedCommand[]>("/api/v1/agent/commands");using var key=System.Security.Cryptography.ECDsa.Create();key.ImportFromPem(File.ReadAllText(Path.Combine(directory,"commands.pem")));var command=CommandProtocol.Verify(envelopes!.Single(),key,identity.DeviceId,DateTimeOffset.UtcNow);Assert.That(command.Id,Is.EqualTo(id));
+  using var receipt=await agent.PostAsJsonAsync($"/api/v1/agent/commands/{id}/receipt",new CommandReceipt("Accepted",19,null));Assert.That(receipt.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  using var complete=await agent.PostAsJsonAsync($"/api/v1/agent/commands/{id}/receipt",new CommandReceipt("Completed",19,null));Assert.That(complete.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  using var replay=await agent.PostAsJsonAsync($"/api/v1/agent/commands/{id}/receipt",new CommandReceipt("Accepted",19,null));Assert.That(replay.StatusCode,Is.EqualTo(HttpStatusCode.Conflict));
+  Assert.That(await db.Audit.CountAsync(x=>x.Resource==id.ToString()),Is.EqualTo(4));
+ }
  private sealed class TestFactory(string cs,string dir):WebApplicationFactory<Program>
  {
   protected override void ConfigureWebHost(IWebHostBuilder b)
   {
-   b.UseEnvironment("Development");b.ConfigureAppConfiguration((_,c)=>c.AddInMemoryCollection(new Dictionary<string,string?>{{"ConnectionStrings:Management",cs},{"Security:MasterKeyFile",Path.Combine(dir,"master.key")},{"Security:KeyDirectory",Path.Combine(dir,"keys")},{"Monitoring:PollSeconds","3600"}}));
+   b.UseEnvironment("Development");b.ConfigureAppConfiguration((_,c)=>c.AddInMemoryCollection(new Dictionary<string,string?>{{"ConnectionStrings:Management",cs},{"Security:MasterKeyFile",Path.Combine(dir,"master.key")},{"Security:KeyDirectory",Path.Combine(dir,"keys")},{"Monitoring:PollSeconds","3600"},{"Commands:SigningKeyFile",Path.Combine(dir,"commands.pem")}}));
   }
  }
 }

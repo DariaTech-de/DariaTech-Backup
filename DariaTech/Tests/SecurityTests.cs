@@ -72,6 +72,18 @@ public sealed class SecurityTests
   Assert.That(ConfigurationPolicy.Valid(d with{TargetUrl="ssh://storage.example/path",BackendOptions=new(){{"ssh-accept-any-fingerprints","true"}}}),Is.False);
   Assert.That(ConfigurationPolicy.Valid(d with{Sources=["relative/path"]}),Is.False);
  }
+ [Test]public void CommandsRejectTamperingWrongDevicesExpiryAndRestoreTraversal()
+ {
+  using var key=ECDsa.Create(ECCurve.NamedCurves.nistP256);var device=Guid.NewGuid();var now=DateTimeOffset.UtcNow;
+  var command=new DeviceCommand(Guid.NewGuid(),Guid.NewGuid(),device,"1",RemoteAction.RunBackup,null,now,now.AddMinutes(5));
+  var signed=CommandProtocol.Sign(command,key);Assert.That(CommandProtocol.Verify(signed,key,device,now),Is.EqualTo(command));
+  Assert.Throws<CryptographicException>(()=>CommandProtocol.Verify(signed,key,Guid.NewGuid(),now));
+  Assert.Throws<CryptographicException>(()=>CommandProtocol.Verify(signed,key,device,now.AddMinutes(6)));
+  var bytes=Convert.FromBase64String(signed.Payload);bytes[^2]^=1;Assert.Throws<CryptographicException>(()=>CommandProtocol.Verify(signed with{Payload=Convert.ToBase64String(bytes)},key,device,now));
+  Assert.That(CommandProtocol.Valid(command with{Action=RemoteAction.Restore,Restore=new(now,["C:\\file"],"../../Windows")},device,now),Is.False);
+  Assert.That(CommandProtocol.Valid(command with{LocalJobId="1/run-script"},device,now),Is.False);
+  Assert.Throws<InvalidOperationException>(()=>DuplicatiAdapter.RestoreDestination(null,"restore-1"));
+ }
  [Test]public void AgentRejectsRemoteEngineAndInsecureConsole()
  {
   Assert.Throws<InvalidOperationException>(()=>new AgentOptions{EngineUrl="https://attacker.example"}.Validate());

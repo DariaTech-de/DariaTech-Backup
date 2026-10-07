@@ -51,6 +51,20 @@ public sealed class EngineIntegrationTests
    Assert.That(await adapter.ApplyConfiguration(assignment,ct.Token),Is.EqualTo(managedId));
    Assert.That(await adapter.ApplyConfiguration(assignment with{Revision=2,Definition=definition with{KeepVersions=90}},ct.Token),Is.EqualTo(managedId));
    var afterManaged=await adapter.ReadJobs(ct.Token);Assert.That(afterManaged.Length,Is.EqualTo(2));Assert.That(afterManaged.Single(x=>x.LocalId==id).LastRun!.Status,Is.EqualTo(RunStatus.Success));
+   var command=new DeviceCommand(Guid.NewGuid(),Guid.NewGuid(),Guid.NewGuid(),id,RemoteAction.RunBackup,null,DateTimeOffset.UtcNow,DateTimeOffset.UtcNow.AddMinutes(5));
+   using var signing=ECDsa.Create(ECCurve.NamedCurves.nistP256);var publicKey=Path.Combine(dir,"commands.pub");File.WriteAllText(publicKey,signing.ExportSubjectPublicKeyInfoPem());
+   state.Write("engine-instance.bin",Guid.NewGuid());
+   options.AllowRemoteCommands=true;options.CommandPublicKeyFile=publicKey;
+   using var fixture=new CommandFixtureHandler(CommandProtocol.Sign(command,signing));using var console=new HttpClient(fixture){BaseAddress=new Uri("https://test-only.invalid")};
+   await RemoteCommands.Synchronize(console,adapter,options,state,command.DeviceId,ct.Token);
+   var remoteTask=fixture.Receipts.Single().TaskId!.Value;await WaitTask(client,remoteTask.ToString(),ct.Token,password,passphrase);
+   var firstRun=(await adapter.ReadJobs(ct.Token)).Single(x=>x.LocalId==id).LastRun!.LocalRunId;
+   await RemoteCommands.Synchronize(console,adapter,options,state,command.DeviceId,ct.Token);
+   Assert.That(fixture.Receipts.Last().Status,Is.EqualTo("Completed"));
+   Assert.That((await adapter.ReadJobs(ct.Token)).Single(x=>x.LocalId==id).LastRun!.LocalRunId,Is.EqualTo(firstRun));
+   var journal=state.Read<Dictionary<Guid,CommandJournalEntry>>("commands.bin")!;
+   journal[command.Id]=journal[command.Id] with{Receipt=new("Accepted",remoteTask,null)};state.Write("commands.bin",journal);state.Write("engine-instance.bin",Guid.NewGuid());
+   await RemoteCommands.Synchronize(console,adapter,options,state,command.DeviceId,ct.Token);Assert.That(fixture.Receipts.Last().Status,Is.EqualTo("Indeterminate"));
    File.Delete(Path.Combine(source,"restore-check.bin"));
    using var restored=await client.PostAsJsonAsync($"/api/v1/backup/{id}/restore",new{paths=new[]{Path.Combine(source,"restore-check.bin")},time="now",restore_path=restore,overwrite=true,permissions=false,skip_metadata=true},ct.Token);restored.EnsureSuccessStatusCode();using var restoreTask=JsonDocument.Parse(await restored.Content.ReadAsStringAsync(ct.Token));await WaitTask(client,DuplicatiAdapter.Get(restoreTask.RootElement,"ID").ToString(),ct.Token,password,passphrase);
    var file=Directory.GetFiles(restore,"restore-check.bin",SearchOption.AllDirectories).Single();Assert.That(await File.ReadAllBytesAsync(file,ct.Token),Is.EqualTo(bytes));
@@ -58,6 +72,15 @@ public sealed class EngineIntegrationTests
   finally
   {
    if(!server.HasExited)server.Kill(true);await server.WaitForExitAsync();await output;await error;Directory.Delete(dir,true);
+  }
+ }
+ private sealed class CommandFixtureHandler(SignedCommand envelope):HttpMessageHandler
+ {
+  public List<CommandReceipt> Receipts {get;}=[];
+  protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct)
+  {
+   if(request.Method==HttpMethod.Post)Receipts.Add((await request.Content!.ReadFromJsonAsync<CommandReceipt>(ct))!);
+   return new(HttpStatusCode.OK){Content=request.Method==HttpMethod.Get?JsonContent.Create(new[]{envelope}):JsonContent.Create(new{})};
   }
  }
  private static async Task WaitTask(HttpClient client,string id,CancellationToken ct,params string[] secrets)

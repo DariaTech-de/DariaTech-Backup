@@ -23,6 +23,7 @@ builder.WebHost.ConfigureKestrel(o=>{o.Limits.MaxRequestBodySize=256*1024;o.AddS
 builder.Services.ConfigureHttpJsonOptions(o=>{o.SerializerOptions.UnmappedMemberHandling=System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow;o.SerializerOptions.RespectNullableAnnotations=true;o.SerializerOptions.RespectRequiredConstructorParameters=true;});
 builder.Services.AddHttpContextAccessor();builder.Services.AddScoped<TenantScope>();
 builder.Services.AddDbContext<ManagementDb>(o=>o.UseNpgsql(builder.Configuration.GetConnectionString("Management")??throw new InvalidOperationException("Management database connection is required")));
+builder.Services.AddSingleton<CommandSigning>();
 builder.Services.AddSingleton<ISecretStore,EncryptedSecretStore>();
 builder.Services.AddDataProtection().SetApplicationName("DariaTech.ManagedBackup").PersistKeysToFileSystem(new DirectoryInfo(builder.Configuration["Security:KeyDirectory"]??"./keys"));
 builder.Services.AddOptions<KeyManagementOptions>().Configure<ISecretStore>((o,s)=>o.XmlEncryptor=new KeyXmlEncryptor(s));
@@ -99,5 +100,5 @@ app.Use(async(c,next)=>
  await next();
 });
 app.MapHealthChecks("/health/ready");app.MapGet("/health/live",()=>Results.Ok(new{status="live"}));
-app.MapConfigurationApi();app.MapManagementApi();app.MapAgentApi();app.MapRazorPages();await app.RunAsync();return 0;
+app.MapCommandApi();app.MapConfigurationApi();app.MapManagementApi();app.MapAgentApi();app.MapRazorPages();await app.RunAsync();return 0;
 public partial class Program { }

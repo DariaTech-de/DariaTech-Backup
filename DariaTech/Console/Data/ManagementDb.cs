@@ -14,6 +14,7 @@ public sealed class ManagementDb(DbContextOptions<ManagementDb> options, TenantS
  public DbSet<NotificationRule> NotificationRules => Set<NotificationRule>();
  public DbSet<ManagedJob> ManagedJobs => Set<ManagedJob>();
  public DbSet<ConfigurationRevision> ConfigurationRevisions => Set<ConfigurationRevision>();
+ public DbSet<RemoteCommand> Commands => Set<RemoteCommand>();
  protected override void OnModelCreating(ModelBuilder b)
  {
   b.Entity<Tenant>().HasQueryFilter(x => scope.Global || x.Id == scope.TenantId);
@@ -46,6 +47,9 @@ public sealed class ManagementDb(DbContextOptions<ManagementDb> options, TenantS
   b.Entity<ManagedJob>().HasOne<Device>().WithMany().HasForeignKey(x=>new{x.TenantId,x.DeviceId}).HasPrincipalKey(x=>new{x.TenantId,x.Id}).OnDelete(DeleteBehavior.Restrict);
   b.Entity<ConfigurationRevision>().HasOne<ManagedJob>().WithMany().HasForeignKey(x=>new{x.TenantId,x.ManagedJobId}).HasPrincipalKey(x=>new{x.TenantId,x.Id}).OnDelete(DeleteBehavior.Restrict);
   b.Entity<ConfigurationRevision>().HasIndex(x=>new{x.ManagedJobId,x.Revision}).IsUnique();
+  b.Entity<RemoteCommand>().HasOne<Device>().WithMany().HasForeignKey(x=>new{x.TenantId,x.DeviceId}).HasPrincipalKey(x=>new{x.TenantId,x.Id}).OnDelete(DeleteBehavior.Restrict);
+  b.Entity<RemoteCommand>().HasOne<BackupJob>().WithMany().HasForeignKey(x=>new{x.TenantId,x.JobId}).HasPrincipalKey(x=>new{x.TenantId,x.Id}).OnDelete(DeleteBehavior.Restrict);
+  b.Entity<RemoteCommand>().HasIndex(x=>new{x.DeviceId,x.Status,x.Expires});
   b.Entity<Role>().HasData(Enum.GetValues<UserRole>().Select(x=>new Role{Id=x,Name=x.ToString()}));
   b.Entity<User>().HasIndex(x=>x.Email).IsUnique();
   b.Entity<User>().Property(x=>x.LastTotpStep).IsConcurrencyToken();
@@ -58,7 +62,7 @@ public sealed class ManagementDb(DbContextOptions<ManagementDb> options, TenantS
    """));
   b.Entity<AuditEvent>().HasQueryFilter(x=>scope.Global || (scope.TenantId != null && x.TenantId == scope.TenantId));
   foreach(var entity in b.Model.GetEntityTypes())
-   foreach(var property in entity.GetProperties().Where(p=>p.ClrType==typeof(string))) property.SetMaxLength(property.Name=="EncryptedConfiguration" ? 120000 : property.Name.Contains("Secret") || property.Name.Contains("Credential") ? 4096 : 1000);
+   foreach(var property in entity.GetProperties().Where(p=>p.ClrType==typeof(string))) property.SetMaxLength(property.Name is "EncryptedConfiguration" or "EncryptedPayload" ? 120000 : property.Name.Contains("Secret") || property.Name.Contains("Credential") ? 4096 : 1000);
  }
  public override int SaveChanges(bool acceptAllChangesOnSuccess) {ValidateScope();return base.SaveChanges(acceptAllChangesOnSuccess);}
  public override Task<int> SaveChangesAsync(CancellationToken ct=default)
