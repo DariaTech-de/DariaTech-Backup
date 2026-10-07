@@ -10,12 +10,24 @@ $env:PSModulePath=Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\Mod
 $brand=Get-Content (Join-Path $InstallDirectory 'product.json') -Raw | ConvertFrom-Json
 $name=$brand.windowsServiceName
 $state=Join-Path $env:ProgramData 'DariaTechBackup'
+function Test-TrustedState {
+ if(!(Test-Path $state)){return $false}
+ if((Get-Item $state).Attributes -band [IO.FileAttributes]::ReparsePoint){return $false}
+ $existing=Get-Acl $state
+ $owner=$existing.GetOwner([Security.Principal.SecurityIdentifier]).Value
+ $trustedOwners=@('S-1-5-18','S-1-5-32-544',[Security.Principal.WindowsIdentity]::GetCurrent().User.Value)
+ if($owner -notin $trustedOwners -or !$existing.AreAccessRulesProtected){return $false}
+ foreach($rule in $existing.Access) {
+  if($rule.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value -notin $trustedOwners){return $false}
+ }
+ return $true
+}
 try {
 if ($Action -eq 'Remove') {
  $service=Get-Service $name -ErrorAction SilentlyContinue
  if ($service) { Stop-Service $name -Force; & sc.exe delete $name | Out-Null; if ($LASTEXITCODE) { throw 'Service removal failed' } }
  # Keep backup databases and DPAPI identity. Reinstallation must use the same machine/SYSTEM identity.
- Remove-Item (Join-Path $state 'enrollment-token.txt'),(Join-Path $state 'engine-password.txt') -Force -ErrorAction SilentlyContinue
+ if(Test-TrustedState){Remove-Item (Join-Path $state 'enrollment-token.txt'),(Join-Path $state 'engine-password.txt') -Force -ErrorAction SilentlyContinue}
  exit 0
 }
 if ($Action -eq 'Prepare') {
@@ -29,14 +41,7 @@ if ($Action -eq 'Prepare') {
   if ($old.Agent.ConsoleUrl.TrimEnd('/') -ne $uri.AbsoluteUri.TrimEnd('/')) { throw 'An enrolled agent cannot change Console origin during upgrade. Re-enrollment requires explicit device revocation and local state reset.' }
  }
  if(Test-Path $state) {
-  if((Get-Item $state).Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'Agent state directory must not be a junction or symbolic link'}
-  $existing=Get-Acl $state
-  $owner=$existing.GetOwner([Security.Principal.SecurityIdentifier]).Value
-  $trustedOwners=@('S-1-5-18','S-1-5-32-544',[Security.Principal.WindowsIdentity]::GetCurrent().User.Value)
-  if($owner -notin $trustedOwners -or !$existing.AreAccessRulesProtected){throw 'Existing agent state directory is not trusted. Verify its provenance and secure its owner/ACLs before retrying'}
-  foreach($rule in $existing.Access) {
-   if($rule.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value -notin $trustedOwners){throw 'Existing agent state directory has unexpected ACL principals; operator review required'}
-  }
+  if(!(Test-TrustedState)){throw 'Existing agent state directory is not trusted. Verify its provenance and secure its owner/ACLs before retrying; junctions and symbolic links are refused'}
  } else { New-Item -ItemType Directory -Path $state | Out-Null }
  $acl=New-Object System.Security.AccessControl.DirectorySecurity
  $acl.SetAccessRuleProtection($true,$false)
