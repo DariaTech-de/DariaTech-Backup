@@ -1,6 +1,15 @@
 name: Windows installer
 on:
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: Publish the tested unsigned pilot installer as a prerelease
+        type: boolean
+        default: false
+      release_tag:
+        description: New pilot release tag
+        type: string
+        default: agent-v0.1.0-pilot.1
   push:
     paths:
       - 'DariaTech/Agent/**'
@@ -13,6 +22,8 @@ permissions:
   contents: read
 jobs:
   installer:
+    permissions:
+      contents: write
     runs-on: windows-2025
     env:
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
@@ -37,3 +48,20 @@ jobs:
           name: DariaTechBackupSetup-win-x64-unsigned
           path: artifacts/installer/*
           if-no-files-found: error
+      - name: Publish tested pilot installer
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          if ($env:RELEASE_TAG -notmatch '^agent-v[0-9A-Za-z.-]+$') { throw 'Invalid release tag' }
+          @'
+          Windows x64 pilot installer with self-contained DariaTech Agent and OSS Duplicati engine.
+
+          Automated Windows checks cover LocalSystem service installation, DPAPI/ACL protection, HTTPS enrollment against a test-only fixture, real engine authentication, heartbeat, upgrade, restart and uninstall. Management tests separately exercise the real PostgreSQL Console and encrypted backup/restore.
+
+          This EXE is unsigned. Authenticode signing, VSS and customer-specific/reboot validation remain release gates. Remote commands, notifications and automatic signed updates are not implemented. See docs/AGENT.md for installation, protected enrollment input files and retained uninstall data.
+          '@ | Set-Content artifacts/installer/RELEASE_NOTES.md
+          gh release create $env:RELEASE_TAG artifacts/installer/*.exe artifacts/installer/*.sha256 --target $env:GITHUB_SHA --prerelease --title 'DariaTech Backup Agent 0.1.0 — Windows pilot' --notes-file artifacts/installer/RELEASE_NOTES.md
+          if ($LASTEXITCODE) { throw 'Release publication failed' }
