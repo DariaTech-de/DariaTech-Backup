@@ -7,6 +7,7 @@ $ErrorActionPreference='Stop'
 $brand=Get-Content (Join-Path $InstallDirectory 'product.json') -Raw | ConvertFrom-Json
 $name=$brand.windowsServiceName
 $state=Join-Path $env:ProgramData 'DariaTechBackup'
+try {
 if ($Action -eq 'Remove') {
  $service=Get-Service $name -ErrorAction SilentlyContinue
  if ($service) { Stop-Service $name -Force; & sc.exe delete $name | Out-Null; if ($LASTEXITCODE) { throw 'Service removal failed' } }
@@ -61,3 +62,7 @@ do {
 } while ((Get-Date) -lt $deadline)
 Stop-Service $name -Force -ErrorAction SilentlyContinue
 throw 'Enrollment or engine startup failed. Check HTTPS reachability, token validity and Windows Application event log. Local state is preserved for retry.'
+} catch {
+ if(Test-Path $state){[IO.File]::WriteAllText((Join-Path $state 'installer-diagnostic.txt'),$_.ToString())}
+ throw
+}

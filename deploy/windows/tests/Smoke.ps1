@@ -14,14 +14,34 @@ Import-Certificate -FilePath $public -CertStoreLocation Cert:\LocalMachine\Root 
 $env:FIXTURE_PFX=$pfx;$env:FIXTURE_PASSWORD=$password;$env:FIXTURE_TOKEN=$token
 $env:FIXTURE_ENGINE_PASSWORD=$password;$env:FIXTURE_RESULT=Join-Path $temporary 'result.json'
 $fixture=Start-Process node -ArgumentList (Join-Path $PSScriptRoot 'console-fixture.cjs') -PassThru -NoNewWindow
+function Invoke-Setup([string[]]$Arguments) {
+ $log=Join-Path $temporary 'setup.log'
+ $setup=Start-Process artifacts/installer/DariaTechBackupSetup.exe -ArgumentList ($Arguments+"/LOG=$log") -PassThru
+ if(!$setup.WaitForExit(240000)) {
+  & taskkill.exe /PID $setup.Id /T /F | Out-Null
+  if(Test-Path $log){Write-Host ((Get-Content $log -Raw).Replace($password,'[REDACTED]').Replace($token,'[REDACTED]'))}
+  throw 'Installer exceeded four-minute timeout'
+ }
+ $setup.Refresh()
+ if($setup.ExitCode -ne 0) {
+  if(Test-Path $log){Write-Host ((Get-Content $log -Raw).Replace($password,'[REDACTED]').Replace($token,'[REDACTED]'))}
+  $diagnostic=Join-Path $env:ProgramData 'DariaTechBackup/installer-diagnostic.txt'
+  if(Test-Path $diagnostic){Write-Host ((Get-Content $diagnostic -Raw).Replace($password,'[REDACTED]').Replace($token,'[REDACTED]'))}
+  Get-WinEvent -FilterHashtable @{LogName='Application';StartTime=(Get-Date).AddMinutes(-10)} -ErrorAction SilentlyContinue |
+   Where-Object {$_.ProviderName -match 'DariaTech|\.NET Runtime'} | Select-Object -First 5 |
+   ForEach-Object {Write-Host ($_.Message.Replace($password,'[REDACTED]').Replace($token,'[REDACTED]'))}
+  throw "Installer exited with code $($setup.ExitCode)"
+ }
+}
 try {
  $tokenFile=Join-Path $temporary 'token.txt';$passwordFile=Join-Path $temporary 'engine-password.txt'
  [IO.File]::WriteAllText($tokenFile,$token);[IO.File]::WriteAllText($passwordFile,$password)
  for($i=0;$i -lt 30;$i++) {
-  try { Invoke-RestMethod https://localhost:18443/health | Out-Null;break } catch { Start-Sleep 1 }
+  try { Invoke-RestMethod https://localhost:18443/health -TimeoutSec 5 | Out-Null;break } catch { Start-Sleep 1 }
  }
- $setup=Start-Process artifacts/installer/DariaTechBackupSetup.exe -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/console=https://localhost:18443',"/tokenfile=$tokenFile","/enginepasswordfile=$passwordFile") -Wait -PassThru
- if($setup.ExitCode -ne 0){throw "Installer exited with code $($setup.ExitCode)"}
+ Write-Host 'Starting silent installation.'
+ Invoke-Setup @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/console=https://localhost:18443',"/tokenfile=$tokenFile","/enginepasswordfile=$passwordFile")
+ Write-Host 'Installation returned success; verifying runtime.'
  $service=Get-CimInstance Win32_Service -Filter "Name='DariaTechBackupAgent'"
  if($service.State -ne 'Running' -or $service.StartMode -ne 'Auto' -or $service.StartName -ne 'LocalSystem'){throw 'Service configuration invalid'}
  $state=Join-Path $env:ProgramData 'DariaTechBackup'
@@ -49,8 +69,7 @@ try {
  if(!$result -or !$result.enrolled -or $result.heartbeats -lt 1){throw 'No authenticated engine-reachable heartbeat received'}
  $identityHash=(Get-FileHash (Join-Path $state 'identity.bin')).Hash
  $credentialHash=(Get-FileHash (Join-Path $state 'engine-credential.bin')).Hash
- $upgrade=Start-Process artifacts/installer/DariaTechBackupSetup.exe -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/console=https://localhost:18443') -Wait -PassThru
- if($upgrade.ExitCode -ne 0){throw 'In-place upgrade failed'}
+ Invoke-Setup @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/console=https://localhost:18443')
  if((Get-FileHash (Join-Path $state 'identity.bin')).Hash -ne $identityHash -or (Get-FileHash (Join-Path $state 'engine-credential.bin')).Hash -ne $credentialHash){throw 'Upgrade changed enrolled identity or engine credential'}
  Stop-Service DariaTechBackupAgent
  Start-Sleep 3
@@ -65,6 +84,7 @@ try {
  if(!(Test-Path (Join-Path $state 'identity.bin'))){throw 'Uninstall erased retained identity'}
  Write-Host 'PASS: silent setup, SYSTEM DPAPI, ACLs, enrollment, real engine authentication, heartbeat, upgrade, restart and uninstall.'
 } finally {
+ Stop-Service DariaTechBackupAgent -Force -ErrorAction SilentlyContinue
  Stop-Process -Id $fixture.Id -Force -ErrorAction SilentlyContinue
  Remove-Item "Cert:\LocalMachine\Root\$($cert.Thumbprint)","Cert:\LocalMachine\My\$($cert.Thumbprint)" -ErrorAction SilentlyContinue
  Remove-Item $temporary -Recurse -Force -ErrorAction SilentlyContinue
