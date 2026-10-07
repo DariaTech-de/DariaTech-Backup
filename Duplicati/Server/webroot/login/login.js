@@ -19,7 +19,7 @@ $(document).ready(function() {
         .done(function(data) {
             if (data.RefreshNonce)
                 localStorage.setItem('v1:persist:duplicati:refreshNonce', data.RefreshNonce);
-            window.location = './';
+            window.location = window.DariaTechBranding && window.DariaTechBranding.managedAgentUI ? './ngax/' : './';
         })
         .fail(function(data) {
             var txt = data;

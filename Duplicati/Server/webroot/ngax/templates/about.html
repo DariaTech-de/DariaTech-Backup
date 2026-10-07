@@ -1,5 +1,5 @@
-<div ng-controller="AboutController">
-    <p><a ng-href="{{brandingService.supportUrl}}">{{brandingService.appSubtitle}}</a> · Duplicati Backup Engine · <a href="../licenses.html">Lizenzen / Open Source</a></p>
+<div ng-controller="AboutController" class="dt-about">
+    <div class="dt-page-intro"><span class="dt-eyebrow">PRODUKT &amp; OPEN SOURCE</span><p>{{brandingService.appSubtitle}} · Duplicati Backup Engine</p></div>
     <h1 translate translate-params-appname="brandingService.appName">About {{appname}}</h1>
     <ul class="tabs">
         <li ng-class="{active: Page=='general'}"><a href ng-click="Page='general'" translate>General</a></li>
@@ -26,13 +26,13 @@
         </div>
 
         <div class="about-general__block">
-            <div translate translate-params-appname="brandingService.appName" translate-params-version="sysinfo.ServerVersionName || 'unknown'">You are currently running {{appname}} {{version}}</div>
+            <div><strong>Version der Backup-Engine:</strong> {{sysinfo.ServerVersionName || 'Unbekannt'}}</div>
 
             <div translate ng-show="state.updatedVersion != null &amp;&amp; state.updateDownloadLink != null &amp;&amp; !state.updateReady &amp;&amp; state.updaterState == 'Waiting'">
                 Update <a href ng-click="doShowUpdateChangelog()">{{state.updatedVersion}}</a> is available. <a href="{{state.updateDownloadLink}}">Download now</a>
             </div>
 
-            <a ng-show="state.updaterState == 'Waiting'" href ng-click="doCheckForUpdates()" translate>Check for updates now</a>
+            <a ng-show="!brandingService.managedAgentUI &amp;&amp; state.updaterState == 'Waiting'" href ng-click="doCheckForUpdates()" translate>Check for updates now</a>
             <div ng-show="state.updaterState == 'Checking'"  translate>Checking for updates …</div>
 
             <progress-bar ng-show="state.updaterState == 'Downloading'" ng-text="'Downloading update …'", ng-progress="state.updateDownloadProgress">

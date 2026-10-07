@@ -3,6 +3,7 @@ backupApp.service('BrandingService', function($timeout) {
     var brand = window.DariaTechBranding;
     var state = {
         appName: brand.productName,
+        managedAgentUI: brand.managedAgentUI === true,
         appSubtitle: brand.companyName,
         appLogoPath: '..' + brand.logo,
         supportUrl: brand.supportUrl,

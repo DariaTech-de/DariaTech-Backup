@@ -1,7 +1,9 @@
 <div class="settings" ng-controller="SystemSettingsController">
-    <h1 translate>Settings</h1>
+    <div class="dt-page-intro"><span class="dt-eyebrow">DIESES GERÄT</span><h1 translate>Settings</h1><p>Lokale Oberfläche und Backup-Verhalten anpassen.</p></div>
+    <section class="dt-managed-note" ng-if="brandingService.managedAgentUI"><strong>Von DariaTech betreuter Agent</strong><p>Registrierung und Verbindung zur Console übernimmt der Windows-Dienst. Automatische Agent-Updates und zentrale Remote-Aktionen sind noch nicht freigeschaltet.</p></section>
 
     <form class="styled">
+        <section ng-if="!brandingService.managedAgentUI">
         <h2 translate>Access to user interface</h2>
         <div class="input checkbox">
             <input type="checkbox" class="checkbox" id="changePassword" name="changePassword" ng-model="changeServerPassword" />
@@ -31,6 +33,8 @@
             <div class="sublabel" translate>By default, the tray icon will open the user interface with a token that unlocks the user interface. This ensures that you can access the user interface from the tray icon, while requiring others to enter a password. If you prefer having to type in the password, even when accessing the user interface from the tray icon, enable this option.</div>
         </div>
 
+        </section>
+        <section ng-if="!brandingService.managedAgentUI">
         <h2 translate>Remote access control</h2>
         <div class="input mixed multiple">
             <label translate>Status: {{getRemoteControlStatusText()}}</label>
@@ -70,6 +74,7 @@
         </div>
 
 
+        </section>
         <h2>{{'Pause after startup or hibernation' | translate}}</h2>
         <div class="input mixed multiple">
             <label for="pauseTime" translate>Pause</label>
@@ -108,8 +113,8 @@
             <label for="themedisplay" translate>Display and color theme</label>
 
             <select id="themedisplay" ng-model="theme">
-                <option value="default" translate>The default blue on white theme (by Alex)</option>
-                <option value="dark" translate>The dark theme (by Michal)</option>
+                <option value="default">DariaTech · Hell</option>
+                <option value="dark">DariaTech · Dunkel</option>
             </select>
         </div>
 
@@ -123,6 +128,7 @@
 
         </div>
 
+        <section ng-if="!brandingService.managedAgentUI">
         <h2 translate>Update channel</h2>
         <div class="input checkbox">
             <input type="radio" class="checkbox" id="updateChannelDefault" value="" name="updateChannel" ng-model="updateChannel" />
@@ -158,6 +164,7 @@
         </div>
         -->
 
+        </section>
         <h2 ng-if="SystemInfo.DefaultUsageReportLevel != 'Disabled'" translate>Usage statistics</h2>
         <div ng-if="SystemInfo.DefaultUsageReportLevel != 'Disabled'" class="input mixed multiple">
             <label for="usagereporterlevel" translate>Anonymous usage reports</label>

@@ -1,6 +1,7 @@
+<section class="dt-alert-heading"><span class="dt-eyebrow">GERÄTEMELDUNGEN</span><h2>Hinweise <span class="dt-count">{{Notifications.length}}</span></h2><p ng-if="Notifications.length == 0">Zurzeit keine Meldungen der Backup-Engine.</p></section>
 <ul class="notification">
-    <li ng-repeat="item in Notifications track by item.ID" ng-show="$index < 4" class="{{item.Type.toLowerCase()}}">
-        <div class="title">{{item.Title}}</div>
+    <li ng-repeat="item in Notifications track by item.ID"  class="{{item.Type.toLowerCase()}}">
+        <div class="title" role="status">{{item.Title}}</div>
         <div class="content">
             <div ng-if="item.Action != 'update:new' &amp;&amp; item.Action != 'update:manual'" class="message">{{item.Message}}</div>
             <div ng-show="item.DownloadLink != null">

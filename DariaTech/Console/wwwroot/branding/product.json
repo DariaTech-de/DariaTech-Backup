@@ -28,5 +28,6 @@
     "darkBorder": "#1a6b54",
     "darkText": "#d6efe7"
   },
-  "installerImage": "installer-icon.png"
+  "installerImage": "installer-icon.png",
+  "managedAgentUI": true
 }
