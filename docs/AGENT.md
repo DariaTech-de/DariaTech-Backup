@@ -4,9 +4,9 @@ Independent .NET Worker in DariaTech/Agent; Duplicati remains a separate local e
 
 ## Bundled Windows installer
 
-The Windows installer source is in deploy/windows. The Windows installer GitHub Actions workflow builds a self-contained x64 Agent and OSS Duplicati engine into DariaTechBackupSetup.exe. Download its unsigned artifact from the successful workflow run. These are pilot artifacts, not Authenticode-signed production releases. Do not override security policy to deploy unsigned software across customer fleets.
+The Windows installer source is in deploy/windows. The Windows installer GitHub Actions workflow builds a self-contained x64 Agent and OSS Duplicati engine into DariaTechBackupSetup.exe. Download the [Windows pilot release](https://github.com/DariaTech-de/DariaTech-Backup/releases/tag/agent-v0.1.0-pilot.1), or its unsigned artifact from a successful workflow run. These are pilot artifacts, not Authenticode-signed production releases. Do not override security policy to deploy unsigned software across customer fleets.
 
-Interactive setup requests the HTTPS Console origin, a site-bound enrollment token and a local engine UI password (14–200 characters). Run as administrator. Setup creates an automatic LocalSystem service with restart recovery. A Windows Job Object terminates its engine child on service termination. Initial enrollment and DPAPI protection execute inside LocalSystem; no manual SYSTEM shell is needed.
+Interactive setup requests the HTTPS Console origin, a site-bound enrollment token and a local engine UI password (14–200 characters). Run as administrator. Setup refuses pre-existing state directories with untrusted ownership, inherited/broad ACLs or reparse points. It returns a nonzero exit code on provisioning failure, including silent installs. Setup creates an automatic LocalSystem service with restart recovery. A Windows Job Object terminates its engine child on service termination. Initial enrollment and DPAPI protection execute inside LocalSystem; no manual SYSTEM shell is needed.
 
 The installer owns a separate loopback engine on port 8210 and stores databases under `%ProgramData%\DariaTechBackup\engine`. It never adopts or modifies an existing Duplicati service/database. Its password and settings encryption key are DPAPI CurrentUser-protected under SYSTEM; secrets are supplied to the child via process environment, not command-line arguments. The local UI is available at http://127.0.0.1:8210/ngax/ using the chosen local password. Configure actual backup jobs there; registration alone does not create a backup job.
 
@@ -65,3 +65,12 @@ Agent polls backups, serverstate, local result logs and progressstate. It maps o
 Encrypted outbox survives restarts and retries failed sends. Console deduplicates runs by job + stable local run ID; completed runs cannot be rewritten by delayed Running messages. Outbox is bounded at 1,440 snapshots; overflow discards oldest with a local warning. The current polling adapter reports the latest completed run per job, not every historical engine run between polls. A polling interval of 60 seconds is default; long offline intervals/multiple jobs may require a future incremental result cursor for complete history. Agent failures are reported as EngineUnavailable/heartbeat status without raw exception text.
 
 Active progress is a separate snapshot, not a fabricated historical BackupRun. Console command execution, remote restore and self-update are absent until their later phase gates pass. Windows service/VSS behavior requires an actual Windows test before release.
+
+## First installation on a Windows test PC
+
+1. Download DariaTechBackupSetup.exe and its SHA-256 file from the pilot release; verify with `Get-FileHash .\DariaTechBackupSetup.exe -Algorithm SHA256`.
+2. Generate a fresh enrollment token for the correct customer/site in the Console.
+3. Run setup as administrator; enter https://backup.dariatech.de, the token and a strong local engine UI password.
+4. Check that the registered device reports a heartbeat in the Console. Installation alone does not create a backup job.
+5. Open http://127.0.0.1:8210/ngax/ on that PC, sign in using the local engine password and configure sources, destination, schedule, backup encryption passphrase and retention. Keep the backup encryption passphrase in your protected recovery store; it is different from the local API/UI password.
+6. Run a backup and a restore test, then check the transmitted result in the Console. Do not roll the unsigned pilot out across production customers before signing and customer-platform validation.

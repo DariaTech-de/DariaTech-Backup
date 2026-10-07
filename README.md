@@ -1,6 +1,6 @@
 # DariaTech Backup — Managed Backup
 
-DariaTech IT-Systemhaus management layer around the Duplicati backup engine. The initial implementation includes a separate .NET agent, PostgreSQL console/API, tenant-scoped customer/site/device management, enrollment, mandatory TOTP login, dashboard and monitoring. It is an iterative development baseline; remote configuration/restore, notifications, signed updates and Windows installer validation remain open.
+DariaTech IT-Systemhaus management layer around the Duplicati backup engine. The initial implementation includes a separate .NET agent, PostgreSQL console/API, tenant-scoped customer/site/device management, enrollment, mandatory TOTP login, dashboard and monitoring. It is an iterative development baseline; remote configuration/restore, notifications, signed updates, Authenticode signing and Windows VSS/reboot validation remain open. A bundled Windows pilot installer is available through the [agent installation guide](docs/AGENT.md).
 
 - [Analysis and reuse boundaries](docs/ANALYSIS.md)
 - [Architecture](docs/ARCHITECTURE.md) and [implementation status](docs/IMPLEMENTATION_PLAN.md)
