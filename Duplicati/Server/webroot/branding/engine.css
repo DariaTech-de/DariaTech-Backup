@@ -19,3 +19,6 @@ body.dariatech-engine .container .body .content input:not([type=checkbox]):not([
 body.dariatech-engine a:focus-visible,body.dariatech-engine button:focus-visible,body.dariatech-engine input:focus-visible{outline:3px solid var(--brand-accent);outline-offset:3px}
 body.dariatech-engine .container .footer{background:var(--dt-panel);border-top:1px solid var(--dt-border);color:var(--dt-ink)}
 @media(max-width:768px){body.dariatech-engine .container .body .mainmenu{background:var(--brand-sidebar)}body.dariatech-engine .container .body>.content{border-radius:10px}}
+
+@media(min-width:1001px){body.dariatech-engine .container .body .mainmenu{left:24px;width:238px}body.dariatech-engine .container .body>.content{float:none;margin-left:290px;width:calc(100% - 330px);box-sizing:border-box;padding:24px;min-height:250px}}
+@media(max-width:1000px){body.dariatech-engine .container .body>.content{float:none;width:calc(100% - 32px);margin:16px;box-sizing:border-box;padding:18px}}
