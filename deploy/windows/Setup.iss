@@ -70,12 +70,15 @@ end;
 function NextButtonClick(CurPageID: Integer): Boolean;
 begin
  Result := True;
+ // Inno calls page validation during silent navigation too. File inputs are
+ // validated below; never open an interactive message box in unattended setup.
+ if WizardSilent then Exit;
  if CurPageID = ConnectionPage.ID then begin
   if (Length(ConnectionPage.Values[1]) <> 64) and (TokenFile = '') and
      not FileExists(ExpandConstant('{commonappdata}\DariaTechBackup\identity.bin')) then begin
    MsgBox('Enter the 64-character enrollment token.', mbError, MB_OK); Result := False;
   end;
-  if not FileExists(ExpandConstant('{commonappdata}\DariaTechBackup\engine-credential.bin')) and
+  if (EnginePasswordFile = '') and not FileExists(ExpandConstant('{commonappdata}\DariaTechBackup\engine-credential.bin')) and
      ((Length(ConnectionPage.Values[2]) < 14) or (Length(ConnectionPage.Values[2]) > 200)) then begin
    MsgBox('Enter a local engine password with 14–200 characters.', mbError, MB_OK); Result := False;
   end;
