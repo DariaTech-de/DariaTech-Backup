@@ -22,4 +22,6 @@ if(args.Contains("set-engine-credential"))
 }
 var brand=JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory,"product.json"))).RootElement;
 builder.Services.AddWindowsService(o=>o.ServiceName=brand.GetProperty("windowsServiceName").GetString()!);
-builder.Services.AddSingleton(options);builder.Services.AddSingleton(state);builder.Services.AddHostedService<Worker>();await builder.Build().RunAsync();
+builder.Services.AddSingleton(options);builder.Services.AddSingleton(state);
+if(options.ManageEngine)builder.Services.AddHostedService<ManagedEngine>();
+builder.Services.AddHostedService<Worker>();await builder.Build().RunAsync();

@@ -7,7 +7,9 @@ public sealed class Worker(AgentOptions options,ProtectedState state,ILogger<Wor
 {
  protected override async Task ExecuteAsync(CancellationToken ct)
  {
-  options.Validate();var identity=state.Read<AgentIdentity>("identity.bin")??throw new InvalidOperationException("Agent must be enrolled before service startup");
+  options.Validate();
+  while(options.ManageEngine&&state.Read<AgentIdentity>("identity.bin") is null)await Task.Delay(TimeSpan.FromSeconds(2),ct);
+  var identity=state.Read<AgentIdentity>("identity.bin")??throw new InvalidOperationException("Agent must be enrolled before service startup");
   using var client=new HttpClient(new HttpClientHandler{AllowAutoRedirect=false}){BaseAddress=new Uri(options.ConsoleUrl),Timeout=TimeSpan.FromSeconds(20)};
   client.DefaultRequestHeaders.Authorization=new AuthenticationHeaderValue("Bearer",identity.Credential);client.DefaultRequestHeaders.Add("X-Device-Id",identity.DeviceId.ToString());
   using var adapter=new DuplicatiAdapter(options,state);

@@ -6,6 +6,7 @@ public sealed class AgentOptions
  public string StateDirectory {get;set;}=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),"DariaTechBackup");
  public string? LinuxKeyFile {get;set;}
  public int HeartbeatSeconds {get;set;}=60;
+ public bool ManageEngine {get;set;}
  public string Version=>typeof(AgentOptions).Assembly.GetName().Version?.ToString()??"unknown";
  public void Validate()
  {

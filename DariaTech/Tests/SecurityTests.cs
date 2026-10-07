@@ -10,6 +10,16 @@ namespace DariaTech.Tests;
 
 public sealed class SecurityTests
 {
+ [Test]public void ManagedEngineKeepsSecretsOffCommandLineAndDisablesVendorReporting()
+ {
+  var start=ManagedEngine.CreateStartInfo("C:\\agent\\engine\\Duplicati.Server.exe","C:\\state\\engine","http://127.0.0.1:8210","test-local-password","test-db-key");
+  Assert.That(string.Join(" ",start.ArgumentList),Does.Not.Contain("test-local-password").And.Not.Contain("test-db-key"));
+  Assert.That(start.Environment["DUPLICATI__WEBSERVICE_PASSWORD"],Is.EqualTo("test-local-password"));
+  Assert.That(start.Environment["SETTINGS_ENCRYPTION_KEY"],Is.EqualTo("test-db-key"));
+  Assert.That(start.Environment["DO_NOT_TRACK"],Is.EqualTo("1"));
+  Assert.That(start.ArgumentList,Does.Contain("--require-db-encryption-key=true"));
+  Assert.Throws<InvalidOperationException>(()=>ManagedEngine.CreateStartInfo("engine.exe","data","http://example.com:8210","password","key"));
+ }
  [Test]public void TotpMatchesRfc6238AndRejectsReplay()
  {
   const string secret="GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";

@@ -1,0 +1,36 @@
+name: Windows installer
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'DariaTech/Agent/**'
+      - 'DariaTech/Contracts/**'
+      - 'deploy/windows/**'
+      - 'scripts/build-windows-installer.ps1'
+      - 'branding/**'
+      - '.github/workflows/windows-installer.yml'
+permissions:
+  contents: read
+jobs:
+  installer:
+    runs-on: windows-2025
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DO_NOT_TRACK: '1'
+      AUTOUPDATER_Duplicati_SKIP_UPDATE: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - name: Install Inno Setup compiler
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+      - name: Build bundled OSS installer
+        shell: pwsh
+        run: ./scripts/build-windows-installer.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DariaTechBackupSetup-win-x64-unsigned
+          path: artifacts/installer/*
+          if-no-files-found: error

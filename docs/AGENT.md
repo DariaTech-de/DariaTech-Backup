@@ -2,7 +2,33 @@
 
 Independent .NET Worker in DariaTech/Agent; Duplicati remains a separate local engine service. Current version 0.1.0.0. The worker performs no backups itself and does not replace the existing scheduler, engine database, encryption, retention or backends.
 
-## Build and provisioning
+## Bundled Windows installer
+
+The Windows installer source is in deploy/windows. The Windows installer GitHub Actions workflow builds a self-contained x64 Agent and OSS Duplicati engine into DariaTechBackupSetup.exe. Download its unsigned artifact from the successful workflow run. These are pilot artifacts, not Authenticode-signed production releases. Do not override security policy to deploy unsigned software across customer fleets.
+
+Interactive setup requests the HTTPS Console origin, a site-bound enrollment token and a local engine UI password (14–200 characters). Run as administrator. Setup creates an automatic LocalSystem service with restart recovery. A Windows Job Object terminates its engine child on service termination. Initial enrollment and DPAPI protection execute inside LocalSystem; no manual SYSTEM shell is needed.
+
+The installer owns a separate loopback engine on port 8210 and stores databases under `%ProgramData%\DariaTechBackup\engine`. It never adopts or modifies an existing Duplicati service/database. Its password and settings encryption key are DPAPI CurrentUser-protected under SYSTEM; secrets are supplied to the child via process environment, not command-line arguments. The local UI is available at http://127.0.0.1:8210/ngax/ using the chosen local password. Configure actual backup jobs there; registration alone does not create a backup job.
+
+For RMM deployment, prefer protected input files:
+
+```text
+DariaTechBackupSetup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /console=https://backup.dariatech.de /tokenfile=C:\secure\enrollment.txt /enginepasswordfile=C:\secure\engine-password.txt
+```
+
+`/token=...` is supported for compatibility but exposes the token in process arguments; prefer `/tokenfile`. Silent setup can omit enginepasswordfile; the service generates a random local password, so use a protected password file if local UI access is needed. Keep input files ACL-restricted and delete the original files after successful installation; setup only deletes its internal staging copies. Do not enable installer logging with token command-line arguments.
+
+Enrollment requires HTTPS reachable without interactive Cloudflare Access/browser challenges. Failed enrollment/startup returns an installer error and preserves state for diagnosis/retry; it does not display a successful installation. Enrollment tokens can expire/be consumed, so a failed network exchange may require a new token. Upgrades preserve identity and engine credentials/database. Uninstall removes the service and program files but deliberately retains backup databases, protected credentials and identity. Secure deletion/de-enrollment is a separate administrative action. DPAPI state cannot simply be copied to a different computer.
+
+Build locally on Windows with .NET SDK 10.0.401 and Inno Setup 6:
+
+```powershell
+./scripts/build-windows-installer.ps1
+```
+
+The current Windows CI evidence and remaining release gates are documented in IMPLEMENTATION_PLAN.md. VSS, reboot recovery, existing customer environments and signing require validation before production fleet deployment.
+
+## Manual build and provisioning
 
 ```sh
 dotnet publish DariaTech/Agent/DariaTech.Agent.csproj -c Release -r win-x64 --self-contained true
@@ -16,7 +42,7 @@ DariaTech.Agent.exe enroll --token-file <protected enrollment-token file>
 DariaTech.Agent.exe
 ```
 
-Run both provisioning commands under the exact Windows service identity (normally LocalSystem via the customer's RMM) because DPAPI CurrentUser cannot decrypt a different account's state. Restrict the state directory to SYSTEM/Administrators before provisioning. Delete input secret files afterwards. Install the published worker as the centrally configured windowsServiceName from branding/product.json with Automatic start and service recovery. No signed DariaTechBackupSetup.exe/MSI has been produced or Windows-tested yet; `/quiet /token=...` remains an installer requirement, not a working command.
+Run both provisioning commands under the exact Windows service identity (normally LocalSystem via the customer's RMM) because DPAPI CurrentUser cannot decrypt a different account's state. Restrict the state directory to SYSTEM/Administrators before provisioning. Delete input secret files afterwards. Install the published worker as the centrally configured windowsServiceName from branding/product.json with Automatic start and service recovery. The bundled EXE workflow above automates these steps; manual provisioning remains available. `/quiet` is not an Inno Setup switch; use `/VERYSILENT`.
 
 ## Engine service profile
 

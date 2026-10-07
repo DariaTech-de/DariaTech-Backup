@@ -34,3 +34,4 @@ keys/
 
 # Temporary administrator provisioning files
 .provision/
+deploy/windows/Branding.iss
