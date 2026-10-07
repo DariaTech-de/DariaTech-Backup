@@ -16,3 +16,31 @@ jobs:
           global-json-file: global.json
       - run: scripts/build-duplicati.sh
       - run: python3 scripts/generate-branding.py --check
+
+  management-security:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-bookworm
+        env:
+          POSTGRES_DB: dariatech_ci
+          # Disposable CI-only database, never production configuration.
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ['5432:5432']
+        options: --health-cmd "pg_isready -U postgres" --health-interval 10s --health-timeout 5s --health-retries 10
+    env:
+      DO_NOT_TRACK: '1'
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      AUTOUPDATER_Duplicati_SKIP_UPDATE: '1'
+      DARIATECH_TEST_DATABASE: Host=127.0.0.1;Database=dariatech_ci;Username=postgres;GSS Encryption Mode=Disable
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - run: dotnet restore DariaTech.slnx --locked-mode
+      - run: dotnet build DariaTech.slnx -c Release --no-restore
+      - run: dotnet build Executables/Duplicati.Server/Duplicati.Server.csproj -c Release -p:DariaTechOssOnly=true
+      - run: dotnet test DariaTech/Tests/DariaTech.Tests.csproj -c Release --no-build
+        env:
+          DARIATECH_ENGINE_SERVER_DLL: ${{ github.workspace }}/Executables/Duplicati.Server/bin/Release/net10.0/Duplicati.Server.dll

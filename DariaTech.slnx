@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/DariaTech/">
+    <Project Path="DariaTech/Contracts/DariaTech.Contracts.csproj" />
+    <Project Path="DariaTech/Agent/DariaTech.Agent.csproj" />
+    <Project Path="DariaTech/Console/DariaTech.Console.csproj" />
+    <Project Path="DariaTech/Tests/DariaTech.Tests.csproj" />
+  </Folder>
+</Solution>

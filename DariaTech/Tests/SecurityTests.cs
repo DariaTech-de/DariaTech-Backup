@@ -1,0 +1,60 @@
+using System.Security.Cryptography;
+using System.Text.Json;
+using DariaTech.Console.Security;
+using DariaTech.Console.Api;
+using DariaTech.Agent;
+using DariaTech.Contracts;
+using Microsoft.Extensions.Configuration;
+using NUnit.Framework;
+namespace DariaTech.Tests;
+
+public sealed class SecurityTests
+{
+ [Test]public void TotpMatchesRfc6238AndRejectsReplay()
+ {
+  const string secret="GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
+  Assert.That(Totp.Code(secret,1),Is.EqualTo("287082"));
+  Assert.That(Totp.Validate(secret,"287082",DateTimeOffset.FromUnixTimeSeconds(59),-1),Is.EqualTo(1));
+  Assert.That(Totp.Validate(secret,"287082",DateTimeOffset.FromUnixTimeSeconds(59),1),Is.Null);
+  Assert.That(Totp.Validate(secret,"123456",DateTimeOffset.FromUnixTimeSeconds(59),-1),Is.Null);
+ }
+ [Test]public void EncryptedSecretsAreTenantAndPurposeBoundAndDetectTampering()
+ {
+  var file=Path.GetTempFileName();File.WriteAllText(file,Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
+  try
+  {
+   var store=new EncryptedSecretStore(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?>{{"Security:MasterKeyFile",file}}).Build());
+   var tenant=Guid.NewGuid();var encrypted=store.Protect(tenant,"backup","test-secret");Assert.That(encrypted,Does.Not.Contain("test-secret"));
+   Assert.That(store.Unprotect(tenant,"backup",encrypted),Is.EqualTo("test-secret"));
+   Assert.Throws<AuthenticationTagMismatchException>(()=>store.Unprotect(Guid.NewGuid(),"backup",encrypted));
+   Assert.Throws<AuthenticationTagMismatchException>(()=>store.Unprotect(tenant,"storage",encrypted));
+   var bytes=Convert.FromBase64String(encrypted);bytes[^1]^=1;Assert.Throws<AuthenticationTagMismatchException>(()=>store.Unprotect(tenant,"backup",Convert.ToBase64String(bytes)));
+  }finally{File.Delete(file);}
+ }
+ [Test]public void TelemetryRejectsRawErrorsAndInvalidCounts()
+ {
+  var run=new RunReport("1",DateTimeOffset.UtcNow.AddMinutes(-1),DateTimeOffset.UtcNow,RunStatus.Failed,10,1,12,null,"BackupFailed");
+  var request=new HeartbeatRequest("0.1.0","Windows",true,[new("1","Backup",null,run)]);
+  Assert.That(AgentApi.Valid(request),Is.True);
+  Assert.That(AgentApi.Valid(request with{Jobs=[new("1","Backup",null,run with{ErrorCode="s3://secret:password@example.com"})]}),Is.False);
+  Assert.That(AgentApi.Valid(request with{Jobs=[new("1","Backup",null,run with{Bytes=-1})]}),Is.False);
+  Assert.That(AgentApi.Valid(request with{Jobs=[new("1","Backup",null,run with{Progress=double.NaN})]}),Is.False);
+  Assert.That(AgentApi.Valid(request with{Jobs=[new("1","Backup",null,run with{Completed=null})]}),Is.False);
+  var incident=run with{Completed=null,Bytes=null,Files=null,StorageBytes=null,ErrorCode="EngineOperationFailed"};
+  Assert.That(AgentApi.Valid(request with{Jobs=[new("1","Backup",null,incident)]}),Is.True);
+  Assert.That(AgentApi.Valid(request with{Jobs=[new("1","Backup",null,incident with{Bytes=0})]}),Is.False);
+ }
+ [Test]public void EngineResultAdapterOnlyExportsAllowlistedStatistics()
+ {
+  using var result=JsonDocument.Parse("""{"MainOperation":"Backup","BeginTime":"2026-10-01T12:00:00Z","EndTime":"2026-10-01T12:10:00Z","ParsedResult":"Warning","ExaminedFiles":12,"SizeOfExaminedFiles":1024,"Warnings":["password=DoNotSend"],"Errors":["patient-name"]}""");
+  using var meta=JsonDocument.Parse("""{"TargetFilesSize":"4096","LastErrorMessage":"secret"}""");
+  var report=DuplicatiAdapter.ParseResult(result.RootElement,meta.RootElement);Assert.That(report!.Status,Is.EqualTo(RunStatus.Warning));
+  var json=JsonSerializer.Serialize(report);Assert.That(json,Does.Not.Contain("DoNotSend").And.Not.Contain("patient-name").And.Not.Contain("LastErrorMessage"));
+  Assert.That(report.StorageBytes,Is.EqualTo(4096));
+ }
+ [Test]public void AgentRejectsRemoteEngineAndInsecureConsole()
+ {
+  Assert.Throws<InvalidOperationException>(()=>new AgentOptions{EngineUrl="https://attacker.example"}.Validate());
+  Assert.Throws<InvalidOperationException>(()=>new AgentOptions{ConsoleUrl="http://backup.dariatech.de"}.Validate());
+ }
+}

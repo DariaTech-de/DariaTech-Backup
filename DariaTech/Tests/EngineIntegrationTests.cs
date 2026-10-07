@@ -1,0 +1,65 @@
+using System.Diagnostics;
+using System.Net;
+using System.Net.Http.Json;
+using System.Net.Sockets;
+using System.Security.Cryptography;
+using System.Text.Json;
+using DariaTech.Agent;
+using DariaTech.Contracts;
+using NUnit.Framework;
+namespace DariaTech.Tests;
+
+[TestFixture,NonParallelizable]
+public sealed class EngineIntegrationTests
+{
+ [Test,Category("EngineIntegration")]
+ public async Task EncryptedBackupReportsRealStatsAndRestoresIdenticalFiles()
+ {
+  var dll=Environment.GetEnvironmentVariable("DARIATECH_ENGINE_SERVER_DLL");if(string.IsNullOrWhiteSpace(dll))Assert.Ignore("Set DARIATECH_ENGINE_SERVER_DLL to run a real engine backup/restore");
+  var dir=Path.Combine(Path.GetTempPath(),"dariatech-engine-"+Guid.NewGuid());Directory.CreateDirectory(dir);
+  var source=Path.Combine(dir,"source");var destination=Path.Combine(dir,"storage");var restore=Path.Combine(dir,"restore");Directory.CreateDirectory(source);Directory.CreateDirectory(destination);
+  var bytes=RandomNumberGenerator.GetBytes(16384);await File.WriteAllBytesAsync(Path.Combine(source,"restore-check.bin"),bytes);
+  var listener=new TcpListener(IPAddress.Loopback,0);listener.Start();var port=((IPEndPoint)listener.LocalEndpoint).Port;listener.Stop();
+  var password=Convert.ToHexString(RandomNumberGenerator.GetBytes(24));var passphrase=Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
+  var start=new ProcessStartInfo("dotnet"){RedirectStandardOutput=true,RedirectStandardError=true,UseShellExecute=false};
+  foreach(var a in new[]{dll!,"--server-datafolder="+Path.Combine(dir,"engine-db"),"--webservice-interface=loopback","--webservice-port="+port,"--webservice-password="+password,"--webservice-api-only=true","--webservice-allowed-hostnames=localhost,127.0.0.1","--disable-update-check=true","--webservice-suppress-welcome-page=true"})start.ArgumentList.Add(a);
+  start.Environment["DO_NOT_TRACK"]="1";start.Environment["AUTOUPDATER_Duplicati_SKIP_UPDATE"]="1";start.Environment["SETTINGS_ENCRYPTION_KEY"]=Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+  using var server=Process.Start(start)!;var output=server.StandardOutput.ReadToEndAsync();var error=server.StandardError.ReadToEndAsync();
+  try
+  {
+   using var ct=new CancellationTokenSource(TimeSpan.FromMinutes(3));using var client=new HttpClient{BaseAddress=new Uri($"http://127.0.0.1:{port}"),Timeout=TimeSpan.FromSeconds(15)};
+   JsonDocument? auth=null;
+   for(var i=0;i<100;i++)
+   {
+    try{using var response=await client.PostAsJsonAsync("/api/v1/auth/login",new{Password=password,RememberMe=false},ct.Token);if(response.IsSuccessStatusCode){auth=JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct.Token));break;}}catch(HttpRequestException){}
+    if(server.HasExited)Assert.Fail("Engine exited during startup; inspect locally captured engine logs");await Task.Delay(100,ct.Token);
+   }
+   Assert.That(auth,Is.Not.Null);using(auth!){client.DefaultRequestHeaders.Authorization=new("Bearer",DuplicatiAdapter.Get(auth!.RootElement,"AccessToken").GetString());}
+   var settings=new[]{new{Name="encryption-module",Value="aes"},new{Name="passphrase",Value=passphrase},new{Name="dblock-size",Value="4mb"},new{Name="disable-module",Value="console-password-input"}};
+   using var created=await client.PostAsJsonAsync("/api/v1/backups",new{Backup=new{Name="Encrypted smoke backup",TargetURL=new Uri(destination+Path.DirectorySeparatorChar).AbsoluteUri,Sources=new[]{source+Path.DirectorySeparatorChar},Settings=settings}},ct.Token);Assert.That(created.IsSuccessStatusCode,Is.True,$"Create backup returned {(int)created.StatusCode}");
+   using var list=JsonDocument.Parse(await client.GetStringAsync("/api/v1/backups",ct.Token));var id=DuplicatiAdapter.Get(DuplicatiAdapter.Get(list.RootElement[0],"Backup"),"ID").ToString();
+   using var run=await client.PostAsync($"/api/v1/backup/{id}/run",null,ct.Token);run.EnsureSuccessStatusCode();using var task=JsonDocument.Parse(await run.Content.ReadAsStringAsync(ct.Token));var taskId=DuplicatiAdapter.Get(task.RootElement,"ID").ToString();
+   await WaitTask(client,taskId,ct.Token,password,passphrase);
+   var key=Path.Combine(dir,"agent.key");await File.WriteAllTextAsync(key,Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),ct.Token);
+   var options=new AgentOptions{EngineUrl=client.BaseAddress!.ToString(),StateDirectory=Path.Combine(dir,"agent"),LinuxKeyFile=key};var state=new ProtectedState(options);state.Write("engine-credential.bin",password);
+   using var adapter=new DuplicatiAdapter(options,state);var jobs=await adapter.ReadJobs(ct.Token);Assert.That(jobs,Has.Length.EqualTo(1));Assert.That(jobs[0].LastRun?.Status,Is.EqualTo(RunStatus.Success));Assert.That(jobs[0].LastRun?.Files,Is.EqualTo(1));Assert.That(jobs[0].LastRun?.Bytes,Is.EqualTo(bytes.Length));
+   Assert.That(Directory.GetFiles(destination),Is.Not.Empty);Assert.That(Directory.GetFiles(destination).All(x=>x.EndsWith(".aes")),Is.True);
+   File.Delete(Path.Combine(source,"restore-check.bin"));
+   using var restored=await client.PostAsJsonAsync($"/api/v1/backup/{id}/restore",new{paths=new[]{Path.Combine(source,"restore-check.bin")},time="now",restore_path=restore,overwrite=true,permissions=false,skip_metadata=true},ct.Token);restored.EnsureSuccessStatusCode();using var restoreTask=JsonDocument.Parse(await restored.Content.ReadAsStringAsync(ct.Token));await WaitTask(client,DuplicatiAdapter.Get(restoreTask.RootElement,"ID").ToString(),ct.Token,password,passphrase);
+   var file=Directory.GetFiles(restore,"restore-check.bin",SearchOption.AllDirectories).Single();Assert.That(await File.ReadAllBytesAsync(file,ct.Token),Is.EqualTo(bytes));
+  }
+  finally
+  {
+   if(!server.HasExited)server.Kill(true);await server.WaitForExitAsync();await output;await error;Directory.Delete(dir,true);
+  }
+ }
+ private static async Task WaitTask(HttpClient client,string id,CancellationToken ct,params string[] secrets)
+ {
+  for(var i=0;i<1000;i++)
+  {
+   using var task=JsonDocument.Parse(await client.GetStringAsync("/api/v1/task/"+id,ct));var status=DuplicatiAdapter.Get(task.RootElement,"Status").GetString();
+   if(status=="Completed")return;if(status=="Failed"){var detail=DuplicatiAdapter.Get(task.RootElement,"ErrorMessage").ToString();foreach(var secret in secrets)detail=detail.Replace(secret,"[REDACTED]");Assert.Fail("Engine task failed: "+detail);}await Task.Delay(100,ct);
+  }
+  Assert.Fail("Engine task did not finish within timeout");
+ }
+}
