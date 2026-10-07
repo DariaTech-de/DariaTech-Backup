@@ -8,7 +8,7 @@ if [[ ${1:-} == --help ]]; then
 fi
 [[ $# == 0 ]] || { echo 'Unbekanntes Argument. Verwende --help.' >&2; exit 2; }
 cd "$repo"
-exec 9>/run/lock/dariatech-backup-update.lock
+exec 9>"${DARIATECH_BACKUP_LOCK_FILE:-/run/lock/dariatech-backup-update.lock}"
 flock -n 9 || { echo 'Ein Update läuft bereits.' >&2; exit 1; }
 trap 'echo "Update abgebrochen. Prüfe die Fehlermeldung oben; bestehende Daten bleiben erhalten." >&2' ERR
 [[ -z $(git status --porcelain --untracked-files=no) ]] || { echo 'Lokale Änderungen im Repository. Update abgebrochen.' >&2; exit 1; }
@@ -18,11 +18,12 @@ git pull --ff-only
 echo '2/3: Neues Console-Image bauen; laufende Console bleibt währenddessen verfügbar …'
 docker compose build console
 echo '3/3: Datenbanksicherung, Migrationen und Console starten …'
-backup_dir=/var/backups/dariatech-backup
+backup_dir=${DARIATECH_BACKUP_BACKUP_DIR:-/var/backups/dariatech-backup}
 install -d -m 0700 "$backup_dir"
 umask 077
 backup_file="$backup_dir/$(date -u +%Y%m%dT%H%M%SZ)-database.sql"
-docker compose exec -T postgres sh -c 'exec pg_dump -U postgres "$POSTGRES_DB"' > "$backup_file"
+docker compose exec -T postgres sh -c 'exec pg_dump -U postgres "$POSTGRES_DB"' > "$backup_file.partial"
+mv "$backup_file.partial" "$backup_file"
 # Separate service uses migration credentials and avoids Console's fixed IP.
 docker compose --profile maintenance run --rm migrate
 docker compose up -d --wait --wait-timeout 120 console
