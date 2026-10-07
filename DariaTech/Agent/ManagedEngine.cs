@@ -37,7 +37,9 @@ public sealed class ManagedEngine(AgentOptions options,ProtectedState state,ILog
   File.Delete(Path.Combine(options.StateDirectory,"engine-password.txt"));
   var executable=Path.Combine(AppContext.BaseDirectory,"engine","Duplicati.Server.exe");
   if(!File.Exists(executable))throw new InvalidOperationException("Bundled engine missing");
-  var data=Path.Combine(options.StateDirectory,"engine");Directory.CreateDirectory(data);
+  // Duplicati creates its own leaf directory with canonical, non-inherited ACLs.
+  // Pre-creating it here would correctly be rejected as an insecure existing folder.
+  var data=Path.Combine(options.StateDirectory,"engine");
   while(!ct.IsCancellationRequested)
   {
    using var process=new Process{StartInfo=CreateStartInfo(executable,data,options.EngineUrl,credential,key)};
