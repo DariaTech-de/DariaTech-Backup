@@ -24,6 +24,7 @@ foreach ($package in 'microsoft.netcore.app.runtime.win-x64','microsoft.aspnetco
 #define CompanyName "$($brand.companyName)"
 #define SupportUrl "$($brand.supportUrl)"
 #define InstallerName "$($brand.installerName)"
+#define InstallerImage "$($brand.installerImage)"
 #define ServiceName "$($brand.windowsServiceName)"
 #define ProductVersion "$version"
 "@ | Set-Content deploy/windows/Branding.iss -Encoding UTF8

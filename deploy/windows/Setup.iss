@@ -16,6 +16,7 @@ MinVersion=10.0.17763
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
+WizardSmallImageFile=..\..\branding\{#InstallerImage}
 LicenseFile=..\..\LICENSE
 CloseApplications=yes
 RestartApplications=no

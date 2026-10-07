@@ -8,4 +8,4 @@ Duplicati/License retains third-party notices and copies them beside the engine.
 
 Modern upstream Angular ngclient source is maintained in a separate repo/package. This implementation brands the maintained ngax interface and the new Console. It does not patch/minify/replace all upstream ngclient strings. Managed agents normally expose only the local API; do not ship an unreviewed vendor UI as a fully rebranded surface.
 
-Never remove upstream credits from About, LICENSE, thirdparty or shipped notices. DariaTech branding support email is intentionally unset until an actual support address is supplied. Logo is an initial geometric DariaTech mark, not an asserted official corporate asset.
+Never remove upstream credits from About, LICENSE, thirdparty or shipped notices. DariaTech assets and public support contacts are sourced from the official company website; see [branding provenance](../branding/README.md). The official corporate assets remain DariaTech trademarks/artwork; the upstream MIT license does not grant third parties ownership of those marks.
