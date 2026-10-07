@@ -92,15 +92,21 @@ begin
  if Code <> 0 then RaiseException('Service installation failed. Check the Windows Application event log, enrollment token and HTTPS reachability. Local state is preserved.');
 end;
 
-procedure CurStepChanged(CurStep: TSetupStep);
-var State: String; ReadToken: AnsiString; Code: Integer;
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var Code: Integer;
 begin
- if CurStep = ssInstall then begin
+ Result := '';
   if not Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
-   '-NoProfile -NonInteractive -Command "$s=Get-Service ''{#ServiceName}'' -ErrorAction SilentlyContinue; if($s){Stop-Service $s.Name -Force; $s.WaitForStatus(''Stopped'',[TimeSpan]::FromSeconds(30))}"',
-   '', SW_HIDE, ewWaitUntilTerminated, Code) then RaiseException('Could not stop previous service.');
-  if Code <> 0 then RaiseException('Could not stop previous service.');
- end;
+   '-NoProfile -NonInteractive -Command "$ErrorActionPreference=''Stop''; $s=Get-Service ''{#ServiceName}'' -ErrorAction SilentlyContinue; if($s){Stop-Service $s.Name -Force; $s.WaitForStatus(''Stopped'',[TimeSpan]::FromSeconds(30))}; exit 0"',
+   '', SW_HIDE, ewWaitUntilTerminated, Code) then begin
+   Result := 'Could not start service preflight.'; Exit;
+  end;
+  if Code <> 0 then Result := 'Could not stop previous service.';
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+var State: String; ReadToken: AnsiString;
+begin
  if CurStep <> ssPostInstall then Exit;
  try
  ConsoleUrl := ConnectionPage.Values[0]; Token := ConnectionPage.Values[1]; EnginePassword := ConnectionPage.Values[2];
