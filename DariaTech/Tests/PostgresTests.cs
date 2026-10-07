@@ -28,6 +28,7 @@ public sealed class PostgresTests
   File.WriteAllText(Path.Combine(directory,"master.key"),Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)));
   await using var db=Db();await db.Database.MigrateAsync();factory=new TestFactory(connection,directory);
  }
+ [SetUp]public void ResetHost(){factory?.Dispose();factory=new TestFactory(connection,directory);}
  [OneTimeTearDown]public void TearDown(){factory?.Dispose();if(directory is not null)Directory.Delete(directory,true);}
  private async Task<(Tenant Tenant,Site Site)> Customer()
  {
@@ -130,6 +131,35 @@ public sealed class PostgresTests
  {
   await using var db=Db();var e=new AuditEvent{Actor="test",Action="test.append-only",Resource="fixture"};db.Audit.Add(e);await db.SaveChangesAsync();
   Assert.ThrowsAsync<Npgsql.PostgresException>(async()=>await db.Database.ExecuteSqlInterpolatedAsync($"""UPDATE "Audit" SET "Action"='changed' WHERE "Id"={e.Id}"""));
+ }
+
+ [Test]public async Task ManagedConfigurationIsEncryptedDeviceBoundVersionedAndAudited()
+ {
+  var(t,site)=await Customer();using var agent=factory.CreateClient(new(){BaseAddress=new Uri("https://localhost")});
+  using var enrolled=await agent.PostAsJsonAsync("/api/v1/agent/enroll",new EnrollmentRequest(await Token(t,site),"Managed","Windows","0.1.0"));
+  var identity=(await enrolled.Content.ReadFromJsonAsync<EnrollmentResponse>())!;
+  agent.DefaultRequestHeaders.Authorization=new("Bearer",identity.Credential);agent.DefaultRequestHeaders.Add("X-Device-Id",identity.DeviceId.ToString());
+  using var admin=await Login(UserRole.SuperAdmin);using var csrf=System.Text.Json.JsonDocument.Parse(await admin.GetStringAsync("/api/v1/management/csrf"));admin.DefaultRequestHeaders.Add("X-CSRF-Token",csrf.RootElement.GetProperty("token").GetString());
+  var definition=new ManagedBackupDefinition("Central backup",["C:\\Data"],"file:///D:/Backups/","test-managed-passphrase-987654",new(),30,[],null);
+  using var created=await admin.PostAsJsonAsync($"/api/v1/management/devices/{identity.DeviceId}/managed-jobs",new ConfigurationInput(0,definition));
+  Assert.That(created.StatusCode,Is.EqualTo(HttpStatusCode.Created));var job=(await created.Content.ReadFromJsonAsync<ManagedJob>())!;
+  await using var db=Db();var revision=await db.ConfigurationRevisions.SingleAsync(x=>x.ManagedJobId==job.Id);
+  Assert.That(revision.EncryptedConfiguration,Does.Not.Contain(definition.Passphrase).And.Not.Contain("C:\\Data"));
+  var management=await admin.GetStringAsync("/api/v1/management/managed-jobs");Assert.That(management,Does.Not.Contain(definition.Passphrase).And.Not.Contain("EncryptedConfiguration"));
+  var assignments=await agent.GetFromJsonAsync<ConfigurationAssignment[]>("/api/v1/agent/configurations");Assert.That(assignments!.Single().Definition.Passphrase,Is.EqualTo(definition.Passphrase));
+  using var ownReceipt=await agent.PostAsJsonAsync($"/api/v1/agent/configurations/{job.Id}/receipt",new ConfigurationReceipt(1,"7","Applied"));Assert.That(ownReceipt.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  using var replay=await agent.PostAsJsonAsync($"/api/v1/agent/configurations/{job.Id}/receipt",new ConfigurationReceipt(1,"7","Applied"));Assert.That(replay.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  Assert.That(await db.Audit.CountAsync(x=>x.Resource==job.Id.ToString()&&x.Action=="backup.configuration-applied"),Is.EqualTo(1));
+  Assert.That((await db.Jobs.SingleAsync(x=>x.DeviceId==identity.DeviceId)).Ownership,Is.EqualTo("Managed"));
+  using var mutation=await admin.PutAsJsonAsync($"/api/v1/management/managed-jobs/{job.Id}",new ConfigurationInput(1,definition with{Passphrase="different-secret-password"}));Assert.That(mutation.StatusCode,Is.EqualTo(HttpStatusCode.Conflict));
+  using var changed=await admin.PutAsJsonAsync($"/api/v1/management/managed-jobs/{job.Id}",new ConfigurationInput(1,definition with{KeepVersions=90}));Assert.That(changed.StatusCode,Is.EqualTo(HttpStatusCode.OK));
+  using var conflict=await admin.PutAsJsonAsync($"/api/v1/management/managed-jobs/{job.Id}",new ConfigurationInput(1,definition));Assert.That(conflict.StatusCode,Is.EqualTo(HttpStatusCode.Conflict));
+  var(other,otherSite)=await Customer();using var foreign=factory.CreateClient(new(){BaseAddress=new Uri("https://localhost")});
+  using var otherEnroll=await foreign.PostAsJsonAsync("/api/v1/agent/enroll",new EnrollmentRequest(await Token(other,otherSite),"Foreign","Windows","0.1.0"));var otherIdentity=(await otherEnroll.Content.ReadFromJsonAsync<EnrollmentResponse>())!;
+  foreign.DefaultRequestHeaders.Authorization=new("Bearer",otherIdentity.Credential);foreign.DefaultRequestHeaders.Add("X-Device-Id",otherIdentity.DeviceId.ToString());
+  Assert.That(await foreign.GetFromJsonAsync<ConfigurationAssignment[]>("/api/v1/agent/configurations"),Is.Empty);
+  using var forbidden=await foreign.PostAsJsonAsync($"/api/v1/agent/configurations/{job.Id}/receipt",new ConfigurationReceipt(2,"7","Applied"));Assert.That(forbidden.StatusCode,Is.EqualTo(HttpStatusCode.NotFound));
+  revision.EncryptedConfiguration="tampered";Assert.ThrowsAsync<InvalidOperationException>(async()=>await db.SaveChangesAsync());
  }
  private sealed class TestFactory(string cs,string dir):WebApplicationFactory<Program>
  {

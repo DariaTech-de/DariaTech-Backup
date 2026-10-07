@@ -21,6 +21,12 @@ public sealed class Worker(AgentOptions options,ProtectedState state,ILogger<Wor
    {
     JobReport[] jobs=[];ProgressReport? progress=null;var reachable=true;
     try{jobs=await adapter.ReadJobs(ct);progress=await adapter.ReadProgress(ct);if(progress is not null&&jobs.All(x=>x.LocalId!=progress.LocalJobId))progress=null;}catch(Exception ex)when(ex is HttpRequestException or InvalidOperationException or System.Text.Json.JsonException or TaskCanceledException){reachable=false;log.LogWarning("Local engine unavailable ({Type})",ex.GetType().Name);}
+    if(reachable)
+    {
+     try{await ManagedConfiguration.Synchronize(client,adapter,options,state,ct);}
+     catch(OperationCanceledException)when(ct.IsCancellationRequested){throw;}
+     catch(Exception ex){log.LogWarning("Managed configuration synchronization failed ({Type})",ex.GetType().Name);}
+    }
     queue.Add(new(options.Version,RuntimeInformation.OSDescription,reachable,jobs,reachable?progress:null));
     // Bound disk use. Lost older snapshots are explicitly reported, never claimed delivered.
     if(queue.Count>1440){queue.RemoveAt(0);log.LogWarning("Telemetry outbox full; oldest snapshot discarded");}

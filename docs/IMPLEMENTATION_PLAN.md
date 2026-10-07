@@ -10,7 +10,7 @@ Work in order; every phase has a separate commit and validation. An unchecked it
 6. [x] Heartbeats, allowlisted real Duplicati job metadata, idempotent backup history; no secret/log forwarding.
 7. [x] Responsive MSP dashboard and device/customer views using persisted records only; explicit empty and unknown states.
 8. [x] Configurable monitoring, deduplicated persistent alerts, resolved states.
-9. [ ] Managed configuration revisions and local-vs-managed ownership; encrypted secrets, agent validation and acknowledgement.
+9. [x] Managed configuration revisions and local-vs-managed ownership; encrypted secrets, agent validation and acknowledgement.
 10. [ ] Allowlisted signed expiring remote commands, durable replay protection, audited backup/stop/restore and extra restore approval.
 11. [ ] Durable notification outbox, email transport, deduplication, retries and reminder rules.
 12. [ ] Approved signed update manifest, artifact hashes, rollback/expiry protection, staged Windows rollout and recovery.
@@ -25,10 +25,12 @@ Phases 1–8 provide a working first management slice, not the final production 
 
 Open within this first slice: Authenticode signing and Windows reboot/VSS/customer-environment validation, incremental capture of every historical engine run between polls, complete privacy erasure/retention workflow, richer customer/site/user edit UI (management APIs exist), storage quota/retention/destination-specific alert signals, MFA recovery/key rotation and production security review. Monitoring currently covers offline, unavailable engine, missing/overdue backups, failed/warning runs and outdated agent version. It does not claim to detect every requested condition.
 
-Phases 9–12 are intentionally unimplemented and clearly labelled in the UI: central configuration distribution, authenticated/replay-protected remote backup/restore, notification delivery and approved signed updates. No execution placeholder accepts untrusted remote commands. Public DNS/hosting for backup.dariatech.de was not configured. No production admin account or demo customer data was seeded.
+Phases 10–12 remain unimplemented and clearly labelled in the UI: authenticated/replay-protected remote backup/restore, notification delivery and approved signed updates. No execution placeholder accepts untrusted remote commands. Public DNS/hosting for backup.dariatech.de was not configured. No production admin account or demo customer data was seeded.
 
 ## Windows installer work
 
 A bundled x64 Inno Setup EXE now builds successfully on Windows GitHub Actions. It includes the OSS engine, installs an automatic LocalSystem agent service, provisions under SYSTEM, protects state ACLs/DPAPI, isolates its engine on port 8210 and supports interactive or file-based silent enrollment. Engine jobs remain configured locally; remote configuration/restore/update gates are unchanged. The release workflow publishes an unsigned pilot prerelease only after its Windows smoke test passes. Automated smoke coverage uses a test-only HTTPS enrollment fixture and the actual bundled engine, not a production Console substitute. See AGENT.md for parameters and deployment limits.
 
 Windows hosted CI passed the actual silent setup/service lifecycle test: insecure pre-existing state rejection, SYSTEM-bound DPAPI protection, restrictive ACLs, HTTPS enrollment against a test-only fixture, actual engine authentication, secret-free heartbeat, preserved identity on upgrade, service/engine stop and restart, and retained-state uninstall. This is evidence for the installer path on Windows Server 2025, not a claim of completed VSS/reboot/customer-PC or Authenticode validation.
+
+Managed configuration now has Admin/CSRF-protected creation and optimistic revisions, purpose-bound encrypted definitions, tenant/device-bound agent distribution, immutable revisions, durable local anti-rollback/receipt journal, and actual engine API application. Local opt-in is required; local jobs are not adopted. This initial policy surface supports AES, sources, secure file/S3/SSH/WebDAV targets, filters, keep-versions and hourly/day schedules; advanced engine features remain local.

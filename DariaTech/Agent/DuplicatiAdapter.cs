@@ -6,7 +6,7 @@ using System.Text.Json;
 using DariaTech.Contracts;
 namespace DariaTech.Agent;
 
-public sealed class DuplicatiAdapter : IDisposable
+public sealed partial class DuplicatiAdapter : IDisposable
 {
  private readonly HttpClient client;
  private readonly ProtectedState state;

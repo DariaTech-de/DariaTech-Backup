@@ -40,3 +40,11 @@ There is no remote-command endpoint, arbitrary local-API proxy, central configur
 Site PUT/DELETE routes validate tenant ownership and refuse deleting sites with device history. User GET exposes metadata only; user PUT requires SuperAdmin, preserves the last active SuperAdmin, rewraps tenant-bound TOTP secrets and invalidates existing sessions.
 
 A generic engine error without a verified backup result is an EngineOperationFailed incident. Started carries the observed error timestamp; Completed and statistics are null because operation timing/type/counts are unknown. It must not be counted as a confirmed failed backup or fabricated zero-duration/zero-byte run. EngineOperationFailed is an additional allowed error code.
+
+## Centrally managed job configurations
+
+`POST /api/v1/management/devices/{deviceId}/managed-jobs` (Admin, cookie + CSRF): `{ expectedRevision: 0, definition: { name, sources, targetUrl, passphrase, backendOptions, keepVersions, filters: [{include,expression}], schedule: null | {start,repeatHours,days} } }`. Passphrase: 14–200 characters. Schedule days use .NET DayOfWeek integers (Sunday=0). Source paths must be absolute, target URL must not embed credentials. Supported managed targets: file, s3, ssh, webdav/webdavs; S3/WebDAV require `use-ssl=true`, SSH requires an explicit `ssh-fingerprint`. Credential options are encrypted with the entire immutable revision, not returned by management reads. No script/custom module/DB-path options are accepted.
+
+`PUT /api/v1/management/managed-jobs/{id}` uses the same envelope with the current expectedRevision. A stale writer receives 409. Changing passphrase or destination requires creating a new job/chain; changing them in place receives `NewBackupChainRequired`. `GET /managed-jobs` returns metadata and application state only.
+
+`GET /api/v1/agent/configurations` requires the device's Bearer credential AND X-Device-Id. It returns at most 20 pending latest assignments, exclusively for that active device and active customer. Contains credentials: HTTPS only; no-store; never print responses in RMM logs. `POST /api/v1/agent/configurations/{jobId}/receipt`: `{revision,localJobId,status}`; status Applied/Rejected/Failed. Applied receipts are idempotent, audit logged, and mark the corresponding telemetry job Managed. Local jobs are not automatically adopted or overwritten.

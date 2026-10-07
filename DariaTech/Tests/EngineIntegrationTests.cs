@@ -44,6 +44,13 @@ public sealed class EngineIntegrationTests
    var options=new AgentOptions{EngineUrl=client.BaseAddress!.ToString(),StateDirectory=Path.Combine(dir,"agent"),LinuxKeyFile=key};var state=new ProtectedState(options);state.Write("engine-credential.bin",password);
    using var adapter=new DuplicatiAdapter(options,state);var jobs=await adapter.ReadJobs(ct.Token);Assert.That(jobs,Has.Length.EqualTo(1));Assert.That(jobs[0].LastRun?.Status,Is.EqualTo(RunStatus.Success));Assert.That(jobs[0].LastRun?.Files,Is.EqualTo(1));Assert.That(jobs[0].LastRun?.Bytes,Is.EqualTo(bytes.Length));
    Assert.That(Directory.GetFiles(destination),Is.Not.Empty);Assert.That(Directory.GetFiles(destination).All(x=>x.EndsWith(".aes")),Is.True);
+   var managedDestination=Path.Combine(dir,"managed-storage");Directory.CreateDirectory(managedDestination);
+   var definition=new ManagedBackupDefinition("Managed integration",[source+Path.DirectorySeparatorChar],new Uri(managedDestination+Path.DirectorySeparatorChar).AbsoluteUri,passphrase,new(),30,[],new(DateTimeOffset.UtcNow.AddDays(1),24,[DayOfWeek.Monday]));
+   var assignment=new ConfigurationAssignment(Guid.NewGuid(),1,definition);
+   var managedId=await adapter.ApplyConfiguration(assignment,ct.Token);
+   Assert.That(await adapter.ApplyConfiguration(assignment,ct.Token),Is.EqualTo(managedId));
+   Assert.That(await adapter.ApplyConfiguration(assignment with{Revision=2,Definition=definition with{KeepVersions=90}},ct.Token),Is.EqualTo(managedId));
+   var afterManaged=await adapter.ReadJobs(ct.Token);Assert.That(afterManaged.Length,Is.EqualTo(2));Assert.That(afterManaged.Single(x=>x.LocalId==id).LastRun!.Status,Is.EqualTo(RunStatus.Success));
    File.Delete(Path.Combine(source,"restore-check.bin"));
    using var restored=await client.PostAsJsonAsync($"/api/v1/backup/{id}/restore",new{paths=new[]{Path.Combine(source,"restore-check.bin")},time="now",restore_path=restore,overwrite=true,permissions=false,skip_metadata=true},ct.Token);restored.EnsureSuccessStatusCode();using var restoreTask=JsonDocument.Parse(await restored.Content.ReadAsStringAsync(ct.Token));await WaitTask(client,DuplicatiAdapter.Get(restoreTask.RootElement,"ID").ToString(),ct.Token,password,passphrase);
    var file=Directory.GetFiles(restore,"restore-check.bin",SearchOption.AllDirectories).Single();Assert.That(await File.ReadAllBytesAsync(file,ct.Token),Is.EqualTo(bytes));

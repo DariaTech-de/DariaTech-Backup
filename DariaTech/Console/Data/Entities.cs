@@ -85,3 +85,16 @@ public sealed class NotificationRule : TenantEntity
  public string Channel { get; set; } = "Email"; public string Recipient { get; set; } = "";
  public int RepeatMinutes { get; set; } = 1440; public bool Enabled { get; set; }
 }
+
+public sealed class ManagedJob : TenantEntity
+{
+ public Guid DeviceId { get; set; } public string Name { get; set; } = "";
+ public long LatestRevision { get; set; } public long AppliedRevision { get; set; } public long LastReportedRevision { get; set; }
+ public string? LocalJobId { get; set; } public string Status { get; set; } = "Pending";
+}
+public sealed class ConfigurationRevision : TenantEntity
+{
+ public Guid ManagedJobId { get; set; } public long Revision { get; set; }
+ public string EncryptedConfiguration { get; set; } = "";
+ public DateTimeOffset Created { get; set; } = DateTimeOffset.UtcNow;
+}

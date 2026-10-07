@@ -62,6 +62,16 @@ public sealed class SecurityTests
   var json=JsonSerializer.Serialize(report);Assert.That(json,Does.Not.Contain("DoNotSend").And.Not.Contain("patient-name").And.Not.Contain("LastErrorMessage"));
   Assert.That(report.StorageBytes,Is.EqualTo(4096));
  }
+ [Test]public void ManagedConfigurationRejectsScriptsUnencryptedStorageAndHostKeyBypass()
+ {
+  var d=new ManagedBackupDefinition("Daily",["C:\\Data"],"file:///D:/Backup/","test-only-long-passphrase",new(),30,[],null);
+  Assert.That(ConfigurationPolicy.Valid(d),Is.True);
+  Assert.That(ConfigurationPolicy.Valid(d with{BackendOptions=new(){{"run-script-before","evil.exe"}}}),Is.False);
+  Assert.That(ConfigurationPolicy.Valid(d with{TargetUrl="s3://bucket/path"}),Is.False);
+  Assert.That(ConfigurationPolicy.Valid(d with{TargetUrl="s3://bucket/path",BackendOptions=new(){{"use-ssl","true"}}}),Is.True);
+  Assert.That(ConfigurationPolicy.Valid(d with{TargetUrl="ssh://storage.example/path",BackendOptions=new(){{"ssh-accept-any-fingerprints","true"}}}),Is.False);
+  Assert.That(ConfigurationPolicy.Valid(d with{Sources=["relative/path"]}),Is.False);
+ }
  [Test]public void AgentRejectsRemoteEngineAndInsecureConsole()
  {
   Assert.Throws<InvalidOperationException>(()=>new AgentOptions{EngineUrl="https://attacker.example"}.Validate());
