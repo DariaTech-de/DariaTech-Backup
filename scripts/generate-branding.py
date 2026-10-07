@@ -18,6 +18,7 @@ for folder in [root / "Duplicati/Server/webroot/branding", root / "DariaTech/Con
     outputs[folder / "product.css"] = ":root { " + " ".join(
         "--brand-" + re.sub(r"([A-Z])", r"-\1", key).lower() + ": " + value + ";"
         for key, value in colors.items()) + " }\n"
+outputs[root / "Duplicati/Server/webroot/branding/engine.css"] = (source / "engine.css").read_text()
 engine_css = root / "Duplicati/Server/webroot/branding/product.css"
 outputs[engine_css] += "a { color: var(--brand-primary); } .btn-primary, .progress-bar { background-color: var(--brand-primary); border-color: var(--brand-primary); } .btn-primary:hover, .btn-primary:focus { background-color: var(--brand-sidebar); border-color: var(--brand-sidebar); } .navbar-inverse { background-color: var(--brand-sidebar); }\n"
 for path, content in outputs.items():

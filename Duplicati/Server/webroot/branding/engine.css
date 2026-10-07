@@ -1,0 +1,21 @@
+/* DariaTech presentation layer; upstream engine and UI behavior stay separate. */
+body.dariatech-engine{--dt-panel:white;--dt-ink:var(--brand-ink);--dt-bg:var(--brand-background);--dt-border:var(--brand-border);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-weight:400;background:var(--dt-bg);color:var(--dt-ink)}
+body.dariatech-engine.dariatech-dark{--dt-panel:var(--brand-dark-panel);--dt-ink:var(--brand-dark-text);--dt-bg:var(--brand-dark-background);--dt-border:var(--brand-dark-border)}
+body.dariatech-engine .container .header{background:var(--brand-sidebar);border-bottom:3px solid var(--brand-logo-accent);box-shadow:0 4px 18px rgb(0 0 0 / 12%)}
+body.dariatech-engine .container .header .logo a,body.dariatech-engine .container .header .logo .home{color:white;font-weight:700}
+body.dariatech-engine .container .header .logo .powered-by{color:var(--brand-sidebar-text)}
+body.dariatech-engine .container .header .state{background:var(--dt-panel);color:var(--dt-ink);border-radius:12px;border-color:var(--dt-border)}
+body.dariatech-engine .container .body .mainmenu{background:var(--brand-sidebar);border-radius:16px;padding:20px;box-sizing:border-box;box-shadow:0 8px 24px rgb(0 0 0 / 10%)}
+body.dariatech-engine .container .body .mainmenu>ul>li>a{color:var(--brand-sidebar-text);font-size:17px;font-weight:500;border-radius:9px;margin-bottom:7px}
+body.dariatech-engine .container .body .mainmenu>ul>li>a.active,body.dariatech-engine .container .body .mainmenu>ul>li>a:hover{background-color:var(--brand-primary);color:white}
+body.dariatech-engine .container .body .mainmenu>ul li.hr-top{border-color:var(--brand-primary)}
+body.dariatech-engine .container .body>.content{background:var(--dt-panel);border:1px solid var(--dt-border);border-radius:16px;color:var(--dt-ink)}
+body.dariatech-engine .container .body .content .tasklist>div{border:1px solid var(--dt-border);border-radius:12px;margin:16px 0;padding:18px;background:var(--dt-bg)}
+body.dariatech-engine .container .body .content h1,body.dariatech-engine .container .body .content h2{color:var(--dt-ink);font-weight:650;letter-spacing:-.4px}
+body.dariatech-engine .container .body .content a{color:var(--brand-primary)}
+body.dariatech-engine.dariatech-dark .container .body .content a{color:var(--brand-accent)}
+body.dariatech-engine .container .body .content a.button,body.dariatech-engine .container .body .content .buttons a,body.dariatech-engine .container .body .content input[type=submit]{background-color:var(--brand-primary);color:white;border-color:var(--brand-primary);border-radius:8px;font-weight:600}
+body.dariatech-engine .container .body .content input:not([type=checkbox]):not([type=radio]):not([type=submit]),body.dariatech-engine .container .body .content select,body.dariatech-engine .container .body .content textarea{background-color:var(--dt-panel);color:var(--dt-ink);border-color:var(--dt-border);border-radius:7px;font-family:inherit;font-weight:400}
+body.dariatech-engine a:focus-visible,body.dariatech-engine button:focus-visible,body.dariatech-engine input:focus-visible{outline:3px solid var(--brand-accent);outline-offset:3px}
+body.dariatech-engine .container .footer{background:var(--dt-panel);border-top:1px solid var(--dt-border);color:var(--dt-ink)}
+@media(max-width:768px){body.dariatech-engine .container .body .mainmenu{background:var(--brand-sidebar)}body.dariatech-engine .container .body>.content{border-radius:10px}}
