@@ -29,6 +29,9 @@ jobs:
       - name: Build bundled OSS installer
         shell: pwsh
         run: ./scripts/build-windows-installer.ps1
+      - name: Test Windows service installation and enrollment
+        shell: pwsh
+        run: ./deploy/windows/tests/Smoke.ps1
       - uses: actions/upload-artifact@v4
         with:
           name: DariaTechBackupSetup-win-x64-unsigned

@@ -59,7 +59,7 @@ public sealed class ManagedEngine(AgentOptions options,ProtectedState state,ILog
   var uri=new Uri(engineUrl);
   if(!uri.IsLoopback||uri.Scheme!="http")throw new InvalidOperationException("Managed engine requires HTTP loopback");
   var start=new ProcessStartInfo(executable){UseShellExecute=false,CreateNoWindow=true,RedirectStandardOutput=true,RedirectStandardError=true,WorkingDirectory=Path.GetDirectoryName(executable)!};
-  foreach(var arg in new[]{"--webservice-interface=loopback",$"--webservice-port={uri.Port}",$"--server-datafolder={data}","--disable-update-check=true","--require-db-encryption-key=true","--webservice-allowed-hostnames=localhost;127.0.0.1"})start.ArgumentList.Add(arg);
+  foreach(var arg in new[]{"--webservice-interface=loopback",$"--webservice-port={uri.Port}",$"--server-datafolder={data}","--disable-update-check=true","--require-db-encryption-key=true","--webservice-allowed-hostnames=localhost,127.0.0.1","--webservice-suppress-welcome-page=true"})start.ArgumentList.Add(arg);
   start.Environment["DUPLICATI__WEBSERVICE_PASSWORD"]=credential;
   start.Environment["SETTINGS_ENCRYPTION_KEY"]=key;
   start.Environment["DO_NOT_TRACK"]="1";start.Environment["USAGEREPORTER_Duplicati_LEVEL"]="none";start.Environment["AUTOUPDATER_Duplicati_SKIP_UPDATE"]="1";
