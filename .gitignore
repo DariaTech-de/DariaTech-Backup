@@ -31,3 +31,6 @@ Tools/MacOSPhotosNative/build/
 **/TestResults/
 artifacts/
 keys/
+
+# Temporary administrator provisioning files
+.provision/
