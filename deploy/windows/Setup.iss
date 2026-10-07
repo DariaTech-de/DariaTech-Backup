@@ -100,7 +100,7 @@ var Code: Integer;
 begin
  Result := '';
   if not Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
-   '-NoProfile -NonInteractive -Command "$ErrorActionPreference=''Stop''; $s=Get-Service ''{#ServiceName}'' -ErrorAction SilentlyContinue; if($s){Stop-Service $s.Name -Force; $s.WaitForStatus(''Stopped'',[TimeSpan]::FromSeconds(30))}; exit 0"',
+   '-NoProfile -NonInteractive -Command "$ErrorActionPreference=''Stop''; $env:PSModulePath=$env:SystemRoot+''\System32\WindowsPowerShell\v1.0\Modules''; $s=Get-Service ''{#ServiceName}'' -ErrorAction SilentlyContinue; if($s){Stop-Service $s.Name -Force; $s.WaitForStatus(''Stopped'',[TimeSpan]::FromSeconds(30))}; exit 0"',
    '', SW_HIDE, ewWaitUntilTerminated, Code) then begin
    Result := 'Could not start service preflight.'; Exit;
   end;

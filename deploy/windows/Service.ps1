@@ -4,6 +4,9 @@ param(
  [string]$ConsoleUrl='https://backup.dariatech.de'
 )
 $ErrorActionPreference='Stop'
+# The installer launches Windows PowerShell 5.1. Do not inherit PowerShell 7
+# module paths from an RMM/CI parent: their Security module cannot load on .NET Framework.
+$env:PSModulePath=Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\Modules'
 $brand=Get-Content (Join-Path $InstallDirectory 'product.json') -Raw | ConvertFrom-Json
 $name=$brand.windowsServiceName
 $state=Join-Path $env:ProgramData 'DariaTechBackup'
