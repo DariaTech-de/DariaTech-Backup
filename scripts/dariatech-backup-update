@@ -28,4 +28,8 @@ mv "$backup_file.partial" "$backup_file"
 docker compose --profile maintenance run --rm migrate
 docker compose up -d --wait --wait-timeout 120 console
 docker compose ps
+# Keep the installed command current after a successful update.
+if [[ ${BASH_SOURCE[0]} == /usr/local/bin/dariatech-backup-update ]]; then
+  install -m 0755 "$repo/scripts/dariatech-backup-update" /usr/local/bin/dariatech-backup-update
+fi
 echo 'DariaTech Backup erfolgreich aktualisiert.'
