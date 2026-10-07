@@ -28,7 +28,16 @@ if ($Action -eq 'Prepare') {
   $old=Get-Content $existingConfig -Raw | ConvertFrom-Json
   if ($old.Agent.ConsoleUrl.TrimEnd('/') -ne $uri.AbsoluteUri.TrimEnd('/')) { throw 'An enrolled agent cannot change Console origin during upgrade. Re-enrollment requires explicit device revocation and local state reset.' }
  }
- New-Item -ItemType Directory -Path $state -Force | Out-Null
+ if(Test-Path $state) {
+  if((Get-Item $state).Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'Agent state directory must not be a junction or symbolic link'}
+  $existing=Get-Acl $state
+  $owner=$existing.GetOwner([Security.Principal.SecurityIdentifier]).Value
+  $trustedOwners=@('S-1-5-18','S-1-5-32-544',[Security.Principal.WindowsIdentity]::GetCurrent().User.Value)
+  if($owner -notin $trustedOwners -or !$existing.AreAccessRulesProtected){throw 'Existing agent state directory is not trusted. Verify its provenance and secure its owner/ACLs before retrying'}
+  foreach($rule in $existing.Access) {
+   if($rule.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value -notin $trustedOwners){throw 'Existing agent state directory has unexpected ACL principals; operator review required'}
+  }
+ } else { New-Item -ItemType Directory -Path $state | Out-Null }
  $acl=New-Object System.Security.AccessControl.DirectorySecurity
  $acl.SetAccessRuleProtection($true,$false)
  foreach ($sid in 'S-1-5-18','S-1-5-32-544') {
@@ -66,6 +75,7 @@ do {
 Stop-Service $name -Force -ErrorAction SilentlyContinue
 throw 'Enrollment or engine startup failed. Check HTTPS reachability, token validity and Windows Application event log. Local state is preserved for retry.'
 } catch {
- if(Test-Path $state){[IO.File]::WriteAllText((Join-Path $state 'installer-diagnostic.txt'),$_.ToString())}
+ # Never write privileged diagnostics into a refused, potentially attacker-owned state path.
+ [IO.File]::WriteAllText((Join-Path $InstallDirectory 'installer-diagnostic.txt'),$_.ToString())
  throw
 }

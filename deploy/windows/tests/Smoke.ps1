@@ -1,5 +1,6 @@
 # Run only on an ephemeral elevated Windows CI runner. No production identities or data.
 $ErrorActionPreference='Stop'
+if($env:GITHUB_ACTIONS -ne 'true'){throw 'This destructive fixture runs only on an ephemeral GitHub Actions runner'}
 Set-Location (Join-Path $PSScriptRoot '../../..')
 $temporary=Join-Path $env:RUNNER_TEMP ('dariatech-installer-'+[Guid]::NewGuid())
 New-Item -ItemType Directory $temporary | Out-Null
@@ -14,7 +15,7 @@ Import-Certificate -FilePath $public -CertStoreLocation Cert:\LocalMachine\Root 
 $env:FIXTURE_PFX=$pfx;$env:FIXTURE_PASSWORD=$password;$env:FIXTURE_TOKEN=$token
 $env:FIXTURE_ENGINE_PASSWORD=$password;$env:FIXTURE_RESULT=Join-Path $temporary 'result.json'
 $fixture=Start-Process node -ArgumentList (Join-Path $PSScriptRoot 'console-fixture.cjs') -PassThru -NoNewWindow
-function Invoke-Setup([string[]]$Arguments) {
+function Invoke-Setup([string[]]$Arguments,[bool]$ExpectFailure=$false) {
  $log=Join-Path $temporary 'setup.log'
  $setup=Start-Process artifacts/installer/DariaTechBackupSetup.exe -ArgumentList ($Arguments+"/LOG=$log") -PassThru
  if(!$setup.WaitForExit(240000)) {
@@ -23,9 +24,10 @@ function Invoke-Setup([string[]]$Arguments) {
   throw 'Installer exceeded four-minute timeout'
  }
  $setup.Refresh()
+ if($ExpectFailure){if($setup.ExitCode -eq 0){throw 'Installer accepted an insecure pre-existing state directory'};return}
  if($setup.ExitCode -ne 0) {
   if(Test-Path $log){Write-Host ((Get-Content $log -Raw).Replace($password,'[REDACTED]').Replace($token,'[REDACTED]'))}
-  $diagnostic=Join-Path $env:ProgramData 'DariaTechBackup/installer-diagnostic.txt'
+  $diagnostic=Join-Path ${env:ProgramFiles} 'DariaTech Backup/installer-diagnostic.txt'
   if(Test-Path $diagnostic){Write-Host ((Get-Content $diagnostic -Raw).Replace($password,'[REDACTED]').Replace($token,'[REDACTED]'))}
   Get-WinEvent -FilterHashtable @{LogName='Application';StartTime=(Get-Date).AddMinutes(-10)} -ErrorAction SilentlyContinue |
    Where-Object {$_.ProviderName -match 'DariaTech|\.NET Runtime'} | Select-Object -First 5 |
@@ -39,6 +41,13 @@ try {
  for($i=0;$i -lt 30;$i++) {
   try { Invoke-RestMethod https://localhost:18443/health -TimeoutSec 5 | Out-Null;break } catch { Start-Sleep 1 }
  }
+ $state=Join-Path $env:ProgramData 'DariaTechBackup'
+ if(Test-Path $state){throw 'Windows smoke test requires a clean runner state directory'}
+ New-Item -ItemType Directory $state | Out-Null
+ Write-Host 'Verifying rejection of an insecure pre-existing state directory.'
+ Invoke-Setup -Arguments @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/console=https://localhost:18443',"/tokenfile=$tokenFile","/enginepasswordfile=$passwordFile") -ExpectFailure $true
+ if(Test-Path (Join-Path $state 'identity.bin')){throw 'Insecure directory was enrolled'}
+ Remove-Item $state -Recurse -Force
  Write-Host 'Starting silent installation.'
  Invoke-Setup @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/console=https://localhost:18443',"/tokenfile=$tokenFile","/enginepasswordfile=$passwordFile")
  Write-Host 'Installation returned success; verifying runtime.'
@@ -82,7 +91,7 @@ try {
  if($removed.ExitCode -ne 0){throw 'Uninstall failed'}
  if(Get-Service DariaTechBackupAgent -ErrorAction SilentlyContinue){throw 'Service survived uninstall'}
  if(!(Test-Path (Join-Path $state 'identity.bin'))){throw 'Uninstall erased retained identity'}
- Write-Host 'PASS: silent setup, SYSTEM DPAPI, ACLs, enrollment, real engine authentication, heartbeat, upgrade, restart and uninstall.'
+ Write-Host 'PASS: insecure-state rejection, silent setup, SYSTEM DPAPI, ACLs, enrollment, real engine authentication, heartbeat, upgrade, restart and uninstall.'
 } finally {
  Stop-Service DariaTechBackupAgent -Force -ErrorAction SilentlyContinue
  Stop-Process -Id $fixture.Id -Force -ErrorAction SilentlyContinue
