@@ -32,7 +32,7 @@
        </div>
         <div class="dt-empty" ng-if="backups.length == 0"><h2>Ihre erste Sicherung beginnt hier</h2><p>Wählen Sie Daten, Speicherziel und Zeitplan. Die vorhandene Backup-Engine übernimmt Verschlüsselung und Sicherung.</p><a class="dt-primary" href="#/addstart">Sicherung einrichten →</a></div>
         <div class="tasklist">
-            <div ng-repeat="item in backups" class="task">
+            <div ng-repeat="item in backups" class="task" ng-class="{'dt-issue': item.Backup.Metadata.LastErrorDate &amp;&amp; (!item.Backup.Metadata.LastBackupDate || item.Backup.Metadata.LastErrorDate &gt; item.Backup.Metadata.LastBackupDate)}">
                 <a href ng-click="$parent.TaskMenuID == item.Backup.ID ? $parent.TaskMenuID = null : $parent.TaskMenuID = item.Backup.ID">
                     <img ng-show="item.Backup.ID != state.activeTask.Item2 && item.Backup.Metadata.NextScheduledRun == null" src="img/backup.png" srcset="img/backup.png 1x, img/backup_2x.png 2x, img/backup_3x.png 3x">
                     <img ng-show="item.Backup.ID != state.activeTask.Item2 && item.Backup.Metadata.NextScheduledRun != null" src="img/backupschedule.png" srcset="img/backupschedule.png 1x, img/backupschedule_2x.png 2x, img/backupschedule_3x.png 3x">
