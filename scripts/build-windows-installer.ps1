@@ -27,6 +27,7 @@ foreach ($package in 'microsoft.netcore.app.runtime.win-x64','microsoft.aspnetco
 #define InstallerImage "$($brand.installerImage)"
 #define ServiceName "$($brand.windowsServiceName)"
 #define ProductVersion "$version"
+#define BrandBackground "$($brand.palette.sidebar)"
 "@ | Set-Content deploy/windows/Branding.iss -Encoding UTF8
 if (!(Test-Path $Compiler)) { throw 'Install Inno Setup 6 or supply -Compiler' }
 & $Compiler deploy/windows/Setup.iss

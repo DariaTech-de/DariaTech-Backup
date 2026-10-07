@@ -15,13 +15,34 @@ PrivilegesRequired=admin
 MinVersion=10.0.17763
 Compression=lzma2
 SolidCompression=yes
-WizardStyle=modern
+WizardStyle=modern light stellar includetitlebar hidebevels
+WizardSizePercent=120
+WizardBackColor={#BrandBackground}
+WizardImageFile=..\..\branding\{#InstallerImage}
+WizardImageBackColor={#BrandBackground}
+WizardImageStretch=no
+WizardSmallImageBackColor={#BrandBackground}
+DisableWelcomePage=no
+DisableProgramGroupPage=yes
+DisableDirPage=yes
+LanguageDetectionMethod=none
+ShowLanguageDialog=no
 WizardSmallImageFile=..\..\branding\{#InstallerImage}
 LicenseFile=..\..\LICENSE
 CloseApplications=yes
 RestartApplications=no
 UninstallDisplayName={#ProductName}
 SetupLogging=no
+
+[Languages]
+Name: "german"; MessagesFile: "compiler:Languages\German.isl"
+
+[Messages]
+WelcomeLabel1=Willkommen bei {#ProductName}
+WelcomeLabel2=Zuverlässige Datensicherung – betreut von {#CompanyName}.%n%nDieser Assistent installiert den Backup-Agenten und die lokale Backup-Engine. Der Dienst startet automatisch mit Windows und sichert auch ohne angemeldeten Benutzer.%n%nHalten Sie die Console-Adresse und den Registrierungstoken bereit.
+FinishedHeadingLabel={#ProductName} ist bereit
+FinishedLabel=Der Agent wurde installiert und mit Ihrer Console verbunden.%n%nBackup-Jobs richten Sie anschließend in der lokalen Oberfläche unter http://127.0.0.1:8210/ngax ein.%n%nDer Dienst startet künftig automatisch mit Windows.
+BeveledLabel={#CompanyName}
 
 [Files]
 Source: "..\..\artifacts\windows\agent\*"; DestDir: "{app}"; Excludes: "appsettings.json"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -48,8 +69,8 @@ end;
 procedure CurPageChanged(CurPageID: Integer);
 begin
  if (CurPageID = wpFinished) and (SetupError <> '') then begin
-  WizardForm.FinishedHeadingLabel.Caption := 'Installation failed';
-  WizardForm.FinishedLabel.Caption := SetupError + #13#10 + 'The local state is retained for diagnosis. Correct the error and run setup again.';
+  WizardForm.FinishedHeadingLabel.Caption := 'Installation fehlgeschlagen';
+  WizardForm.FinishedLabel.Caption := SetupError + #13#10 + 'Lokale Daten bleiben erhalten. Beheben Sie den Fehler und starten Sie die Installation erneut.';
  end;
 end;
 
@@ -59,11 +80,11 @@ begin
  Token := ExpandConstant('{param:token|}');
  TokenFile := ExpandConstant('{param:tokenfile|}');
  EnginePasswordFile := ExpandConstant('{param:enginepasswordfile|}');
- ConnectionPage := CreateInputQueryPage(wpSelectDir, 'Console registration',
-  'Register this device with DariaTech', 'Enter the HTTPS Console URL and a single-use enrollment token. The local engine password protects the UI on this PC.');
- ConnectionPage.Add('Console URL:', False);
- ConnectionPage.Add('Enrollment token:', True);
- ConnectionPage.Add('Local engine password (14–200 characters; optional for silent installation):', True);
+ ConnectionPage := CreateInputQueryPage(wpSelectDir, 'Gerät registrieren',
+  'Mit Ihrer DariaTech Console verbinden', 'Geben Sie die Console-Adresse und den einmaligen Registrierungstoken ein. Das lokale Passwort schützt die Backup-Oberfläche auf diesem PC.');
+ ConnectionPage.Add('Console-Adresse (HTTPS):', False);
+ ConnectionPage.Add('Registrierungstoken:', True);
+ ConnectionPage.Add('Passwort für die lokale Oberfläche (14–200 Zeichen):', True);
  ConnectionPage.Values[0] := ConsoleUrl;
  ConnectionPage.Values[1] := Token;
 end;
@@ -77,11 +98,11 @@ begin
  if CurPageID = ConnectionPage.ID then begin
   if (Length(ConnectionPage.Values[1]) <> 64) and (TokenFile = '') and
      not FileExists(ExpandConstant('{commonappdata}\DariaTechBackup\identity.bin')) then begin
-   MsgBox('Enter the 64-character enrollment token.', mbError, MB_OK); Result := False;
+   MsgBox('Geben Sie den Registrierungstoken mit 64 Zeichen ein.', mbError, MB_OK); Result := False;
   end;
   if (EnginePasswordFile = '') and not FileExists(ExpandConstant('{commonappdata}\DariaTechBackup\engine-credential.bin')) and
      ((Length(ConnectionPage.Values[2]) < 14) or (Length(ConnectionPage.Values[2]) > 200)) then begin
-   MsgBox('Enter a local engine password with 14–200 characters.', mbError, MB_OK); Result := False;
+   MsgBox('Geben Sie ein lokales Passwort mit 14–200 Zeichen ein.', mbError, MB_OK); Result := False;
   end;
  end;
 end;
@@ -92,8 +113,8 @@ begin
  if not Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
   '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + ExpandConstant('{app}\Service.ps1') +
   '" -Action ' + Action + ' -InstallDirectory "' + ExpandConstant('{app}') + '" -ConsoleUrl "' + ConsoleUrl + '"',
-  '', SW_HIDE, ewWaitUntilTerminated, Code) then RaiseException('Could not start service installer.');
- if Code <> 0 then RaiseException('Service installation failed. Check the Windows Application event log, enrollment token and HTTPS reachability. Local state is preserved.');
+  '', SW_HIDE, ewWaitUntilTerminated, Code) then RaiseException('Die Dienstinstallation konnte nicht gestartet werden.');
+ if Code <> 0 then RaiseException('Dienstinstallation fehlgeschlagen. Prüfen Sie Registrierungstoken, HTTPS-Verbindung und Windows-Anwendungsprotokoll. Lokale Daten bleiben erhalten.');
 end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
@@ -103,9 +124,9 @@ begin
   if not Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
    '-NoProfile -NonInteractive -Command "$ErrorActionPreference=''Stop''; $env:PSModulePath=$env:SystemRoot+''\System32\WindowsPowerShell\v1.0\Modules''; $s=Get-Service ''{#ServiceName}'' -ErrorAction SilentlyContinue; if($s){Stop-Service $s.Name -Force; $s.WaitForStatus(''Stopped'',[TimeSpan]::FromSeconds(30))}; exit 0"',
    '', SW_HIDE, ewWaitUntilTerminated, Code) then begin
-   Result := 'Could not start service preflight.'; Exit;
+   Result := 'Die Dienstprüfung konnte nicht gestartet werden.'; Exit;
   end;
-  if Code <> 0 then Result := 'Could not stop previous service.';
+  if Code <> 0 then Result := 'Der vorhandene Dienst konnte nicht angehalten werden.';
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
@@ -114,25 +135,25 @@ begin
  if CurStep <> ssPostInstall then Exit;
  try
  ConsoleUrl := ConnectionPage.Values[0]; Token := ConnectionPage.Values[1]; EnginePassword := ConnectionPage.Values[2];
- if (Pos('"', ConsoleUrl) > 0) or (Pos(#13, ConsoleUrl) > 0) or (Pos(#10, ConsoleUrl) > 0) then RaiseException('Invalid Console URL.');
+ if (Pos('"', ConsoleUrl) > 0) or (Pos(#13, ConsoleUrl) > 0) or (Pos(#10, ConsoleUrl) > 0) then RaiseException('Ungültige Console-Adresse.');
  State := ExpandConstant('{commonappdata}\DariaTechBackup');
  if not FileExists(State+'\identity.bin') then begin
   if TokenFile <> '' then begin
-   if not LoadStringFromFile(TokenFile, ReadToken) then RaiseException('Cannot read token file.');
+   if not LoadStringFromFile(TokenFile, ReadToken) then RaiseException('Tokendatei kann nicht gelesen werden.');
    Token := Trim(String(ReadToken));
   end;
-  if Length(Token) <> 64 then RaiseException('A 64-character enrollment token or /tokenfile is required.');
+  if Length(Token) <> 64 then RaiseException('Ein Registrierungstoken mit 64 Zeichen oder /tokenfile ist erforderlich.');
  end;
  RunHelper('Prepare');
  if not FileExists(State+'\identity.bin') then
-  if not SaveStringToFile(State+'\enrollment-token.txt', AnsiString(Token), False) then RaiseException('Cannot save enrollment input.');
+  if not SaveStringToFile(State+'\enrollment-token.txt', AnsiString(Token), False) then RaiseException('Registrierungstoken kann nicht gespeichert werden.');
  if EnginePasswordFile <> '' then begin
-  if not LoadStringFromFile(EnginePasswordFile, ReadToken) then RaiseException('Cannot read local password file.');
+  if not LoadStringFromFile(EnginePasswordFile, ReadToken) then RaiseException('Lokale Passwortdatei kann nicht gelesen werden.');
   EnginePassword := Trim(UTF8Decode(ReadToken));
  end;
- if (EnginePassword <> '') and ((Length(EnginePassword) < 14) or (Length(EnginePassword) > 200)) then RaiseException('Local password must be 14–200 characters.');
+ if (EnginePassword <> '') and ((Length(EnginePassword) < 14) or (Length(EnginePassword) > 200)) then RaiseException('Das lokale Passwort muss 14–200 Zeichen lang sein.');
  if (EnginePassword <> '') and not FileExists(State+'\engine-credential.bin') then
-  if not SaveStringToFile(State+'\engine-password.txt', UTF8Encode(EnginePassword), False) then RaiseException('Cannot save local password.');
+  if not SaveStringToFile(State+'\engine-password.txt', UTF8Encode(EnginePassword), False) then RaiseException('Lokales Passwort kann nicht gespeichert werden.');
  RunHelper('Install');
  Token := ''; EnginePassword := ''; ConnectionPage.Values[1] := ''; ConnectionPage.Values[2] := '';
  except
