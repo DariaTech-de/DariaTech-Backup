@@ -29,3 +29,5 @@ Schema changes: create/review EF migration and snapshot, test upgrade, then run 
 ## Status
 
 See IMPLEMENTATION_PLAN.md for checked delivery versus later phases. Do not make partially implemented remote controls appear active. Console UI uses actual persisted data, including clear empty/unknown/no-backup states. Test fixture records are not product seed/demo data. Use logical commits with build/test evidence; do not commit local secrets, databases or test logs.
+
+The Console Docker build keeps NuGet auditing enabled, but passes `WarningsNotAsErrors=NU1900` to restore and publish. NU1900 means the advisory service could not be queried; it remains visible as a warning so a transient network outage does not prevent rebuilding an existing deployment. An unavailable audit is not a clean security result. Known-vulnerability warnings NU1901–NU1904, package download failures and lock-file mismatches still fail the build. Normal project/CI warning policy remains unchanged.

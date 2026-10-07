@@ -5,8 +5,8 @@ WORKDIR /src
 COPY . .
 RUN --mount=type=secret,id=proxy_bundle \
     if [ -f /run/secrets/proxy_bundle ]; then export SSL_CERT_FILE=/run/secrets/proxy_bundle; fi; \
-    DOTNET_CLI_TELEMETRY_OPTOUT=1 dotnet restore DariaTech/Console/DariaTech.Console.csproj --locked-mode && \
-    dotnet publish DariaTech/Console/DariaTech.Console.csproj -c Release --no-restore -o /out
+    DOTNET_CLI_TELEMETRY_OPTOUT=1 dotnet restore DariaTech/Console/DariaTech.Console.csproj --locked-mode -p:WarningsNotAsErrors=NU1900 && \
+    dotnet publish DariaTech/Console/DariaTech.Console.csproj -c Release --no-restore -p:WarningsNotAsErrors=NU1900 -o /out
 FROM mcr.microsoft.com/dotnet/aspnet:10.0.12-noble AS runtime
 WORKDIR /app
 COPY --from=build /out .
