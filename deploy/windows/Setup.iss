@@ -28,7 +28,7 @@ Source: "..\..\artifacts\windows\agent\appsettings.json"; DestDir: "{app}"; Flag
 Source: "..\..\artifacts\windows\engine\*"; DestDir: "{app}\engine"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "Service.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\LICENSE"; DestDir: "{app}\legal"; Flags: ignoreversion
-Source: "..\..\thirdparty\*"; DestDir: "{app}\legal\thirdparty"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\..\thirdparty\*"; DestDir: "{app}\legal\thirdparty"; Excludes: "*.dll,*.exe,*.zip,*.nupkg"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\..\DariaTech\Console\wwwroot\legal\management\*"; DestDir: "{app}\legal\management"; Flags: ignoreversion
 
 [UninstallRun]

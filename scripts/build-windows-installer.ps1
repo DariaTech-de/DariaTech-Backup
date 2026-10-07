@@ -8,6 +8,17 @@ dotnet publish DariaTech/Agent/DariaTech.Agent.csproj -c Release -r win-x64 --se
 if ($LASTEXITCODE) { throw 'Agent publish failed' }
 dotnet publish Executables/Duplicati.Server/Duplicati.Server.csproj -c Release -r win-x64 --self-contained true -p:DariaTechOssOnly=true -o artifacts/windows/engine
 if ($LASTEXITCODE) { throw 'OSS engine publish failed' }
+$cache=(dotnet nuget locals global-packages --list) -replace '^global-packages:\s*',''
+foreach ($package in 'microsoft.netcore.app.runtime.win-x64','microsoft.aspnetcore.app.runtime.win-x64') {
+ $root=Join-Path $cache $package
+ $versionDirectory=Get-ChildItem $root -Directory | Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
+ if (!$versionDirectory) { throw "Runtime package not found: $package" }
+ $legal=Join-Path 'artifacts/windows/agent/legal' $package
+ New-Item -ItemType Directory $legal -Force | Out-Null
+ $notices=Get-ChildItem $versionDirectory.FullName -File | Where-Object { $_.Name -match '^LICENSE\.TXT$|^THIRD-PARTY-NOTICES\.TXT$' }
+ if (!$notices) { throw "Runtime license notices not found: $package" }
+ $notices | Copy-Item -Destination $legal
+}
 @"
 #define ProductName "$($brand.productName)"
 #define CompanyName "$($brand.companyName)"
