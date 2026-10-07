@@ -37,6 +37,20 @@ Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile
 [Code]
 var ConnectionPage: TInputQueryWizardPage;
     Token, TokenFile, ConsoleUrl, EnginePassword, EnginePasswordFile: String;
+    SetupError: String;
+
+function GetCustomSetupExitCode: Integer;
+begin
+ if SetupError <> '' then Result := 10 else Result := 0;
+end;
+
+procedure CurPageChanged(CurPageID: Integer);
+begin
+ if (CurPageID = wpFinished) and (SetupError <> '') then begin
+  WizardForm.FinishedHeadingLabel.Caption := 'Installation failed';
+  WizardForm.FinishedLabel.Caption := SetupError + #13#10 + 'The local state is retained for diagnosis. Correct the error and run setup again.';
+ end;
+end;
 
 procedure InitializeWizard;
 begin
@@ -88,6 +102,7 @@ begin
   if Code <> 0 then RaiseException('Could not stop previous service.');
  end;
  if CurStep <> ssPostInstall then Exit;
+ try
  ConsoleUrl := ConnectionPage.Values[0]; Token := ConnectionPage.Values[1]; EnginePassword := ConnectionPage.Values[2];
  if (Pos('"', ConsoleUrl) > 0) or (Pos(#13, ConsoleUrl) > 0) or (Pos(#10, ConsoleUrl) > 0) then RaiseException('Invalid Console URL.');
  State := ExpandConstant('{commonappdata}\DariaTechBackup');
@@ -110,4 +125,8 @@ begin
   if not SaveStringToFile(State+'\engine-password.txt', UTF8Encode(EnginePassword), False) then RaiseException('Cannot save local password.');
  RunHelper('Install');
  Token := ''; EnginePassword := ''; ConnectionPage.Values[1] := ''; ConnectionPage.Values[2] := '';
+ except
+  SetupError := GetExceptionMessage;
+  Log('Service provisioning failed: ' + SetupError);
+ end;
 end;
