@@ -1,3 +1,18 @@
+# DariaTech Backup — Managed Backup
+
+DariaTech IT-Systemhaus management layer around the Duplicati backup engine. The initial implementation includes a separate .NET agent, PostgreSQL console/API, tenant-scoped customer/site/device management, enrollment, mandatory TOTP login, dashboard and monitoring. It is an iterative development baseline; remote configuration/restore, notifications, signed updates and Windows installer validation remain open.
+
+- [Analysis and reuse boundaries](docs/ANALYSIS.md)
+- [Architecture](docs/ARCHITECTURE.md) and [implementation status](docs/IMPLEMENTATION_PLAN.md)
+- [Deployment](docs/DEPLOYMENT.md), [agent](docs/AGENT.md), [API](docs/API.md)
+- [Security](docs/SECURITY.md), [licensing](docs/LICENSING.md), [development](docs/DEVELOPMENT.md)
+
+Management solution: `DariaTech.slnx`. Engine distribution: `scripts/build-duplicati.sh` (OSS-only). Central product settings: `branding/product.json`. Console starts with empty persisted data; it does not create demo customers or a default administrator.
+
+The original upstream README follows. Duplicati copyright, license notices and source identities are preserved.
+
+---
+
 # Duplicati
 
 **English** | [中文](./README.zh-CN.md) | [日本語](./README.ja-JP.md)

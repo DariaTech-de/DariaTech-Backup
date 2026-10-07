@@ -1,0 +1,92 @@
+name: dariatech-backup
+services:
+  postgres:
+    image: dariatech-backup-postgres:local
+    build:
+      context: .
+      dockerfile: deploy/Postgres.Dockerfile
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: dariatech
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password, app_password]
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d dariatech"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  migrate:
+    image: ${CONSOLE_IMAGE:-dariatech-backup-console:local}
+    build:
+      context: .
+      dockerfile: DariaTech/Console/Dockerfile
+    command: ["--migrate"]
+    profiles: [maintenance]
+    environment:
+      Database__ConnectionFile: /run/secrets/migration_connection
+      Security__MasterKeyFile: /run/secrets/master_key
+      Security__KeyDirectory: /var/lib/dariatech/keys
+    secrets: [migration_connection, master_key]
+    volumes: [console-keys:/var/lib/dariatech/keys]
+    depends_on:
+      postgres: {condition: service_healthy}
+    networks: [backend]
+  console:
+    image: ${CONSOLE_IMAGE:-dariatech-backup-console:local}
+    build:
+      context: .
+      dockerfile: DariaTech/Console/Dockerfile
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      AllowedHosts: ${BACKUP_DOMAIN:-backup.dariatech.de};localhost;127.0.0.1
+      Database__ConnectionFile: /run/secrets/app_connection
+      Security__MasterKeyFile: /run/secrets/master_key
+      Security__KeyDirectory: /var/lib/dariatech/keys
+      Security__TrustedProxies: 172.30.83.10
+      Monitoring__OfflineMinutes: ${OFFLINE_MINUTES:-30}
+      Monitoring__BackupAgeHours: ${BACKUP_AGE_HOURS:-24}
+      Monitoring__LatestApprovedVersion: ${APPROVED_AGENT_VERSION:-}
+    secrets: [app_connection, master_key]
+    volumes: [console-keys:/var/lib/dariatech/keys]
+    depends_on:
+      postgres: {condition: service_healthy}
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    networks:
+      backend: {}
+      edge: {ipv4_address: 172.30.83.20}
+  proxy:
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    environment:
+      BACKUP_DOMAIN: ${BACKUP_DOMAIN:-backup.dariatech.de}
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on: [console]
+    networks:
+      edge: {ipv4_address: 172.30.83.10}
+networks:
+  backend: {internal: true}
+  edge:
+    ipam:
+      config: [{subnet: 172.30.83.0/24}]
+volumes:
+  postgres-data: {}
+  console-keys: {}
+  caddy-data: {}
+  caddy-config: {}
+secrets:
+  postgres_password: {file: .secrets/postgres-password}
+  app_password: {file: .secrets/app-password}
+  app_connection: {file: .secrets/app-connection}
+  migration_connection: {file: .secrets/migration-connection}
+  master_key: {file: .secrets/master.key}

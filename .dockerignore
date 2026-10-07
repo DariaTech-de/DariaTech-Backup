@@ -1,0 +1,17 @@
+**/bin
+**/obj
+**/TestResults
+.git
+.secrets
+.env*
+artifacts
+node_modules
+**/node_modules
+Duplicati
+Executables
+proprietary
+ReleaseBuilder
+Tools
+LiveTests
+Localizations
+Assets

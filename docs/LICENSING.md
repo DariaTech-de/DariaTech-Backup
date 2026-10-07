@@ -1,0 +1,11 @@
+# Licensing and attribution
+
+Root LICENSE remains unchanged: MIT, Copyright (c) 2026 Duplicati Inc. Preserve it and source copyright headers. Rebranding presentation is permitted by that code license but does not transfer copyright or trademark ownership. Duplicati is identified as the backup engine in Open Source/About; DariaTech is the management/presentation layer.
+
+`proprietary/LICENSE` is separate, subscription-restricted, and NOT MIT. DariaTech distribution builds explicitly omit the proprietary loader/checker, Office365, GoogleWorkspace and DiskImage components through DariaTechOssOnly. Do not distribute an unfiltered upstream solution publish as DariaTech OSS. Those components and their original license files remain unmodified in the repository; omission does not claim entitlement to their features.
+
+Duplicati/License retains third-party notices and copies them beside the engine. Console packages include root MIT and thirdparty notices under `/legal`; `/Licenses` provides links. Management dependencies are inventoried from restored NuGet assets by `scripts/collect-management-licenses.py`; inventory preserves NuGet author/copyright/license metadata and includes MIT/PostgreSQL license texts. Inventory includes build-time packages, so it is broader than the runtime payload. Run again after dependency changes, and review the final runtime/SBOM and applicable notices before distribution. No legal review of trademarks, service terms or third-party commercial accounts is claimed.
+
+Modern upstream Angular ngclient source is maintained in a separate repo/package. This implementation brands the maintained ngax interface and the new Console. It does not patch/minify/replace all upstream ngclient strings. Managed agents normally expose only the local API; do not ship an unreviewed vendor UI as a fully rebranded surface.
+
+Never remove upstream credits from About, LICENSE, thirdparty or shipped notices. DariaTech branding support email is intentionally unset until an actual support address is supplied. Logo is an initial geometric DariaTech mark, not an asserted official corporate asset.

@@ -3,13 +3,13 @@
 Work in order; every phase has a separate commit and validation. An unchecked item is not a delivered feature.
 
 1. [x] Baseline: pin .NET SDK, reproducible OSS-only build, engine regression tests; record evidence.
-2. [ ] Branding: one manifest for name/company/assets/support/colors/installer/service; ngax integration and legal notices.
-3. [ ] Enrollment: tenant/site-bound random single-use expiring tokens, atomic redemption; independent Windows-capable worker.
-4. [ ] API/PostgreSQL: explicit versioned migrations, scoped queries, secure admin login with TOTP, device auth, audit and rate limits.
-5. [ ] Customer/site/device CRUD, constrained tenant relationships, roles including future customer roles, export/deletion strategy.
-6. [ ] Heartbeats, allowlisted real Duplicati job metadata, idempotent backup history; no secret/log forwarding.
-7. [ ] Responsive MSP dashboard and device/customer views using persisted records only; explicit empty and unknown states.
-8. [ ] Configurable monitoring, deduplicated persistent alerts, resolved states.
+2. [x] Branding: one manifest for name/company/assets/support/colors/installer/service; ngax integration and legal notices.
+3. [x] Enrollment: tenant/site-bound random single-use expiring tokens, atomic redemption; independent Windows-capable worker.
+4. [x] API/PostgreSQL: explicit versioned migrations, scoped queries, secure admin login with TOTP, device auth, audit and rate limits.
+5. [x] Customer/site/device management APIs, constrained tenant relationships, roles including future customer roles, scoped export and archival; physical erasure remains a release gap.
+6. [x] Heartbeats, allowlisted real Duplicati job metadata, idempotent backup history; no secret/log forwarding.
+7. [x] Responsive MSP dashboard and device/customer views using persisted records only; explicit empty and unknown states.
+8. [x] Configurable monitoring, deduplicated persistent alerts, resolved states.
 9. [ ] Managed configuration revisions and local-vs-managed ownership; encrypted secrets, agent validation and acknowledgement.
 10. [ ] Allowlisted signed expiring remote commands, durable replay protection, audited backup/stop/restore and extra restore approval.
 11. [ ] Durable notification outbox, email transport, deduplication, retries and reminder rules.
@@ -18,3 +18,11 @@ Work in order; every phase has a separate commit and validation. An unchecked it
 ## Release gates
 
 No production rollout before: negative cross-tenant tests, MFA/session tests, real encrypted backup+restore, Windows service/installer test, notification delivery test, signed update tamper/replay test, dependency/license review and operational PostgreSQL restore drill. Domain deployment requires actual hosting/DNS/SMTP credentials; a Compose file alone does not publish backup.dariatech.de.
+
+## Delivery evidence and limits (2026-10-07)
+
+Phases 1–8 provide a working first management slice, not the final production service. OSS server build succeeded; 66 selected upstream tests passed, 3 existing upstream skips. Sixteen management/security/engine tests passed without skips, including actual AES-encrypted backup, parsed statistics and byte-identical restore. Console and Agent builds have no warnings/errors. A Docker image was built; PostgreSQL migrations applied explicitly; the console started with a non-superuser app role and healthy readiness.
+
+Open within this first slice: signed Windows installer and Windows service/VSS validation, incremental capture of every historical engine run between polls, complete privacy erasure/retention workflow, richer customer/site/user edit UI (management APIs exist), storage quota/retention/destination-specific alert signals, MFA recovery/key rotation and production security review. Monitoring currently covers offline, unavailable engine, missing/overdue backups, failed/warning runs and outdated agent version. It does not claim to detect every requested condition.
+
+Phases 9–12 are intentionally unimplemented and clearly labelled in the UI: central configuration distribution, authenticated/replay-protected remote backup/restore, notification delivery and approved signed updates. No execution placeholder accepts untrusted remote commands. Public DNS/hosting for backup.dariatech.de was not configured. No production admin account or demo customer data was seeded.
