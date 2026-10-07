@@ -1,0 +1,401 @@
+[
+  {
+    "package": "Humanizer.Core/2.14.1",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Mehdi Khalili, Claire Novotny",
+    "copyright": "Copyright (c) .NET Foundation and Contributors"
+  },
+  {
+    "package": "Microsoft.Build.Framework/18.0.2",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.CodeAnalysis.Analyzers/3.11.0",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.CodeAnalysis.Common/5.0.0",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.CodeAnalysis.CSharp/5.0.0",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.CodeAnalysis.CSharp.Workspaces/5.0.0",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.CodeAnalysis.Workspaces.Common/5.0.0",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.CodeAnalysis.Workspaces.MSBuild/5.0.0",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.EntityFrameworkCore/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.EntityFrameworkCore.Abstractions/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.EntityFrameworkCore.Analyzers/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.EntityFrameworkCore.Design/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.EntityFrameworkCore.Relational/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.Extensions.DependencyModel/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.VisualStudio.SolutionPersistence/1.0.52",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Mono.TextTemplating/3.0.0",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Mikayla Hutchinson",
+    "copyright": ""
+  },
+  {
+    "package": "Newtonsoft.Json/13.0.3",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "James Newton-King",
+    "copyright": "Copyright \u00a9 James Newton-King 2008"
+  },
+  {
+    "package": "Npgsql/10.0.0",
+    "license": "PostgreSQL",
+    "text": "PostgreSQL.txt",
+    "authors": "Shay Rojansky,Nikita Kazmin,Brar Piening,Nino Floris,Yoh Deadfall,Austin Drenski,Emil Lenngren,Francisco Figueiredo Jr.,Kenji Uno",
+    "copyright": "Copyright 2025 \u00a9 The Npgsql Development Team"
+  },
+  {
+    "package": "Npgsql.EntityFrameworkCore.PostgreSQL/10.0.0",
+    "license": "PostgreSQL",
+    "text": "PostgreSQL.txt",
+    "authors": "Shay Rojansky,Austin Drenski,Yoh Deadfall",
+    "copyright": "Copyright 2025 \u00a9 The Npgsql Development Team"
+  },
+  {
+    "package": "System.CodeDom/6.0.0",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "System.Composition/9.0.0",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "System.Composition.AttributedModel/9.0.0",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "System.Composition.Convention/9.0.0",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "System.Composition.Hosting/9.0.0",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "System.Composition.Runtime/9.0.0",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "System.Composition.TypedParts/9.0.0",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.Extensions.Configuration/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.Extensions.Configuration.Abstractions/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.Extensions.Configuration.Binder/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.Extensions.Configuration.CommandLine/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.Extensions.Configuration.EnvironmentVariables/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.Extensions.Configuration.FileExtensions/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.Extensions.Configuration.Json/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.Extensions.Configuration.UserSecrets/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.Extensions.DependencyInjection/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.Extensions.DependencyInjection.Abstractions/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.Extensions.Diagnostics/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.Extensions.Diagnostics.Abstractions/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.Extensions.FileProviders.Abstractions/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.Extensions.FileProviders.Physical/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.Extensions.FileSystemGlobbing/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.Extensions.Hosting/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.Extensions.Hosting.Abstractions/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.Extensions.Hosting.WindowsServices/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.Extensions.Logging/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.Extensions.Logging.Abstractions/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.Extensions.Logging.Configuration/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.Extensions.Logging.Console/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.Extensions.Logging.Debug/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.Extensions.Logging.EventLog/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.Extensions.Logging.EventSource/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.Extensions.Options/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.Extensions.Options.ConfigurationExtensions/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "Microsoft.Extensions.Primitives/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "System.Diagnostics.EventLog/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "System.Security.Cryptography.ProtectedData/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  },
+  {
+    "package": "System.ServiceProcess.ServiceController/10.0.10",
+    "license": "MIT",
+    "text": "MIT.txt",
+    "authors": "Microsoft",
+    "copyright": "\u00a9 Microsoft Corporation. All rights reserved."
+  }
+]

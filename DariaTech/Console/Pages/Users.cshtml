@@ -1,0 +1,3 @@
+@page
+@model UsersModel
+<h1>Benutzer</h1><p>Benutzer werden derzeit über den lokalen Provisionierungsbefehl angelegt. TOTP ist für alle Benutzer Pflicht.</p><table><thead><tr><th>E-Mail</th><th>Rolle</th><th>Aktiv</th></tr></thead><tbody>@foreach(var u in Model.Items){<tr><td>@u.Email</td><td>@u.Role</td><td>@u.Active</td></tr>}</tbody></table>

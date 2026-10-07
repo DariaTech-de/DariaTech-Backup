@@ -1,0 +1,4 @@
+@page
+@model BackupsModel
+<h1>Backups</h1>
+@if(Model.Items.Count==0){<p>Keine Einträge vorhanden.</p>}else{<div class="table-wrap"><table><thead><tr><th>Backup-Job</th><th>Verwaltung</th><th>Nächster Lauf</th></tr></thead><tbody>@foreach(var row in Model.Items){<tr><td>@row.Name</td><td>@row.Ownership</td><td>@row.NextRun</td></tr>}</tbody></table></div>}

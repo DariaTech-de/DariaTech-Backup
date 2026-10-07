@@ -1,0 +1,4 @@
+@page
+@model ActivityModel
+<h1>Aktivitäten</h1>
+@if(Model.Items.Count==0){<p>Keine Einträge vorhanden.</p>}else{<div class="table-wrap"><table><thead><tr><th>Zeit</th><th>Aktion</th><th>Benutzer / Agent</th><th>Ressource</th></tr></thead><tbody>@foreach(var row in Model.Items){<tr><td>@row.Time</td><td>@row.Action</td><td>@row.Actor</td><td>@row.Resource</td></tr>}</tbody></table></div>}

@@ -1,0 +1,3 @@
+@page
+@model LoginModel
+<section class="login"><h1>Console anmelden</h1><p>Zugriff für autorisierte DariaTech-Mitarbeiter.</p><form method="post"><label>E-Mail<input asp-for="Email" type="email" autocomplete="username" required></label><label>Passwort<input asp-for="Password" type="password" autocomplete="current-password" required></label><label>Authenticator-Code<input asp-for="Code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" required></label><div asp-validation-summary="All"></div><button>Anmelden</button></form></section>

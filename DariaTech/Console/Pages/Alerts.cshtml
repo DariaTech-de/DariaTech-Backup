@@ -1,0 +1,4 @@
+@page
+@model AlertsModel
+<h1>Warnungen</h1>
+@if(Model.Items.Count==0){<p>Keine Einträge vorhanden.</p>}else{<div class="table-wrap"><table><thead><tr><th>Schweregrad</th><th>Problem</th><th>Seit</th><th>Zuletzt erkannt</th></tr></thead><tbody>@foreach(var row in Model.Items){<tr><td>@row.Severity</td><td>@row.Code</td><td>@row.Opened</td><td>@row.LastSeen</td></tr>}</tbody></table></div>}

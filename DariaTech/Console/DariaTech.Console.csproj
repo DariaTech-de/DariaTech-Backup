@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+ <ItemGroup>
+  <ProjectReference Include="../Contracts/DariaTech.Contracts.csproj" />
+  <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.10" />
+  <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.10" />
+  <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
+  <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10" PrivateAssets="all" />
+ </ItemGroup>
+ <ItemGroup>
+  <Content Include="../../branding/product.json" Link="product.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  <Content Include="../../LICENSE" Link="wwwroot/legal/duplicati/LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  <Content Include="../../thirdparty/**/*" Link="wwwroot/legal/thirdparty/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+ </ItemGroup>
+</Project>
