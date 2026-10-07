@@ -1,0 +1,15 @@
+# Explicit optional SMTP overlay. Keep .secrets/smtp-password.enc out of Git.
+# docker compose -f docker-compose.yml -f deploy/compose.notifications.yml up -d console
+services:
+  console:
+    environment:
+      Notifications__Enabled: 'true'
+      Notifications__Host: ${SMTP_HOST:?Set SMTP_HOST}
+      Notifications__Port: ${SMTP_PORT:-587}
+      Notifications__Sender: ${SMTP_SENDER:?Set SMTP_SENDER}
+      Notifications__Username: ${SMTP_USERNAME:-}
+      Notifications__PasswordFile: /run/secrets/smtp_password
+    secrets: [smtp_password]
+secrets:
+  smtp_password:
+    file: .secrets/smtp-password.enc

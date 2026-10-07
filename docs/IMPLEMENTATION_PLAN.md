@@ -12,7 +12,7 @@ Work in order; every phase has a separate commit and validation. An unchecked it
 8. [x] Configurable monitoring, deduplicated persistent alerts, resolved states.
 9. [x] Managed configuration revisions and local-vs-managed ownership; encrypted secrets, agent validation and acknowledgement.
 10. [x] Allowlisted signed expiring remote commands, durable replay protection, audited backup/stop/restore and extra restore approval.
-11. [ ] Durable notification outbox, email transport, deduplication, retries and reminder rules.
+11. [x] Durable notification outbox, email transport, deduplication, retries and reminder rules.
 12. [ ] Approved signed update manifest, artifact hashes, rollback/expiry protection, staged Windows rollout and recovery.
 
 ## Release gates
@@ -25,7 +25,7 @@ Phases 1–8 provide a working first management slice, not the final production 
 
 Open within this first slice: Authenticode signing and Windows reboot/VSS/customer-environment validation, incremental capture of every historical engine run between polls, complete privacy erasure/retention workflow, richer customer/site/user edit UI (management APIs exist), storage quota/retention/destination-specific alert signals, MFA recovery/key rotation and production security review. Monitoring currently covers offline, unavailable engine, missing/overdue backups, failed/warning runs and outdated agent version. It does not claim to detect every requested condition.
 
-Phases 11–12 remain unimplemented and clearly labelled in the UI: notification delivery and approved signed updates. No execution placeholder accepts untrusted remote commands. Public DNS/hosting for backup.dariatech.de was not configured. No production admin account or demo customer data was seeded.
+Phase 12 remains unimplemented and clearly labelled in the UI: approved signed updates. No execution placeholder accepts untrusted remote commands. Public DNS/hosting for backup.dariatech.de was not configured. No production admin account or demo customer data was seeded.
 
 ## Windows installer work
 
@@ -36,3 +36,5 @@ Windows hosted CI passed the actual silent setup/service lifecycle test: insecur
 Managed configuration now has Admin/CSRF-protected creation and optimistic revisions, purpose-bound encrypted definitions, tenant/device-bound agent distribution, immutable revisions, durable local anti-rollback/receipt journal, and actual engine API application. Local opt-in is required; local jobs are not adopted. This initial policy surface supports AES, sources, secure file/S3/SSH/WebDAV targets, filters, keep-versions and hourly/day schedules; advanced engine features remain local.
 
 Remote run/stop/verification and non-overwriting restore now use signed, expiring, device-bound commands. Local opt-in and a separately pinned public key are required. Restore requires two administrators and a local RestoreRoot. Durable journaling rejects replay and reports uncertain dispatch or changed engine instance as Indeterminate. Actual engine run and duplicate-delivery tests cover execution, not arbitrary shell commands. Restore-point/file browsing through the management plane remains an additional integration task.
+
+Email notification rules and a durable tenant-bound outbox now provide occurrence deduplication, retry/backoff, bounded reminders, cancellation and recovery. The SMTP transport requires STARTTLS and encrypts its password envelope using the Console master key. Queue behavior is integration-tested; actual provider delivery remains an operational gate pending SMTP configuration.

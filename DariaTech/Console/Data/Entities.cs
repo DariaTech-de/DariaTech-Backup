@@ -108,3 +108,14 @@ public sealed class RemoteCommand : TenantEntity
  public string Status { get; set; } = "Pending"; public long? TaskId { get; set; }
  public string? ErrorCode { get; set; }
 }
+
+public sealed class NotificationDelivery : TenantEntity
+{
+ public Guid RuleId {get;set;} public Guid AlertId {get;set;}
+ public DateTimeOffset Occurrence {get;set;} public int Sequence {get;set;}
+ public string Kind {get;set;}="Alert"; public string Status {get;set;}="Pending";
+ public DateTimeOffset Created {get;set;}=DateTimeOffset.UtcNow;
+ public DateTimeOffset Due {get;set;}=DateTimeOffset.UtcNow;
+ public DateTimeOffset? LeaseUntil {get;set;} public DateTimeOffset? Sent {get;set;}
+ public int Attempts {get;set;} public string? ErrorCode {get;set;}
+}

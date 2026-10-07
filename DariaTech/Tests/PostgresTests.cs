@@ -181,6 +181,31 @@ public sealed class PostgresTests
   using var replay=await agent.PostAsJsonAsync($"/api/v1/agent/commands/{id}/receipt",new CommandReceipt("Accepted",19,null));Assert.That(replay.StatusCode,Is.EqualTo(HttpStatusCode.Conflict));
   Assert.That(await db.Audit.CountAsync(x=>x.Resource==id.ToString()),Is.EqualTo(4));
  }
+
+ [Test]public async Task NotificationOutboxDeduplicatesRetriesRemindsAndSendsRecovery()
+ {
+  var(t,site)=await Customer();await using var db=Db();var device=new Device{TenantId=t.Id,SiteId=site.Id,Name="Offline device"};db.Devices.Add(device);
+  var now=DateTimeOffset.UtcNow;var alert=new Alert{TenantId=t.Id,DeviceId=device.Id,Key="offline",Code="DeviceOffline",Opened=now,LastSeen=now};db.Alerts.Add(alert);
+  var rule=new NotificationRule{TenantId=t.Id,Recipient="alerts@test.invalid",Enabled=true,RepeatMinutes=60};db.NotificationRules.Add(rule);await db.SaveChangesAsync();await db.Entry(alert).ReloadAsync();
+  await Notifications.Plan(db,now);await Notifications.Plan(db,now.AddSeconds(1));Assert.That(await db.Deliveries.CountAsync(x=>x.RuleId==rule.Id),Is.EqualTo(1));
+  var delivery=await db.Deliveries.SingleAsync(x=>x.RuleId==rule.Id);var transport=new TestNotificationTransport{Fail=true};
+  // The worker uses global maintenance scope; disable unrelated fixture rules when asserting order.
+  await db.NotificationRules.Where(x=>x.Id!=rule.Id).ExecuteUpdateAsync(q=>q.SetProperty(x=>x.Enabled,false));await Notifications.Plan(db,now);
+  Assert.That(await Notifications.DeliverOne(db,transport,now),Is.True);await db.Entry(delivery).ReloadAsync();Assert.That(delivery.Status,Is.EqualTo("Retry"));Assert.That(delivery.ErrorCode,Is.EqualTo("DeliveryFailed"));
+  Assert.That(await Notifications.DeliverOne(db,transport,now.AddMinutes(1)),Is.False);
+  transport.Fail=false;await Notifications.DeliverOne(db,transport,now.AddMinutes(6));await db.Entry(delivery).ReloadAsync();Assert.That(delivery.Status,Is.EqualTo("Sent"));Assert.That(transport.Messages,Has.Count.EqualTo(1));
+  await Notifications.Plan(db,now.AddMinutes(30));Assert.That(await db.Deliveries.CountAsync(x=>x.RuleId==rule.Id),Is.EqualTo(1));
+  await Notifications.Plan(db,now.AddHours(2));Assert.That(await db.Deliveries.CountAsync(x=>x.RuleId==rule.Id&&x.Kind=="Alert"),Is.EqualTo(2));
+  alert.Resolved=now.AddHours(2);await db.SaveChangesAsync();await Notifications.Plan(db,now.AddHours(2));Assert.That(await db.Deliveries.CountAsync(x=>x.RuleId==rule.Id&&x.Kind=="Recovery"),Is.EqualTo(1));
+  await Notifications.DeliverOne(db,transport,now.AddHours(2));Assert.That(transport.Messages.Last().Subject,Does.Contain("Entwarnung"));
+  Assert.That(transport.Messages.All(x=>!x.Body.Contains("password",StringComparison.OrdinalIgnoreCase)),Is.True);
+  var(_,foreignSite)=await Customer();var illegal=new NotificationDelivery{TenantId=t.Id,AlertId=alert.Id,RuleId=Guid.NewGuid()};db.Deliveries.Add(illegal);Assert.ThrowsAsync<DbUpdateException>(async()=>await db.SaveChangesAsync());
+ }
+ private sealed class TestNotificationTransport:INotificationTransport
+ {
+  public bool Fail {get;set;} public List<NotificationMessage> Messages {get;}=[];
+  public Task Send(NotificationMessage message,CancellationToken ct){if(Fail)throw new InvalidOperationException("test-only simulated delivery failure");Messages.Add(message);return Task.CompletedTask;}
+ }
  private sealed class TestFactory(string cs,string dir):WebApplicationFactory<Program>
  {
   protected override void ConfigureWebHost(IWebHostBuilder b)

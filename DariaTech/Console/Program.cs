@@ -43,6 +43,8 @@ builder.Services.AddAntiforgery(o=>{o.HeaderName="X-CSRF-Token";o.Cookie.SecureP
 builder.Services.AddRazorPages(o=>{o.Conventions.AuthorizeFolder("/");o.Conventions.AllowAnonymousToPage("/Login");o.Conventions.AllowAnonymousToPage("/Licenses");});
 builder.Services.Configure<MonitoringOptions>(builder.Configuration.GetSection("Monitoring"));
 builder.Services.AddHostedService<Monitoring>();
+builder.Services.AddOptions<NotificationOptions>().Bind(builder.Configuration.GetSection("Notifications")).Validate(o=>o.Valid(),"Valid SMTP settings and encrypted password file required").ValidateOnStart();
+builder.Services.AddSingleton<INotificationTransport,SmtpTransport>();builder.Services.AddHostedService<Notifications>();
 builder.Services.AddRateLimiter(o=>
 {
  o.RejectionStatusCode=429;
@@ -60,6 +62,16 @@ builder.Services.Configure<ForwardedHeadersOptions>(o=>
 });
 builder.Services.AddHealthChecks().AddCheck<DatabaseHealth>("postgresql");
 var app=builder.Build();
+if(args.Contains("--protect-smtp-password"))
+{
+ var input=builder.Configuration["Provision:PasswordFile"]??throw new InvalidOperationException("Provision:PasswordFile required");
+ var output=builder.Configuration["Provision:OutputFile"]??throw new InvalidOperationException("Provision:OutputFile required");
+ if(File.Exists(output))throw new InvalidOperationException("Refusing to overwrite existing SMTP password envelope");
+ var password=File.ReadAllText(input).TrimEnd('\r','\n');if(password.Length<1||password.Length>2000)throw new InvalidOperationException("Invalid SMTP password length");
+ File.WriteAllText(output,app.Services.GetRequiredService<ISecretStore>().Protect(Guid.Empty,"smtp-password",password));
+ if(!OperatingSystem.IsWindows())File.SetUnixFileMode(output,UnixFileMode.UserRead|UnixFileMode.UserWrite);
+ return 0;
+}
 if(args.Contains("--migrate")||args.Contains("--bootstrap-user"))
 {
  using var s=app.Services.CreateScope();s.ServiceProvider.GetRequiredService<TenantScope>().Maintenance=true;
@@ -100,5 +112,5 @@ app.Use(async(c,next)=>
  await next();
 });
 app.MapHealthChecks("/health/ready");app.MapGet("/health/live",()=>Results.Ok(new{status="live"}));
-app.MapCommandApi();app.MapConfigurationApi();app.MapManagementApi();app.MapAgentApi();app.MapRazorPages();await app.RunAsync();return 0;
+app.MapNotificationApi();app.MapCommandApi();app.MapConfigurationApi();app.MapManagementApi();app.MapAgentApi();app.MapRazorPages();await app.RunAsync();return 0;
 public partial class Program { }

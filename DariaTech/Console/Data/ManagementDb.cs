@@ -15,6 +15,7 @@ public sealed class ManagementDb(DbContextOptions<ManagementDb> options, TenantS
  public DbSet<ManagedJob> ManagedJobs => Set<ManagedJob>();
  public DbSet<ConfigurationRevision> ConfigurationRevisions => Set<ConfigurationRevision>();
  public DbSet<RemoteCommand> Commands => Set<RemoteCommand>();
+ public DbSet<NotificationDelivery> Deliveries => Set<NotificationDelivery>();
  protected override void OnModelCreating(ModelBuilder b)
  {
   b.Entity<Tenant>().HasQueryFilter(x => scope.Global || x.Id == scope.TenantId);
@@ -50,6 +51,10 @@ public sealed class ManagementDb(DbContextOptions<ManagementDb> options, TenantS
   b.Entity<RemoteCommand>().HasOne<Device>().WithMany().HasForeignKey(x=>new{x.TenantId,x.DeviceId}).HasPrincipalKey(x=>new{x.TenantId,x.Id}).OnDelete(DeleteBehavior.Restrict);
   b.Entity<RemoteCommand>().HasOne<BackupJob>().WithMany().HasForeignKey(x=>new{x.TenantId,x.JobId}).HasPrincipalKey(x=>new{x.TenantId,x.Id}).OnDelete(DeleteBehavior.Restrict);
   b.Entity<RemoteCommand>().HasIndex(x=>new{x.DeviceId,x.Status,x.Expires});
+  b.Entity<NotificationDelivery>().HasOne<NotificationRule>().WithMany().HasForeignKey(x=>new{x.TenantId,x.RuleId}).HasPrincipalKey(x=>new{x.TenantId,x.Id}).OnDelete(DeleteBehavior.Restrict);
+  b.Entity<NotificationDelivery>().HasOne<Alert>().WithMany().HasForeignKey(x=>new{x.TenantId,x.AlertId}).HasPrincipalKey(x=>new{x.TenantId,x.Id}).OnDelete(DeleteBehavior.Restrict);
+  b.Entity<NotificationDelivery>().HasIndex(x=>new{x.RuleId,x.AlertId,x.Occurrence,x.Kind,x.Sequence}).IsUnique();
+  b.Entity<NotificationDelivery>().HasIndex(x=>new{x.Status,x.Due});
   b.Entity<Role>().HasData(Enum.GetValues<UserRole>().Select(x=>new Role{Id=x,Name=x.ToString()}));
   b.Entity<User>().HasIndex(x=>x.Email).IsUnique();
   b.Entity<User>().Property(x=>x.LastTotpStep).IsConcurrencyToken();
