@@ -1,0 +1,52 @@
+name: Publish tested agent artifact
+on:
+  workflow_dispatch:
+    inputs:
+      tested_run_id:
+        description: Successful Windows installer run ID
+        required: true
+        type: string
+      release_tag:
+        description: New pilot release tag
+        default: agent-v0.1.0-pilot.1
+        type: string
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TESTED_RUN: ${{ inputs.tested_run_id }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
+    steps:
+      - name: Validate provenance and download installer
+        run: |
+          python3 - <<'PY'
+          import json,os,re,subprocess
+          if not re.fullmatch(r'[0-9]+',os.environ['TESTED_RUN']): raise SystemExit('Invalid run ID')
+          if not re.fullmatch(r'agent-v[0-9A-Za-z.-]+',os.environ['RELEASE_TAG']): raise SystemExit('Invalid release tag')
+          result=json.loads(subprocess.check_output(['gh','run','view',os.environ['TESTED_RUN'],'--json','conclusion,headSha,headBranch,workflowName,jobs']))
+          if result['conclusion']!='success' or result['headBranch']!='master' or result['workflowName']!='Windows installer': raise SystemExit('Only successful master installer runs are publishable')
+          if not any(step['name']=='Test Windows service installation and enrollment' and step['conclusion']=='success' for job in result['jobs'] for step in job['steps']): raise SystemExit('Windows smoke test evidence missing')
+          with open(os.environ['GITHUB_ENV'],'a') as f: f.write('TESTED_SHA='+result['headSha']+'\n')
+          PY
+          gh run download "$TESTED_RUN" -n DariaTechBackupSetup-win-x64-unsigned -D installer
+          python3 - <<'PY'
+          import hashlib,pathlib
+          root=pathlib.Path('installer')
+          if hashlib.sha256((root/'DariaTechBackupSetup.exe').read_bytes()).hexdigest()!=(root/'DariaTechBackupSetup.exe.sha256').read_text().strip(): raise SystemExit('Checksum mismatch')
+          PY
+      - name: Publish unsigned pilot prerelease
+        run: |
+          cat > release-notes.md <<'EOF'
+          Windows x64 pilot installer with self-contained DariaTech Agent and OSS Duplicati engine.
+
+          Automated Windows checks cover LocalSystem service installation, DPAPI/ACL protection, HTTPS enrollment against a test-only fixture, real engine authentication, heartbeat, upgrade, restart and uninstall. Management tests separately cover the real PostgreSQL Console and encrypted backup/restore.
+
+          This EXE is unsigned. Authenticode signing, VSS, reboot and customer-specific validation remain release gates. Remote commands, notifications and automatic signed updates are not implemented. See docs/AGENT.md for installation and protected enrollment files. Uninstall retains local state/databases.
+          EOF
+          gh release create "$RELEASE_TAG" installer/DariaTechBackupSetup.exe installer/DariaTechBackupSetup.exe.sha256 --target "$TESTED_SHA" --prerelease --title 'DariaTech Backup Agent 0.1.0 — Windows pilot' --notes-file release-notes.md

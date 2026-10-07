@@ -1,6 +1,6 @@
 # DariaTech agent
 
-Independent .NET Worker in DariaTech/Agent; Duplicati remains a separate local engine service. Current version 0.1.0.0. The worker performs no backups itself and does not replace the existing scheduler, engine database, encryption, retention or backends.
+Independent .NET Worker in DariaTech/Agent; Duplicati remains a separate local engine process (installer-managed child or manually installed service). Current version 0.1.0.0. The worker performs no backups itself and does not replace the existing scheduler, engine database, encryption, retention or backends.
 
 ## Bundled Windows installer
 
