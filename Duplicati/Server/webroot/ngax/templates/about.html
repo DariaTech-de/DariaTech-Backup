@@ -1,4 +1,5 @@
 <div ng-controller="AboutController">
+    <p><a ng-href="{{brandingService.supportUrl}}">{{brandingService.appSubtitle}}</a> · Duplicati Backup Engine · <a href="../licenses.html">Lizenzen / Open Source</a></p>
     <h1 translate translate-params-appname="brandingService.appName">About {{appname}}</h1>
     <ul class="tabs">
         <li ng-class="{active: Page=='general'}"><a href ng-click="Page='general'" translate>General</a></li>
@@ -11,7 +12,7 @@
     <div ng-show="Page == 'general'" class="about-general">
         <div class="about-general__block"
             translate
-            translate-params-appname="brandingService.appName" 
+            translate-params-appname="'Duplicati'" 
             translate-params-dev1="'Kenneth Skovhede'" 
             translate-params-dev2="'Rene Stach'" 
             translate-params-mail1="'mailto:kenneth@duplicati.com'"

@@ -1,0 +1,1 @@
+window.DariaTechBranding = {"productName": "DariaTech Backup", "companyName": "DariaTech IT-Systemhaus", "logo": "/branding/logo.svg", "favicon": "/branding/favicon.svg", "supportUrl": "https://dariatech.de", "supportEmail": "", "primaryColor": "#2563eb", "installerName": "DariaTechBackupSetup", "windowsServiceName": "DariaTechBackupAgent"};
