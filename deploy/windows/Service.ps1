@@ -19,6 +19,11 @@ if ($Action -eq 'Prepare') {
  if ($uri.Scheme -ne 'https' -or $uri.AbsolutePath -ne '/' -or $uri.UserInfo -or $uri.Query -or $uri.Fragment) { throw 'Console URL must be an HTTPS origin' }
  $service=Get-Service $name -ErrorAction SilentlyContinue
  if ($service) { Stop-Service $name -Force }
+ $existingConfig=Join-Path $InstallDirectory 'appsettings.json'
+ if ((Test-Path (Join-Path $state 'identity.bin')) -and (Test-Path $existingConfig)) {
+  $old=Get-Content $existingConfig -Raw | ConvertFrom-Json
+  if ($old.Agent.ConsoleUrl.TrimEnd('/') -ne $uri.AbsoluteUri.TrimEnd('/')) { throw 'An enrolled agent cannot change Console origin during upgrade. Re-enrollment requires explicit device revocation and local state reset.' }
+ }
  New-Item -ItemType Directory -Path $state -Force | Out-Null
  $acl=New-Object System.Security.AccessControl.DirectorySecurity
  $acl.SetAccessRuleProtection($true,$false)

@@ -23,7 +23,8 @@ UninstallDisplayName={#ProductName}
 SetupLogging=no
 
 [Files]
-Source: "..\..\artifacts\windows\agent\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\..\artifacts\windows\agent\*"; DestDir: "{app}"; Excludes: "appsettings.json"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\..\artifacts\windows\agent\appsettings.json"; DestDir: "{app}"; Flags: onlyifdoesntexist
 Source: "..\..\artifacts\windows\engine\*"; DestDir: "{app}\engine"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "Service.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\LICENSE"; DestDir: "{app}\legal"; Flags: ignoreversion
@@ -60,7 +61,8 @@ begin
      not FileExists(ExpandConstant('{commonappdata}\DariaTechBackup\identity.bin')) then begin
    MsgBox('Enter the 64-character enrollment token.', mbError, MB_OK); Result := False;
   end;
-  if (Length(ConnectionPage.Values[2]) < 14) or (Length(ConnectionPage.Values[2]) > 200) then begin
+  if not FileExists(ExpandConstant('{commonappdata}\DariaTechBackup\engine-credential.bin')) and
+     ((Length(ConnectionPage.Values[2]) < 14) or (Length(ConnectionPage.Values[2]) > 200)) then begin
    MsgBox('Enter a local engine password with 14–200 characters.', mbError, MB_OK); Result := False;
   end;
  end;

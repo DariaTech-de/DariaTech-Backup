@@ -47,6 +47,11 @@ try {
   Start-Sleep 1
  }
  if(!$result -or !$result.enrolled -or $result.heartbeats -lt 1){throw 'No authenticated engine-reachable heartbeat received'}
+ $identityHash=(Get-FileHash (Join-Path $state 'identity.bin')).Hash
+ $credentialHash=(Get-FileHash (Join-Path $state 'engine-credential.bin')).Hash
+ $upgrade=Start-Process artifacts/installer/DariaTechBackupSetup.exe -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/console=https://localhost:18443') -Wait -PassThru
+ if($upgrade.ExitCode -ne 0){throw 'In-place upgrade failed'}
+ if((Get-FileHash (Join-Path $state 'identity.bin')).Hash -ne $identityHash -or (Get-FileHash (Join-Path $state 'engine-credential.bin')).Hash -ne $credentialHash){throw 'Upgrade changed enrolled identity or engine credential'}
  Stop-Service DariaTechBackupAgent
  Start-Sleep 3
  if(Get-Process Duplicati.Server -ErrorAction SilentlyContinue){throw 'Engine survived service stop'}
@@ -58,7 +63,7 @@ try {
  if($removed.ExitCode -ne 0){throw 'Uninstall failed'}
  if(Get-Service DariaTechBackupAgent -ErrorAction SilentlyContinue){throw 'Service survived uninstall'}
  if(!(Test-Path (Join-Path $state 'identity.bin'))){throw 'Uninstall erased retained identity'}
- Write-Host 'PASS: silent setup, SYSTEM DPAPI, ACLs, enrollment, real engine authentication, heartbeat, restart and uninstall.'
+ Write-Host 'PASS: silent setup, SYSTEM DPAPI, ACLs, enrollment, real engine authentication, heartbeat, upgrade, restart and uninstall.'
 } finally {
  Stop-Process -Id $fixture.Id -Force -ErrorAction SilentlyContinue
  Remove-Item "Cert:\LocalMachine\Root\$($cert.Thumbprint)","Cert:\LocalMachine\My\$($cert.Thumbprint)" -ErrorAction SilentlyContinue
