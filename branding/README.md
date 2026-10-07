@@ -12,3 +12,16 @@ Official sources retrieved 2026-10-07:
 - Company display name, support email `kontakt@dariatech.de` and telephone `+49 8331 99 59 369`: official website header and structured company data. No street address is inferred from the site's locality-only structured address.
 
 Official branding is used at the company owner's request. These corporate marks are not relicensed under Duplicati's MIT license. Upstream and third-party copyright/license notices remain unchanged.
+
+## Updating an existing Console installation
+
+After pulling these changes, rebuild and replace only the Console image (no schema migration is needed for branding):
+
+```bash
+cd /opt/dariatech-backup
+git pull --ff-only
+docker compose build console
+docker compose up -d console
+```
+
+The deployment keeps the existing database and secret volumes. Console asset URLs include content versions so cached branding refreshes after an update. The agent installer ships updated local-engine branding; existing PCs receive it when the new installer is run as an upgrade.

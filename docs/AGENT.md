@@ -4,7 +4,7 @@ Independent .NET Worker in DariaTech/Agent; Duplicati remains a separate local e
 
 ## Bundled Windows installer
 
-The Windows installer source is in deploy/windows. The Windows installer GitHub Actions workflow builds a self-contained x64 Agent and OSS Duplicati engine into DariaTechBackupSetup.exe. Download the [Windows pilot release](https://github.com/DariaTech-de/DariaTech-Backup/releases/tag/agent-v0.1.0-pilot.1), or its unsigned artifact from a successful workflow run. These are pilot artifacts, not Authenticode-signed production releases. Do not override security policy to deploy unsigned software across customer fleets.
+The Windows installer source is in deploy/windows. The Windows installer GitHub Actions workflow builds a self-contained x64 Agent and OSS Duplicati engine into DariaTechBackupSetup.exe. Download the [Windows pilot release](https://github.com/DariaTech-de/DariaTech-Backup/releases/tag/agent-v0.1.0-pilot.2), or its unsigned artifact from a successful workflow run. These are pilot artifacts, not Authenticode-signed production releases. Do not override security policy to deploy unsigned software across customer fleets.
 
 Interactive setup requests the HTTPS Console origin, a site-bound enrollment token and a local engine UI password (14–200 characters). Run as administrator. Setup refuses pre-existing state directories with untrusted ownership, inherited/broad ACLs or reparse points. It returns a nonzero exit code on provisioning failure, including silent installs. Setup creates an automatic LocalSystem service with restart recovery. A Windows Job Object terminates its engine child on service termination. Initial enrollment and DPAPI protection execute inside LocalSystem; no manual SYSTEM shell is needed.
 
@@ -74,3 +74,5 @@ Active progress is a separate snapshot, not a fabricated historical BackupRun. C
 4. Check that the registered device reports a heartbeat in the Console. Installation alone does not create a backup job.
 5. Open http://127.0.0.1:8210/ngax/ on that PC, sign in using the local engine password and configure sources, destination, schedule, backup encryption passphrase and retention. Keep the backup encryption passphrase in your protected recovery store; it is different from the local API/UI password.
 6. Run a backup and a restore test, then check the transmitted result in the Console. Do not roll the unsigned pilot out across production customers before signing and customer-platform validation.
+
+Branding pilot.2 uses the official DariaTech assets documented in [branding provenance](../branding/README.md). Windows workflow [37693913159](https://github.com/DariaTech-de/DariaTech-Backup/actions/runs/37693913159) passed installation, enrollment, engine authentication, heartbeat, upgrade, restart and uninstall checks for this package.
