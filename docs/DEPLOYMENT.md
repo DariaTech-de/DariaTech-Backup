@@ -113,8 +113,10 @@ Install the command once from your existing checkout:
 
 ```bash
 cd /opt/dariatech-backup
-git pull --ff-only
+git pull --ff-only &&
 install -m 0755 scripts/dariatech-backup-update /usr/local/bin/dariatech-backup-update
 ```
 
 Then run `sudo dariatech-backup-update`. It fetches a fast-forward update, builds the Console while the existing service stays running, creates a PostgreSQL dump in `/var/backups/dariatech-backup` (root-only), applies explicit migrations through the dedicated maintenance service and waits for the replacement Console to become healthy. Download/build failures stop the command before migration or service replacement. Concurrent updates and tracked local changes are rejected; untracked `.env` and Compose override files remain supported. There is no automatic schema downgrade or rollback after a migration. Protect/retain database dump files according to your data retention policy; encrypted data requires the original secret files and key volume for recovery. This updates the Console, not Windows agents.
+
+After a successful update, the installed `/usr/local/bin/dariatech-backup-update` command refreshes itself from the checked-out script. Its orchestration checks can be run without Docker services using `bash scripts/tests/update-command.sh`; these cover success and failures during fetch, build, backup, migration and health verification.
