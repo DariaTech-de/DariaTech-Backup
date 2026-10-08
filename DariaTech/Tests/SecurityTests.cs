@@ -24,6 +24,11 @@ public sealed class SecurityTests
  {
   const string repo="DariaTech-de/DariaTech-Backup";const string tag="agent-v0.2.0";var prefix=$"https://github.com/{repo}/releases/download/{tag}/";var sha=new string('b',64);
   string Manifest(params object[] assets)=>JsonSerializer.Serialize(new{version="0.2.0",tag,created=DateTimeOffset.UtcNow,assets});
+  Assert.That(DestinationCatalog.All.SelectMany(x=>x.Options).Select(x=>x.Name),Has.None.EqualTo("s3-ext-usehttp").And.None.EqualTo("s3-ext-serviceurl"),"options that bypass use-ssl are not offered");
+  Assert.That(DestinationCatalog.TransportSecure("b2",new Dictionary<string,string>{{"b2-download-url","http://files.example"}}),Is.False);
+  Assert.That(DestinationCatalog.TransportSecure("b2",new Dictionary<string,string>{{"b2-download-url","https://files.example"}}),Is.True);
+  Assert.That(DestinationCatalog.TransportSecure("aliyunoss",new Dictionary<string,string>{{"oss-endpoint","oss-cn-hangzhou.aliyuncs.com"}}),Is.False,"the Aliyun SDK defaults to HTTP without a scheme");
+  Assert.That(DestinationCatalog.TransportSecure("s3",new Dictionary<string,string>{{"use-ssl","true"},{"s3-server-name","http://minio.local"}}),Is.False);
   var parsed=DariaTech.Console.Services.AgentReleases.Parse(Manifest(
    new{platform="linux-x64",label="Linux",file="a.tar.gz",sha256=sha,size=10,url=prefix+"a.tar.gz"},
    new{platform="linux-x64",label="Dup",file="b.tar.gz",sha256=sha,size=10,url=prefix+"b.tar.gz"},
@@ -37,11 +42,15 @@ public sealed class SecurityTests
   var token=new string('C',64);var asset=parsed.Assets[0];
   foreach(var platform in DariaTech.Console.Services.AgentReleases.Platforms)
   {
-   var command=DariaTech.Console.Services.AgentReleases.Command(platform,asset,"https://backup.example",token);
+   var command=DariaTech.Console.Services.AgentReleases.Command(platform,asset,"https://backup.example",token,true);
+   var local=DariaTech.Console.Services.AgentReleases.Command(platform,asset,"https://backup.example",token,false);
    Assert.That(command,Does.Contain(asset.Url).And.Contain("https://backup.example"));
+   Assert.That(command,Does.Contain(platform=="win-x64"?"/allowmanaged=1":"--allow-managed-configuration"));Assert.That(local,Does.Not.Contain("allowmanaged").And.Not.Contain("allow-managed"));
    Assert.That(command.Split('\n').Count(x=>x.Contains(token)),Is.EqualTo(1),"the token is written once into a protected file");
-   if(platform=="win-x64")Assert.That(command,Does.Contain("Get-FileHash").And.Contain("/tokenfile=$t").And.Contain(sha.ToUpperInvariant()));
-   else Assert.That(command,Does.Contain("--enrollment-token-file").And.Contain("install -m 600").And.Contain(sha+"  ").And.Contain(platform.StartsWith("osx")?"shasum -a 256":"sha256sum"));
+   if(platform!="win-x64")Assert.That(command.Split('\n')[^2],Does.StartWith("sudo \"$d/install.sh\""),"the installer runs last so its status is the command's status");
+   // Every step must stop the whole command on failure and the installer's status must be its result.
+   if(platform=="win-x64")Assert.That(command,Does.Contain("Get-FileHash").And.Contain("/tokenfile=$t").And.Contain(sha.ToUpperInvariant()).And.Contain("$ErrorActionPreference='Stop'").And.Contain("$p.ExitCode -ne 0").And.StartWith("# PowerShell").And.EndWith("}"));
+   else Assert.That(command,Does.Contain("set -eu").And.EndWith(")").And.Contain("--enrollment-token-file").And.Contain("install -m 600").And.Contain(sha+"  ").And.Contain(platform.StartsWith("osx")?"shasum -a 256":"sha256sum"));
   }
  }
  [Test]public void TotpMatchesRfc6238AndRejectsReplay()

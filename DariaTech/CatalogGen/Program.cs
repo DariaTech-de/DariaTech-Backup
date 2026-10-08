@@ -13,6 +13,8 @@ var excludedOptions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) {
  "ssh-keyfile", "ssh-accept-any-fingerprints", "service-account-file", "gcs-service-account-file", "ignore-revocation-failure", "debug-propfind-file",
  "ftp-log-to-console", "ftp-log-privateinfo-to-console", "ftp-log-diagnostics", "accept-any-ssl-certificate",
  "accept-specified-ssl-hash", "oauth-url", "rclone-executable", "rclone-option", "rclone-local-repository",
+ // The AWS SDK applies these after use-ssl, so they could silently switch an S3 destination to plain HTTP or another endpoint.
+ "s3-ext-serviceurl", "s3-ext-usehttp", "s3-ext-proxyhost", "s3-ext-proxyport",
 };
 var untested = BackendModules.UntestedBackendModules;
 var deprecated = BackendModules.DeprecatedBackendModules;

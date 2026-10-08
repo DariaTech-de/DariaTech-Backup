@@ -30,6 +30,7 @@ public static class DestinationCatalog
 
  // Transport rules on top of the engine's own option list: never push a configuration that sends
  // credentials or backup data without TLS, or that trusts an unverified SSH host.
+ static readonly HashSet<string> EndpointOptions=new(["b2-download-url","api-url","oss-endpoint"],StringComparer.OrdinalIgnoreCase);
  public static bool TransportSecure(string scheme,IReadOnlyDictionary<string,string> options)
  {
   var (type,forcedTls)=Resolve(scheme);
@@ -37,6 +38,9 @@ public static class DestinationCatalog
   if(forcedTls&&type.Key is not "ssh")return true;
   scheme=type.Key;
   string? Get(string key)=>options.FirstOrDefault(x=>string.Equals(x.Key,key,StringComparison.OrdinalIgnoreCase)).Value;
+  // Endpoint overrides replace the TLS default of their backend (the Aliyun SDK even defaults to HTTP without a scheme).
+  foreach(var (key,value) in options)
+   if(EndpointOptions.Contains(key)&&!string.IsNullOrEmpty(value)&&!value.StartsWith("https://",StringComparison.OrdinalIgnoreCase)||value?.TrimStart().StartsWith("http://",StringComparison.OrdinalIgnoreCase)==true)return false;
   return scheme.ToLowerInvariant() switch
   {
    "s3" or "webdav" or "tahoe"=>Get("use-ssl")=="true",

@@ -1201,19 +1201,6 @@
         "defaultValue": "10"
       },
       {
-        "name": "s3-ext-proxyhost",
-        "type": "String",
-        "secret": false,
-        "summary": "ProxyHost"
-      },
-      {
-        "name": "s3-ext-proxyport",
-        "type": "Integer",
-        "secret": false,
-        "summary": "ProxyPort",
-        "defaultValue": "0"
-      },
-      {
         "name": "s3-ext-requestchecksumcalculation",
         "type": "String",
         "secret": false,
@@ -1258,12 +1245,6 @@
         "secret": false,
         "summary": "ServiceId",
         "defaultValue": "S3"
-      },
-      {
-        "name": "s3-ext-serviceurl",
-        "type": "String",
-        "secret": false,
-        "summary": "ServiceURL"
       },
       {
         "name": "s3-ext-signaturemethod",
@@ -1323,13 +1304,6 @@
         "type": "Boolean",
         "secret": false,
         "summary": "UseFIPSEndpoint",
-        "defaultValue": "False"
-      },
-      {
-        "name": "s3-ext-usehttp",
-        "type": "Boolean",
-        "secret": false,
-        "summary": "UseHttp",
         "defaultValue": "False"
       },
       {
@@ -2362,19 +2336,6 @@
         "defaultValue": "10"
       },
       {
-        "name": "s3-ext-proxyhost",
-        "type": "String",
-        "secret": false,
-        "summary": "ProxyHost"
-      },
-      {
-        "name": "s3-ext-proxyport",
-        "type": "Integer",
-        "secret": false,
-        "summary": "ProxyPort",
-        "defaultValue": "0"
-      },
-      {
         "name": "s3-ext-requestchecksumcalculation",
         "type": "String",
         "secret": false,
@@ -2419,12 +2380,6 @@
         "secret": false,
         "summary": "ServiceId",
         "defaultValue": "S3"
-      },
-      {
-        "name": "s3-ext-serviceurl",
-        "type": "String",
-        "secret": false,
-        "summary": "ServiceURL"
       },
       {
         "name": "s3-ext-signaturemethod",
@@ -2484,13 +2439,6 @@
         "type": "Boolean",
         "secret": false,
         "summary": "UseFIPSEndpoint",
-        "defaultValue": "False"
-      },
-      {
-        "name": "s3-ext-usehttp",
-        "type": "Boolean",
-        "secret": false,
-        "summary": "UseHttp",
         "defaultValue": "False"
       },
       {

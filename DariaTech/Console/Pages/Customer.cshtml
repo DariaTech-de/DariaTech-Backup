@@ -49,6 +49,8 @@
     <label class="platform"><input type="radio" name="platform" value="@p" checked="@(p==Model.Platform?"checked":null)" />
      <span><strong>@DariaTech.Console.Services.AgentReleases.PlatformLabel(p)</strong><span class="sub">@(p=="win-x64"?"Installer (.exe) als Windows-Dienst":p.StartsWith("osx")?"Paket (.tar.gz) als launchd-Dienst":"Paket (.tar.gz) als systemd-Dienst")</span></span></label>}
    </fieldset>
+   <label class="platform managed-optin"><input type="checkbox" name="allowManaged" value="true" checked="@(Model.AllowManaged?"checked":null)" />
+    <span><strong>Backup-Jobs aus der Konsole zulassen</strong><span class="sub">Lokale Freigabe auf dem Gerät: Ohne sie übernimmt der Agent keine in der Konsole angelegten Jobs. Später nur lokal durch einen Administrator änderbar.</span></span></label>
    <div class="inline-form">
     <div class="field"><label for="siteId">Standort</label><select id="siteId" name="siteId">@foreach(var site in Model.Sites){<option value="@site.Id">@site.Name</option>}</select></div>
     <div class="field"><label for="validMinutes">Gültigkeit in Minuten</label><input id="validMinutes" type="number" name="validMinutes" min="5" max="1440" value="60"></div>
@@ -68,7 +70,7 @@
    <ol class="install-steps">
     <li>@(Model.Platform=="win-x64"?"PowerShell als Administrator öffnen.":"Terminal öffnen (Benutzer mit sudo-Rechten).")</li>
     <li>Befehl kopieren und einfügen. Er lädt das Paket, prüft die Prüfsumme und registriert das Gerät mit diesem Token.@(Model.Platform=="win-x64"?" Im Installer nur noch das Passwort für die lokale Oberfläche (mind. 14 Zeichen) vergeben.":"")</li>
-    <li>Das Gerät erscheint danach unter diesem Kunden; Backup-Jobs legen Sie dann in der Konsole an.</li>
+    <li>@(Model.AllowManaged?"Das Gerät erscheint danach unter diesem Kunden; Backup-Jobs legen Sie dann in der Konsole an.":"Das Gerät erscheint danach unter diesem Kunden. Konsolen-Jobs sind nicht freigegeben; Jobs werden lokal auf dem Gerät eingerichtet.")</li>
    </ol>
    <div class="command"><pre><code data-copy-source>@Model.Command</code></pre><button type="button" class="button secondary" data-copy>Befehl kopieren</button></div>
    <p class="sub">Alternativ manuell: <a href="@a.Url" rel="noopener">@Ui.Icon("download")@a.File</a> (@((a.Size/1048576.0).ToString("0.0")) MB) · SHA-256 <span class="code hash">@a.Sha256</span>

@@ -67,27 +67,40 @@ public sealed partial class AgentReleases(IConfiguration config,ILogger<AgentRel
   "win-x64"=>"Windows (10/11, Server 2019+)","osx-arm64"=>"macOS mit Apple-Chip (M1–M4)","osx-x64"=>"macOS mit Intel-Prozessor",
   "linux-x64"=>"Linux x64 (systemd)","linux-arm64"=>"Linux ARM64 (systemd, z. B. Raspberry Pi 4/5)",_=>platform,
  };
- // Ready-to-run install commands. The token never appears in a process argument list: it is written to a
- // root-only (Unix) or user-profile (Windows) file that the installer consumes and deletes.
- public static string Command(string platform,AgentAsset? asset,string consoleUrl,string token)
+ // Ready-to-run install commands. They stop at the first failed step (download, checksum, installer) and end
+ // with the installer's status. The token never appears in a process argument list: it is written to a
+ // root-only (Unix) or user-profile (Windows) file that the installer consumes and deletes. allowManaged is
+ // the local administrator's opt-in for backup jobs created in the Console.
+ public static string Command(string platform,AgentAsset? asset,string consoleUrl,string token,bool allowManaged)
  {
   var url=asset?.Url??"<Download-URL>";var sha=asset?.Sha256??"<SHA256>";
   if(platform=="win-x64")return string.Join("\n",
    "# PowerShell als Administrator",
+   "& {",
+   "$ErrorActionPreference='Stop'",
    "$f=\"$env:TEMP\\DariaTechBackupSetup.exe\"; $t=\"$env:TEMP\\dariatech-token.txt\"",
-   $"Invoke-WebRequest -UseBasicParsing \"{url}\" -OutFile $f",
-   $"if((Get-FileHash $f -Algorithm SHA256).Hash -ne \"{sha.ToUpperInvariant()}\"){{throw \"Prüfsumme stimmt nicht\"}}",
-   $"Set-Content -NoNewline -Path $t -Value \"{token}\"",
-   $"Start-Process $f -ArgumentList \"/console={consoleUrl}\",\"/tokenfile=$t\" -Wait",
-   "Remove-Item $t -ErrorAction SilentlyContinue");
+   "try {",
+   $" Invoke-WebRequest -UseBasicParsing \"{url}\" -OutFile $f",
+   $" if((Get-FileHash $f -Algorithm SHA256).Hash -ne \"{sha.ToUpperInvariant()}\"){{throw \"Prüfsumme stimmt nicht\"}}",
+   $" Set-Content -NoNewline -Path $t -Value \"{token}\"",
+   $" $p=Start-Process $f -ArgumentList \"/console={consoleUrl}\",\"/tokenfile=$t\"{(allowManaged?",\"/allowmanaged=1\"":"")} -Wait -PassThru",
+   " if($p.ExitCode -ne 0){throw \"Installation fehlgeschlagen (Code $($p.ExitCode))\"}",
+   "} finally { Remove-Item $t -ErrorAction SilentlyContinue }",
+   "}");
   var mac=platform.StartsWith("osx",StringComparison.Ordinal);
   var tmp=mac?"/private/tmp":"/tmp";var check=mac?"shasum -a 256 -c -":"sha256sum -c -";
   return string.Join("\n",
    $"# Terminal ({(mac?"macOS":"Linux")}), Benutzer mit sudo-Rechten",
-   $"curl -fsSL -o {tmp}/dariatech-agent.tar.gz \"{url}\"",
-   $"echo \"{sha}  {tmp}/dariatech-agent.tar.gz\" | {check}",
-   $"d=$(sudo mktemp -d {tmp}/dariatech.XXXXXXXX) && sudo tar -xzf {tmp}/dariatech-agent.tar.gz -C \"$d\"",
-   "sudo install -m 600 /dev/null \"$d/token\" && printf %s '"+token+"' | sudo tee \"$d/token\" >/dev/null",
-   $"sudo \"$d/install.sh\" --console-url '{consoleUrl}' --enrollment-token-file \"$d/token\"; sudo rm -rf \"$d\" {tmp}/dariatech-agent.tar.gz");
+   "(",
+   "set -eu",
+   $"p=$(mktemp {tmp}/dariatech-agent.XXXXXXXX); d=$(sudo mktemp -d {tmp}/dariatech.XXXXXXXX)",
+   "trap 'rm -f \"$p\"; sudo rm -rf \"$d\"' EXIT",
+   $"curl -fsSL -o \"$p\" \"{url}\"",
+   $"echo \"{sha}  $p\" | {check}",
+   "sudo tar -xzf \"$p\" -C \"$d\"",
+   "sudo install -m 600 /dev/null \"$d/token\"",
+   "printf %s '"+token+"' | sudo tee \"$d/token\" >/dev/null",
+   $"sudo \"$d/install.sh\" --console-url '{consoleUrl}' --enrollment-token-file \"$d/token\"{(allowManaged?" --allow-managed-configuration":"")}",
+   ")");
  }
 }

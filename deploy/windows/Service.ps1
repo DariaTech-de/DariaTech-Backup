@@ -1,7 +1,9 @@
 param(
  [ValidateSet('Prepare','Install','Remove')][string]$Action,
  [Parameter(Mandatory=$true)][string]$InstallDirectory,
- [string]$ConsoleUrl='https://backup.dariatech.de'
+ [string]$ConsoleUrl='https://backup.dariatech.de',
+ # Local administrator opt-in for Console-managed backup jobs; it only ever enables, an existing opt-in is kept.
+ [switch]$AllowManagedConfiguration
 )
 $ErrorActionPreference='Stop'
 # The installer launches Windows PowerShell 5.1. Do not inherit PowerShell 7
@@ -61,6 +63,7 @@ if ($Action -eq 'Prepare') {
    if ($old.Agent.PSObject.Properties.Name -contains $property) { $agentConfiguration[$property]=$old.Agent.$property }
   }
  }
+ if ($AllowManagedConfiguration) { $agentConfiguration.AllowManagedConfiguration=$true }
  @{Agent=$agentConfiguration;Logging=@{LogLevel=@{Default='Information'}}} |
   ConvertTo-Json -Depth 5 | Set-Content (Join-Path $InstallDirectory 'appsettings.json') -Encoding UTF8
  exit 0

@@ -504,3 +504,4 @@ body.dark .link-button{color:var(--accent)!important}
 .command pre{margin:0;width:100%;max-width:100%;overflow-x:auto;padding:12px 14px;border-radius:10px;background:var(--panel);border:1px solid var(--line)}
 .command code{font:500 12.5px/1.55 var(--mono);white-space:pre;color:var(--ink)}
 .hash{overflow-wrap:anywhere}
+.managed-optin{max-width:640px}
