@@ -3,12 +3,22 @@ $ErrorActionPreference='Stop'
 Set-Location (Join-Path $PSScriptRoot '..')
 $brand=Get-Content branding/product.json -Raw | ConvertFrom-Json
 foreach ($value in $brand.PSObject.Properties.Value) { if ($value -is [string] -and ($value.Contains('"') -or $value.Contains("`n"))) { throw 'Unsafe branding value' } }
+# Publish does not remove obsolete files. Recreate only these generated payload directories
+# so a prior full/proprietary publish can never leak stale binaries into the OSS installer.
+foreach ($generated in 'artifacts/windows/agent','artifacts/windows/engine') {
+ if(Test-Path $generated) {
+  if((Get-Item $generated).Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'Generated payload directory cannot be a link'}
+  Remove-Item $generated -Recurse -Force
+ }
+}
 $version=([xml](Get-Content DariaTech/Agent/DariaTech.Agent.csproj)).Project.PropertyGroup.Version
 if ($VersionOverride) { $version=$VersionOverride }
 dotnet publish DariaTech/Agent/DariaTech.Agent.csproj -c Release -r win-x64 --self-contained true -p:Version=$version -o artifacts/windows/agent
 if ($LASTEXITCODE) { throw 'Agent publish failed' }
 dotnet publish Executables/Duplicati.Server/Duplicati.Server.csproj -c Release -r win-x64 --self-contained true -p:DariaTechOssOnly=true -o artifacts/windows/engine
 if ($LASTEXITCODE) { throw 'OSS engine publish failed' }
+$restricted=Get-ChildItem artifacts/windows/engine -Recurse -File | Where-Object { $_.Name -match '(?i)(Proprietary|Office365|GoogleWorkspace|DiskImage).*\.(dll|exe)$' }
+if($restricted){throw 'Subscription-restricted binaries found in OSS payload'}
 $cache=(dotnet nuget locals global-packages --list) -replace '^global-packages:\s*',''
 foreach ($package in 'microsoft.netcore.app.runtime.win-x64','microsoft.aspnetcore.app.runtime.win-x64') {
  $root=Join-Path $cache $package

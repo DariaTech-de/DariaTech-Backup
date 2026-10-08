@@ -11,7 +11,10 @@ try {
  if(Get-Service DariaTechBackupAgent -ErrorAction SilentlyContinue){throw 'Prior installer smoke test must finish uninstalling before update fixture'}
  if(Test-Path $state){Remove-Item $state -Recurse -Force}
  # Same tested source, two genuinely different compiled agent/installer versions.
+ $stale=Join-Path 'artifacts/windows/engine' 'Duplicati.Proprietary.Sentinel.dll'
+ [IO.File]::WriteAllText((Join-Path (Get-Location) $stale),'CI-only stale payload sentinel, not executable code')
  ./scripts/build-windows-installer.ps1 -VersionOverride '0.1.0'
+ if(Test-Path $stale){throw 'Stale restricted payload survived OSS packaging'}
  $oldInstaller=Join-Path $temp 'old.exe';Copy-Item artifacts/installer/DariaTechBackupSetup.exe $oldInstaller
  $password=[Guid]::NewGuid().ToString('N')+[Guid]::NewGuid().ToString('N')
  $token=([Guid]::NewGuid().ToString('N')+[Guid]::NewGuid().ToString('N')).ToUpperInvariant()
