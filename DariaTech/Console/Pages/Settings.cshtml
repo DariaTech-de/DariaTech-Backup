@@ -1,3 +1,22 @@
 @page
 @model SettingsModel
-<h1>Einstellungen</h1><section class="panel"><h2>Monitoring</h2><p>Offline nach @Model.Options.OfflineMinutes Minuten. Backup überfällig nach @Model.Options.BackupAgeHours Stunden.</p><p>Freigegebene Agent-Version: @(string.IsNullOrWhiteSpace(Model.Options.LatestApprovedVersion)?"Noch nicht festgelegt":Model.Options.LatestApprovedVersion)</p><p>Grenzwerte werden über die Server-Konfiguration verwaltet.</p></section><section class="panel"><h2>Entwicklungsstand</h2><p>Enrollment, Kunden/Standorte, Heartbeats, Backup-Historie, Dashboard und Alerts sind verbunden. Zentrale Konfigurationsverteilung, Remote-Backup/Restore, E-Mail-Benachrichtigungen und signierte Updates sind noch nicht freigeschaltet.</p><a href="/api/v1/management/export">Datenexport herunterladen</a></section>
+@using DariaTech.Console.Services
+@{ ViewData["Title"] = "Einstellungen"; }
+<div class="page-heading"><div><span class="eyebrow">Verwalten</span><h1>Einstellungen</h1><p class="lead">Grenzwerte werden über die Server-Konfiguration verwaltet.</p></div><div class="actions"><a class="button secondary" href="/api/v1/management/export">@Ui.Icon("download")Datenexport herunterladen</a></div></div>
+<section class="kpis" aria-label="Monitoring">
+ <article class="kpi"><span class="kpi-label">@Ui.Icon("device")Offline nach</span><strong>@Model.Options.OfflineMinutes Min.</strong><span class="sub">ohne Heartbeat</span></article>
+ <article class="kpi"><span class="kpi-label">@Ui.Icon("backups")Backup überfällig nach</span><strong>@Model.Options.BackupAgeHours Std.</strong><span class="sub">seit letztem Erfolg</span></article>
+ <article class="kpi"><span class="kpi-label">@Ui.Icon("shield")Freigegebene Agent-Version</span><strong>@(string.IsNullOrWhiteSpace(Model.Options.LatestApprovedVersion)?"—":Model.Options.LatestApprovedVersion)</strong><span class="sub">@(string.IsNullOrWhiteSpace(Model.Options.LatestApprovedVersion)?"Noch nicht festgelegt":"Ältere Agenten erzeugen eine Warnung")</span></article>
+</section>
+<section class="card">
+ <h2>Funktionsumfang</h2>
+ <ul class="feature-list">
+  <li class="on">@Ui.Icon("check")Registrierung, Kunden und Standorte</li>
+  <li class="on">@Ui.Icon("check")Heartbeats, Backup-Historie und Dashboard</li>
+  <li class="on">@Ui.Icon("check")Monitoring und Warnungen</li>
+  <li class="on">@Ui.Icon("check")Zentrale Konfiguration (Management-API)</li>
+  <li class="on">@Ui.Icon("check")Signierte Fernbefehle und Wiederherstellung (Management-API)</li>
+  <li class="on">@Ui.Icon("check")E-Mail-Benachrichtigungen (Management-API)</li>
+  <li class="on">@Ui.Icon("check")Signierte Agent-Updates (Management-API)</li>
+ </ul>
+</section>

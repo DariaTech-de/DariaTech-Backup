@@ -11,3 +11,5 @@ Modern upstream Angular ngclient source is maintained in a separate repo/package
 Never remove upstream credits from About, LICENSE, thirdparty or shipped notices. DariaTech assets and public support contacts are sourced from the official company website; see [branding provenance](../branding/README.md). The official corporate assets remain DariaTech trademarks/artwork; the upstream MIT license does not grant third parties ownership of those marks.
 
 See [enterprise capability inventory](ENTERPRISE_CAPABILITIES.md) for OSS reuse, independently implemented management and subscription-restricted integration boundaries.
+
+Console fonts: Geist and Geist Mono (Copyright 2024 The Geist Project Authors) are self-hosted under `DariaTech/Console/wwwroot/fonts` and licensed under the SIL Open Font License 1.1 (`wwwroot/legal/management/OFL-Geist.txt`, linked from the Console license page). They are fetched from the `@fontsource-variable/geist` and `@fontsource-variable/geist-mono` npm packages (latin subsets) and not modified.

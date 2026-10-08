@@ -1,4 +1,43 @@
 @page
 @model CustomersModel
-<h1>Kunden</h1><div class="cards">@foreach(var c in Model.Customers){var devices=Model.Rows.Where(x=>x.Device.TenantId==c.TenantId).ToList();<a class="panel customer" href="/Customer?id=@c.Id"><small>@c.Number</small><h2>@c.Name</h2><p>@devices.Count Geräte · @devices.Count(x=>x.Status=="Healthy") Healthy</p><p>@devices.Count(x=>x.Status=="Warning") Warning · @devices.Count(x=>x.Status=="Critical") Critical · @devices.Count(x=>x.Status=="Offline") Offline</p></a>}</div>
-@if(User.IsInRole("SuperAdmin")||User.IsInRole("Administrator")){<section class="panel"><h2>Kunde anlegen</h2><form method="post" class="form-grid"><label>Firmenname<input asp-for="Input.Name" maxlength="200" required></label><label>Kundennummer<input asp-for="Input.Number" maxlength="80" required></label><label>Ansprechpartner<input asp-for="Input.Contact" maxlength="1000"></label><label>E-Mail<input asp-for="Input.Email" type="email"></label><label>Telefon<input asp-for="Input.Phone"></label><label>Adresse<input asp-for="Input.Address"></label><label>Interne Notizen<textarea asp-for="Input.Notes"></textarea></label><div asp-validation-summary="All"></div><button>Kunden anlegen</button></form></section>}
+@using DariaTech.Console.Services
+@{ ViewData["Title"] = "Kunden"; var canCreate = User.IsInRole("SuperAdmin") || User.IsInRole("Administrator"); }
+<div class="page-heading">
+ <div><span class="eyebrow">Verwalten</span><h1>Kunden</h1><p class="lead">@Model.Customers.Count Kunden · @Model.Rows.Count Geräte</p></div>
+ @if(canCreate){<div class="actions"><a class="button" href="#new-customer">@Ui.Icon("plus")Kunde anlegen</a></div>}
+</div>
+@if(Model.Customers.Count==0){<div class="empty"><span class="empty-icon">@Ui.Icon("customers")</span><h2>Noch keine Kunden</h2><p>Legen Sie den ersten Kunden an. Danach folgen Standorte und Geräte.</p></div>}
+<div class="cards">
+@foreach(var c in Model.Customers){var devices=Model.Rows.Where(x=>x.Device.TenantId==c.TenantId).ToList();var h=devices.Count(x=>x.Status=="Healthy");var worst=devices.Any(x=>x.Status=="Critical")?"Critical":devices.Any(x=>x.Status=="Offline")?"Offline":devices.Any(x=>x.Status=="Warning")?"Warning":devices.Count>0?"Healthy":"";
+ <a class="card customer-card" href="/Customer?id=@c.Id">
+  <div class="customer-top"><span class="customer-avatar" aria-hidden="true">@Ui.Initials(c.Name)</span>@if(worst!=""){<span class="status @Ui.StatusClass(worst)">@Ui.StatusLabel(worst)</span>}</div>
+  <div><h2>@c.Name</h2><span class="sub">@c.Number</span></div>
+  <div class="customer-meter">
+   <progress max="@Math.Max(1,devices.Count)" value="@h" aria-label="Gesunde Geräte">@h</progress>
+   <span class="sub">@h von @devices.Count Geräten gesund</span>
+  </div>
+  <ul class="mini-stats">
+   <li><span class="dot warning"></span>@devices.Count(x=>x.Status=="Warning")</li>
+   <li><span class="dot critical"></span>@devices.Count(x=>x.Status=="Critical")</li>
+   <li><span class="dot offline"></span>@devices.Count(x=>x.Status=="Offline")</li>
+   <li class="right">@Ui.Size(devices.Sum(x=>x.Storage))</li>
+  </ul>
+ </a>
+}
+</div>
+@if(canCreate){
+<section class="card" id="new-customer">
+ <div class="card-head"><div><h2>Kunde anlegen</h2><span class="sub">Jeder Kunde ist ein eigener, getrennter Mandant.</span></div></div>
+ <form method="post" class="form-grid">
+  <div class="field"><label asp-for="Input.Name">Firmenname</label><input asp-for="Input.Name" maxlength="200" required></div>
+  <div class="field"><label asp-for="Input.Number">Kundennummer</label><input asp-for="Input.Number" maxlength="80" required></div>
+  <div class="field"><label asp-for="Input.Contact">Ansprechpartner</label><input asp-for="Input.Contact" maxlength="1000"></div>
+  <div class="field"><label asp-for="Input.Email">E-Mail</label><input asp-for="Input.Email" type="email"></div>
+  <div class="field"><label asp-for="Input.Phone">Telefon</label><input asp-for="Input.Phone"></div>
+  <div class="field"><label asp-for="Input.Address">Adresse</label><input asp-for="Input.Address"></div>
+  <div class="field span-2"><label asp-for="Input.Notes">Interne Notizen</label><textarea asp-for="Input.Notes" rows="3"></textarea></div>
+  <partial name="_Errors" model='"span-2"' />
+  <div class="span-2"><button class="button">@Ui.Icon("plus")Kunde anlegen</button></div>
+ </form>
+</section>
+}

@@ -8,6 +8,7 @@ Official sources retrieved 2026-10-07:
 - `company-logo.png`: unchanged PNG returned by https://www.dariatech.de/logo.
 - `favicon.svg`: unchanged https://www.dariatech.de/favicon.svg.
 - `installer-icon.png`: unchanged https://www.dariatech.de/apple-touch-icon.png; used in the Windows installer wizard.
+- `installer-wizard-{100,150,200}.png` and `installer-small-{100,150,200}.png`: Windows installer side panel and header badge, rendered by `scripts/generate-installer-art.py` from the manifest palette, product name and the official logo mark geometry. Regenerate (requires Pillow) after changing any of these.
 - Palette: website stylesheet `/_astro/gaming-pc-service-_city_.DkEU5CcL.css`. Primary `#1a6b54`, dark green `#0c3c30`, bright mint `#28b89a`; the official logo uses turquoise `#01c4a6`. Light/dark surface tokens reuse this palette. Backup status colors remain semantic and independent.
 - Company display name, support email `kontakt@dariatech.de` and telephone `+49 8331 99 59 369`: official website header and structured company data. No street address is inferred from the site's locality-only structured address.
 

@@ -1,0 +1,16 @@
+@using System.Text.Json
+@{ var brand = JsonDocument.Parse(System.IO.File.ReadAllText(System.IO.Path.Combine(AppContext.BaseDirectory,"product.json"))).RootElement; }
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Anmelden · @brand.GetProperty("productName").GetString()</title>
+<link asp-append-version="true" rel="icon" href="@brand.GetProperty("favicon").GetString()">
+<link rel="preload" href="/fonts/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link asp-append-version="true" rel="stylesheet" href="/branding/product.css">
+<link asp-append-version="true" rel="stylesheet" href="/css/app.css">
+<script asp-append-version="true" src="/js/app.js" defer></script>
+</head>
+<body class="auth-body">@RenderBody()</body>
+</html>

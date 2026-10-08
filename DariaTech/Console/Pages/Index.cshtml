@@ -1,3 +1,111 @@
 @page
 @model IndexModel
-<div class="page-heading"><div><span class="eyebrow">DARIATECH MANAGEMENT</span><h1>Backup-Übersicht</h1><p class="muted">Kunden schützen. Probleme erkennen. Gezielt handeln.</p></div><a class="button" href="/Customers">Kunden verwalten →</a></div><section class="kpis"><article><small>Kunden</small><strong>@Model.Customers</strong></article><article><small>Geräte</small><strong>@Model.Rows.Count</strong></article><article><small>Erfolgreiche Backups · 24h</small><strong>@Model.Successes</strong></article><article class="kpi-warning"><small>Warnungen</small><strong>@Model.Rows.Count(x=>x.Status=="Warning")</strong></article><article class="kpi-critical"><small>Kritische Geräte</small><strong>@Model.Rows.Count(x=>x.Status=="Critical")</strong></article><article class="kpi-offline"><small>Offline-Geräte</small><strong>@Model.Rows.Count(x=>x.Status=="Offline")</strong></article></section><section class="panel"><h2>Kunden und Geräte</h2><partial name="_Devices" model="Model.Rows" /></section>
+@using DariaTech.Console.Services
+@{
+ ViewData["Title"] = "Dashboard";
+ var total = Model.Rows.Count;
+ var healthy = Model.Count("Healthy"); var warning = Model.Count("Warning"); var critical = Model.Count("Critical"); var offline = Model.Count("Offline");
+ var protectedPct = total == 0 ? 0 : healthy * 100.0 / total;
+ var segments = new[]{(healthy,"healthy"),(warning,"warning"),(critical,"critical"),(offline,"offline")}.Where(x=>x.Item1>0).ToList();
+ var gap = 6.0; var usable = 1000 - gap * Math.Max(0, segments.Count - 1); var x0 = 0.0;
+ var max = Math.Max(1, Model.Days.Max(d => d.Total)); const double chartH = 200; double H(int v) => Math.Round(v * chartH / max, 1);
+ var runs14 = Model.Days.Sum(d => d.Total); var ok14 = Model.Days.Sum(d => d.Success);
+ var attention = Model.Rows.Where(r => r.Status != "Healthy").ToList();
+ var storage = Model.Rows.Sum(r => r.Storage);
+ var de = System.Globalization.CultureInfo.GetCultureInfo("de-DE");
+}
+<div class="page-heading">
+ <div>
+  <span class="eyebrow">@DateTime.UtcNow.ToString("dddd, d. MMMM yyyy", de) · Stand @DateTime.UtcNow.ToString("HH:mm") UTC</span>
+  <h1>Backup-Übersicht</h1>
+  <p class="lead">Kunden schützen. Probleme erkennen. Gezielt handeln.</p>
+ </div>
+ <div class="actions">
+  <a class="button secondary" href="/api/v1/management/export">@Ui.Icon("download")Datenexport</a>
+  <a class="button" href="/Customers">@Ui.Icon("plus")Gerät registrieren</a>
+ </div>
+</div>
+
+<section class="hero-grid" aria-label="Schutzstatus">
+ <article class="hero">
+  <svg class="hero-rings" viewBox="0 0 400 400" aria-hidden="true" focusable="false"><circle cx="200" cy="200" r="80"/><circle cx="200" cy="200" r="130"/><circle cx="200" cy="200" r="180"/></svg>
+  <div class="hero-top">
+   <div class="hero-figure">
+    <span class="hero-label">Geschützte Geräte</span>
+    @if(total==0){<span class="hero-value">—</span><span class="hero-note">Noch keine Geräte registriert.</span>}
+    else{<span class="hero-value">@Ui.Percent(protectedPct)<span class="unit">%</span></span><span class="hero-note">@healthy von @total Geräten gesund, mit aktuellem erfolgreichem Backup.</span>}
+   </div>
+   <div class="hero-side">
+    <span class="hero-label">Erfolgreiche Backups · 24 h</span>
+    <span class="hero-mono">@Ui.Number(Model.Successes)</span>
+   </div>
+  </div>
+  <svg class="segbar" viewBox="0 0 1000 12" preserveAspectRatio="none" role="img" aria-label="Verteilung: @healthy gesund, @warning Warnung, @critical kritisch, @offline offline">
+   @if(total==0){<rect class="seg-empty" x="0" y="0" width="1000" height="12" rx="6"/>}
+   @foreach(var s in segments){var w=usable*s.Item1/total;<rect class="seg-@s.Item2" x="@x0.ToString("0.##",System.Globalization.CultureInfo.InvariantCulture)" y="0" width="@w.ToString("0.##",System.Globalization.CultureInfo.InvariantCulture)" height="12"/>x0+=w+gap;}
+  </svg>
+  <dl class="legend">
+   <div><dt><span class="swatch healthy"></span>Gesund</dt><dd>@healthy</dd></div>
+   <div><dt><span class="swatch warning"></span>Warnung</dt><dd>@warning</dd></div>
+   <div><dt><span class="swatch critical"></span>Kritisch</dt><dd>@critical</dd></div>
+   <div><dt><span class="swatch offline"></span>Offline</dt><dd>@offline</dd></div>
+  </dl>
+ </article>
+
+ <article class="card">
+  <div class="card-head"><h2>Laufende Sicherungen</h2><span class="chip">@Model.Running.Count() aktiv</span></div>
+  @if(!Model.Running.Any()){<p class="card-empty">@Ui.Icon("check")Gerade läuft keine Sicherung.</p>}
+  <ul class="running">
+  @foreach(var r in Model.Running.Take(4)){var p=(int)Math.Round((r.Device.Progress??0)*100);
+   <li><div class="running-row"><a href="/Device?id=@r.Device.Id">@r.Device.Name</a><span class="mono">@p %</span></div>
+   <progress max="100" value="@p" aria-label="Fortschritt @r.Device.Name">@p %</progress>
+   <span class="sub">@r.Customer · @Ui.Size(r.Device.ProgressBytes) · @Ui.Number(r.Device.ProgressFiles) Dateien</span></li>}
+  </ul>
+ </article>
+</section>
+
+<section class="kpis" aria-label="Kennzahlen">
+ <article class="kpi"><span class="kpi-label">@Ui.Icon("customers")Betreute Kunden</span><strong>@Ui.Number(Model.Customers)</strong><span class="sub">@Ui.Number(Model.Sites) Standorte</span></article>
+ <article class="kpi"><span class="kpi-label">@Ui.Icon("device")Geräte</span><strong>@Ui.Number(total)</strong><span class="sub">@offline offline</span></article>
+ <article class="kpi"><span class="kpi-label">@Ui.Icon("backups")Gesicherte Daten</span><strong>@Ui.Size(storage)</strong><span class="sub">Verschlüsselt am Speicherziel</span></article>
+ <article class="kpi @(Model.OpenAlertCount>0?"kpi-alert":"")"><span class="kpi-label">@Ui.Icon("alert")Offene Warnungen</span><strong>@Ui.Number(Model.OpenAlertCount)</strong><span class="sub">@critical Geräte kritisch</span></article>
+</section>
+
+<section class="split-main">
+ <article class="card">
+  <div class="card-head">
+   <div><h2>Backup-Läufe · letzte 14 Tage</h2><span class="sub">@Ui.Number(runs14) Läufe@(runs14>0?" · "+Ui.Percent(ok14*100.0/runs14)+" % erfolgreich":"")</span></div>
+   <ul class="chart-legend"><li><span class="swatch healthy"></span>Erfolgreich</li><li><span class="swatch warning"></span>Mit Warnung</li><li><span class="swatch critical"></span>Fehlgeschlagen</li></ul>
+  </div>
+  <figure class="chart">
+   <svg viewBox="0 0 700 206" preserveAspectRatio="none" role="img" aria-label="Backup-Läufe pro Tag der letzten 14 Tage">
+    <line class="grid" x1="0" x2="700" y1="5" y2="5"/><line class="grid" x1="0" x2="700" y1="55" y2="55"/><line class="grid" x1="0" x2="700" y1="105" y2="105"/><line class="grid" x1="0" x2="700" y1="155" y2="155"/><line class="axis" x1="0" x2="700" y1="205.5" y2="205.5"/>
+    @for(var i=0;i<Model.Days.Count;i++){var d=Model.Days[i];var x=i*50+8;var y=205.0;
+     <g><title>@d.Day.ToString("dd.MM.") – @d.Success erfolgreich, @d.Warning mit Warnung, @d.Failed fehlgeschlagen</title>
+     @{var hs=H(d.Success);var hw=H(d.Warning);var hf=H(d.Failed);}
+     @if(d.Total==0){<rect class="bar-empty" x="@x" y="201" width="34" height="4" rx="2"/>}
+     @if(hs>0){y-=hs;<rect class="bar-ok" x="@x" y="@y.ToString(System.Globalization.CultureInfo.InvariantCulture)" width="34" height="@hs.ToString(System.Globalization.CultureInfo.InvariantCulture)" rx="3"/>}
+     @if(hw>0){y-=hw+2;<rect class="bar-warn" x="@x" y="@y.ToString(System.Globalization.CultureInfo.InvariantCulture)" width="34" height="@hw.ToString(System.Globalization.CultureInfo.InvariantCulture)" rx="3"/>}
+     @if(hf>0){y-=hf+2;<rect class="bar-fail" x="@x" y="@y.ToString(System.Globalization.CultureInfo.InvariantCulture)" width="34" height="@hf.ToString(System.Globalization.CultureInfo.InvariantCulture)" rx="3"/>}</g>}
+   </svg>
+   <figcaption class="chart-axis" aria-hidden="true">@foreach(var d in Model.Days){<span>@d.Day.ToString("d.M.")</span>}</figcaption>
+  </figure>
+ </article>
+
+ <article class="card">
+  <div class="card-head"><h2>Offene Warnungen</h2><a class="link" href="/Alerts">Alle anzeigen →</a></div>
+  @if(Model.OpenAlerts.Count==0){<p class="card-empty">@Ui.Icon("check")Keine offenen Warnungen.</p>}
+  <ul class="alert-list">
+  @foreach(var a in Model.OpenAlerts){<li><a href="/Device?id=@a.DeviceId"><span class="sev @Ui.SeverityClass(a.Alert.Severity)"><span class="sr-only">@Ui.SeverityLabel(a.Alert.Severity)</span></span><span class="alert-text"><strong>@Ui.AlertTitle(a.Alert.Code)</strong><span class="sub">@a.Device · seit @Ui.Ago(a.Alert.Opened)</span></span></a></li>}
+  </ul>
+ </article>
+</section>
+
+<section class="card card-flush">
+ <div class="card-head padded">
+  <div><h2>Geräte mit Handlungsbedarf</h2><span class="sub">Sortiert nach Schweregrad, dann nach Kunde</span></div>
+  <a class="button secondary" href="/Devices">Alle Geräte</a>
+ </div>
+ @if(total>0&&attention.Count==0){<div class="all-good">@Ui.Icon("shield")<div><strong>Alles im grünen Bereich.</strong><span class="sub">Alle @total Geräte sind gesund und aktuell gesichert.</span></div></div>}
+ else{<partial name="_Devices" model="(IReadOnlyList<DeviceRow>)(total==0?Model.Rows:attention)" />}
+</section>

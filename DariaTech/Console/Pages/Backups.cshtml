@@ -1,4 +1,9 @@
 @page
 @model BackupsModel
-<h1>Backups</h1>
-@if(Model.Items.Count==0){<p>Keine Einträge vorhanden.</p>}else{<div class="table-wrap"><table><thead><tr><th>Backup-Job</th><th>Verwaltung</th><th>Nächster Lauf</th></tr></thead><tbody>@foreach(var row in Model.Items){<tr><td>@row.Name</td><td>@row.Ownership</td><td>@row.NextRun</td></tr>}</tbody></table></div>}
+@using DariaTech.Console.Services
+@{ ViewData["Title"] = "Backups"; }
+<div class="page-heading"><div><span class="eyebrow">Überwachen</span><h1>Backups</h1><p class="lead">@Model.Items.Count Backup-Jobs auf allen Geräten.</p></div></div>
+@if(Model.Items.Count==0){<div class="empty"><span class="empty-icon">@Ui.Icon("backups")</span><h2>Noch keine Backup-Jobs</h2><p>Jobs erscheinen hier, sobald ein Agent sie aus der lokalen Backup-Engine meldet.</p></div>}
+else{<section class="card card-flush"><div class="table-wrap"><table class="table"><thead><tr><th scope="col">Backup-Job</th><th scope="col">Gerät</th><th scope="col">Verwaltung</th><th scope="col">Nächster Lauf</th><th scope="col">Status</th></tr></thead><tbody>
+@foreach(var row in Model.Items){<tr><td><strong>@row.Name</strong></td><td><a href="/Device?id=@row.DeviceId">@(Model.Devices.TryGetValue(row.DeviceId,out var n)?n:"—")</a></td><td>@Ui.Ownership(row.Ownership)</td><td>@Ui.In(row.NextRun)<span class="sub">@Ui.Date(row.NextRun)</span></td><td><span class="status @(row.Active?"healthy":"offline")">@(row.Active?"Aktiv":"Inaktiv")</span></td></tr>}
+</tbody></table></div></section>}

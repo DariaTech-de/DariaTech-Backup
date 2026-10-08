@@ -1,5 +1,77 @@
 @page
 @model LoginModel
 @using System.Text.Json
-@{ var brand = JsonDocument.Parse(System.IO.File.ReadAllText(System.IO.Path.Combine(AppContext.BaseDirectory,"product.json"))).RootElement; }
-<section class="login"><img asp-append-version="true" class="company-logo" src="@brand.GetProperty("companyLogo").GetString()" alt="@brand.GetProperty("companyName").GetString()"><h1>Console anmelden</h1><p>Zugriff für autorisierte DariaTech-Mitarbeiter.</p><form method="post"><label>E-Mail<input asp-for="Email" type="email" autocomplete="username" required></label><label>Passwort<input asp-for="Password" type="password" autocomplete="current-password" required></label><label>Authenticator-Code<input asp-for="Code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" required></label><div asp-validation-summary="All"></div><button>Anmelden</button></form></section>
+@using DariaTech.Console.Services
+@{
+ Layout = "_AuthLayout";
+ var brand = JsonDocument.Parse(System.IO.File.ReadAllText(System.IO.Path.Combine(AppContext.BaseDirectory,"product.json"))).RootElement;
+ string B(string key) => brand.GetProperty(key).GetString() ?? "";
+}
+<div class="auth">
+<section class="auth-hero" aria-label="So funktioniert @B("productName")">
+ <svg class="auth-orbit" viewBox="0 0 800 800" aria-hidden="true" focusable="false"><circle cx="400" cy="400" r="160" class="dashed"/><circle cx="400" cy="400" r="250"/><circle cx="400" cy="400" r="340" class="dotted"/><circle cx="650" cy="400" r="6" class="sat"/><circle cx="400" cy="60" r="4" class="sat"/></svg>
+
+ <div class="brand brand-light">
+  <span class="brand-mark">@Ui.Mark</span>
+  <span class="brand-text"><span class="brand-name">@B("productName")</span><span class="brand-sub">Managed Console</span></span>
+ </div>
+
+ <div class="scene" aria-hidden="true">
+  <svg class="scene-paths" viewBox="0 0 648 330" preserveAspectRatio="none" focusable="false">
+   <path class="path-backup" d="M190 150 Q 330 40 470 150"/>
+   <path class="path-restore" d="M190 180 Q 330 290 470 180"/>
+   <text x="330" y="66" text-anchor="middle" class="path-label">verschlüsselt ↗</text>
+   <text x="330" y="282" text-anchor="middle" class="path-label muted">↙ wiederhergestellt</text>
+  </svg>
+  <div class="scene-card scene-device">
+   <div class="scene-card-head">@Ui.Icon("device")Ihr PC</div>
+   <ul class="scene-files">
+    <li><span class="file"></span>Rechnungen.pdf</li>
+    <li><span class="file"></span>Mandanten.xlsx</li>
+    <li><span class="file"></span>Fotos 2026</li>
+   </ul>
+   <span class="scene-bar"><span class="scene-bar-fill restore"></span></span>
+  </div>
+  <span class="packet backup">@Ui.Icon("lock")</span>
+  <span class="packet backup d1">@Ui.Icon("lock")</span>
+  <span class="packet backup d2">@Ui.Icon("lock")</span>
+  <span class="packet backup d3">@Ui.Icon("lock")</span>
+  <span class="packet restore">@Ui.Icon("check")</span>
+  <span class="packet restore d1">@Ui.Icon("check")</span>
+  <span class="packet restore d2">@Ui.Icon("check")</span>
+  <div class="scene-card scene-vault">
+   <div class="scene-card-head">@Ui.Icon("cloud")Backup-Tresor</div>
+   <span class="vault-lock">@Ui.Icon("lock")</span>
+   <span class="vault-caption">AES-256</span>
+   <span class="scene-bar"><span class="scene-bar-fill backup"></span></span>
+  </div>
+ </div>
+
+ <div class="auth-story">
+  <div class="story-captions">
+   <div class="caption caption-backup"><span class="eyebrow">Backup</span><h2>Verschlüsselt, bevor es Ihren PC verlässt.</h2></div>
+   <div class="caption caption-restore" aria-hidden="true"><span class="eyebrow">Wiederherstellung</span><h2>Zurück, Datei für Datei – geprüft und vollständig.</h2></div>
+  </div>
+  <div class="story-track" aria-hidden="true"><span class="story-dot"></span></div>
+  <div class="story-steps" aria-hidden="true"><span>Sichern</span><span>Verschlüsseln</span><span>Aufbewahren</span><span>Wiederherstellen</span></div>
+ </div>
+</section>
+
+<section class="auth-panel">
+ <form class="auth-form" method="post">
+  <img asp-append-version="true" class="auth-company" src="@B("companyLogo")" alt="@B("companyName")">
+  <div class="auth-heading">
+   <span class="eyebrow">Willkommen zurück</span>
+   <h1>Bei der Console anmelden</h1>
+   <p>Zugriff für autorisierte Mitarbeiter von @B("companyName"). Melden Sie sich mit Ihrem Konto und dem Code aus Ihrer Authenticator-App an.</p>
+  </div>
+  <partial name="_Errors" model='""' />
+  <div class="field"><label asp-for="Email">E-Mail</label><input asp-for="Email" type="email" autocomplete="username" required autofocus></div>
+  <div class="field"><label asp-for="Password">Passwort</label><input asp-for="Password" type="password" autocomplete="current-password" required></div>
+  <div class="field"><label asp-for="Code"><span>Bestätigungscode</span><span class="label-hint">6 Ziffern</span></label><input asp-for="Code" class="otp" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="• • • • • •" required></div>
+  <button class="button button-lg">Anmelden @Ui.Icon("arrow")</button>
+  <p class="auth-note">@Ui.Icon("shield")Zwei-Faktor-Anmeldung ist für alle Konten verpflichtend. Anmeldeversuche werden protokolliert und begrenzt.</p>
+ </form>
+ <p class="auth-foot">© @B("companyName") · <a href="@B("legalUrl")">Impressum</a> · <a href="@B("supportUrl")">Support</a></p>
+</section>
+</div>

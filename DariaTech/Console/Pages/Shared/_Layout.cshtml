@@ -1,5 +1,77 @@
 @using System.Text.Json
-@{ var brand = JsonDocument.Parse(System.IO.File.ReadAllText(System.IO.Path.Combine(AppContext.BaseDirectory,"product.json"))).RootElement; }
-<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>@brand.GetProperty("productName").GetString()</title><link asp-append-version="true" rel="icon" href="@brand.GetProperty("favicon").GetString()"><link asp-append-version="true" rel="stylesheet" href="/branding/product.css"><link asp-append-version="true" rel="stylesheet" href="/css/app.css"><script src="/js/app.js" defer></script></head>
-<body><aside><div class="sidebar-caption">MANAGED BACKUP</div><a class="brand" href="/"><img asp-append-version="true" src="@brand.GetProperty("logo").GetString()" alt="">@brand.GetProperty("productName").GetString()</a><small>@brand.GetProperty("companyName").GetString()</small><nav>@foreach(var item in new[]{(Path:"/",Label:"Dashboard"),(Path:"/Customers",Label:"Kunden"),(Path:"/Devices",Label:"Geräte"),(Path:"/Backups",Label:"Backups"),(Path:"/Alerts",Label:"Warnungen"),(Path:"/Activity",Label:"Aktivitäten"),(Path:"/Users",Label:"Benutzer"),(Path:"/Settings",Label:"Einstellungen")}){<a href="@item.Path" aria-current="@(Context.Request.Path.Value==item.Path?"page":null)">@item.Label</a>}</nav><div class="sidebar-foot"><a href="/Licenses">Lizenzen / Open Source</a><small>Sicherungen mit Duplicati Engine</small></div></aside>
-<div class="workspace"><header><form action="/Devices" method="get"><input name="q" type="search" placeholder="Kunden und Geräte suchen" aria-label="Globale Suche"></form><a href="/Alerts">Benachrichtigungen</a><button type="button" id="theme">Hell / Dunkel</button>@if(User.Identity?.IsAuthenticated==true){<span>@User.Identity.Name</span><form method="post" asp-page="/Logout"><button>Abmelden</button></form>}</header><main>@RenderBody()</main><footer>@brand.GetProperty("companyName").GetString() · <a href="@brand.GetProperty("supportUrl").GetString()">Support</a> · <a href="mailto:@brand.GetProperty("supportEmail").GetString()">@brand.GetProperty("supportEmail").GetString()</a> · <a href="@brand.GetProperty("supportPhoneUri").GetString()">@brand.GetProperty("supportPhone").GetString()</a> · <a href="@brand.GetProperty("legalUrl").GetString()">Impressum</a> · <a href="/Licenses">Open Source</a></footer></div></body></html>
+@using DariaTech.Console.Services
+@{
+ var brand = JsonDocument.Parse(System.IO.File.ReadAllText(System.IO.Path.Combine(AppContext.BaseDirectory,"product.json"))).RootElement;
+ string B(string key) => brand.GetProperty(key).GetString() ?? "";
+ var path = Context.Request.Path.Value ?? "/";
+ string? Current(string p) => (p == "/" ? path == "/" || path.Equals("/Index", StringComparison.OrdinalIgnoreCase) : path.Equals(p, StringComparison.OrdinalIgnoreCase) || (p == "/Devices" && path.Equals("/Device", StringComparison.OrdinalIgnoreCase)) || (p == "/Customers" && path.Equals("/Customer", StringComparison.OrdinalIgnoreCase))) ? "page" : null;
+ var monitor = new[]{(Path:"/",Label:"Dashboard",Icon:"dashboard"),(Path:"/Customers",Label:"Kunden",Icon:"customers"),(Path:"/Devices",Label:"Geräte",Icon:"device"),(Path:"/Backups",Label:"Backups",Icon:"backups"),(Path:"/Alerts",Label:"Warnungen",Icon:"alert"),(Path:"/Activity",Label:"Aktivitäten",Icon:"activity")};
+ var manage = new[]{(Path:"/Users",Label:"Benutzer",Icon:"users"),(Path:"/Settings",Label:"Einstellungen",Icon:"settings")};
+ var name = User.Identity?.Name;
+}
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>@(ViewData["Title"] is string t ? t + " · " : "")@B("productName")</title>
+<link asp-append-version="true" rel="icon" href="@B("favicon")">
+<link rel="preload" href="/fonts/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link asp-append-version="true" rel="stylesheet" href="/branding/product.css">
+<link asp-append-version="true" rel="stylesheet" href="/css/app.css">
+<script asp-append-version="true" src="/js/app.js" defer></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Zum Inhalt springen</a>
+<div class="app">
+<aside class="sidebar">
+ <a class="brand" href="/">
+  <span class="brand-mark">@Ui.Mark</span>
+  <span class="brand-text"><span class="brand-name">@B("productName")</span><span class="brand-sub">Managed Console</span></span>
+ </a>
+ <nav class="nav" aria-label="Hauptnavigation">
+  <span class="nav-section">Überwachen</span>
+  @foreach(var item in monitor){<a href="@item.Path" aria-current="@Current(item.Path)">@Ui.Icon(item.Icon)<span>@item.Label</span></a>}
+  <span class="nav-section">Verwalten</span>
+  @foreach(var item in manage){<a href="@item.Path" aria-current="@Current(item.Path)">@Ui.Icon(item.Icon)<span>@item.Label</span></a>}
+ </nav>
+ <div class="sidebar-foot">
+  <div class="support-card">
+   <strong>Persönlicher Support</strong>
+   <span>Ihr Ansprechpartner bei @B("companyName").</span>
+   <a href="@B("supportPhoneUri")">@Ui.Icon("phone")@B("supportPhone")</a>
+   <a href="mailto:@B("supportEmail")">@Ui.Icon("mail")@B("supportEmail")</a>
+  </div>
+  <small>Sicherungen mit Duplicati Engine · <a href="/Licenses" aria-current="@Current("/Licenses")">Open Source</a></small>
+ </div>
+</aside>
+<div class="workspace">
+ <header class="topbar">
+  <form class="search" action="/Devices" method="get" role="search">
+   <label class="sr-only" for="global-search">Kunden und Geräte suchen</label>
+   @Ui.Icon("search")
+   <input id="global-search" name="q" type="search" placeholder="Kunden, Geräte oder Standorte suchen …" value="@Context.Request.Query["q"]">
+   <kbd>/</kbd>
+  </form>
+  <div class="topbar-actions">
+   <a class="icon-button" href="/Alerts" aria-label="Warnungen anzeigen">@Ui.Icon("bell")</a>
+   <button class="icon-button" type="button" id="theme" aria-label="Hell/Dunkel umschalten" aria-pressed="false">@Ui.Icon("moon")</button>
+   @if(User.Identity?.IsAuthenticated==true){
+    <span class="user-chip"><span class="avatar" aria-hidden="true">@Ui.Initials(name)</span><span class="user-meta"><span class="user-name">@name</span><span class="user-role">@User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value</span></span></span>
+    <form method="post" asp-page="/Logout"><button class="icon-button" aria-label="Abmelden">@Ui.Icon("logout")</button></form>
+   }
+  </div>
+ </header>
+ <main id="main">@RenderBody()</main>
+ <footer class="footer">
+  <span>© @B("companyName")</span>
+  <a href="@B("supportUrl")">Support</a>
+  <a href="mailto:@B("supportEmail")">@B("supportEmail")</a>
+  <a href="@B("supportPhoneUri")">@B("supportPhone")</a>
+  <a href="@B("legalUrl")">Impressum</a>
+  <a href="/Licenses">Open-Source-Lizenzen</a>
+ </footer>
+</div>
+</div>
+</body>
+</html>

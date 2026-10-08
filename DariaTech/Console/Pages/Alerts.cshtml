@@ -1,4 +1,9 @@
 @page
 @model AlertsModel
-<h1>Warnungen</h1>
-@if(Model.Items.Count==0){<p>Keine Einträge vorhanden.</p>}else{<div class="table-wrap"><table><thead><tr><th>Schweregrad</th><th>Problem</th><th>Seit</th><th>Zuletzt erkannt</th></tr></thead><tbody>@foreach(var row in Model.Items){<tr><td>@row.Severity</td><td>@row.Code</td><td>@row.Opened</td><td>@row.LastSeen</td></tr>}</tbody></table></div>}
+@using DariaTech.Console.Services
+@{ ViewData["Title"] = "Warnungen"; var crit = Model.Items.Count(x => x.Severity == "Critical"); }
+<div class="page-heading"><div><span class="eyebrow">Überwachen</span><h1>Warnungen</h1><p class="lead">@Model.Items.Count offene Warnungen · @crit kritisch</p></div></div>
+@if(Model.Items.Count==0){<div class="empty good"><span class="empty-icon">@Ui.Icon("shield")</span><h2>Keine offenen Warnungen</h2><p>Alle überwachten Geräte melden sich und sichern planmäßig.</p></div>}
+else{<section class="card card-flush"><div class="table-wrap"><table class="table"><thead><tr><th scope="col">Schweregrad</th><th scope="col">Problem</th><th scope="col">Gerät</th><th scope="col">Seit</th><th scope="col">Zuletzt erkannt</th></tr></thead><tbody>
+@foreach(var row in Model.Items){<tr><td><span class="status @Ui.SeverityClass(row.Severity)">@Ui.SeverityLabel(row.Severity)</span></td><td><strong>@Ui.AlertTitle(row.Code)</strong><span class="sub code">@row.Code</span></td><td><a href="/Device?id=@row.DeviceId">@(Model.Devices.TryGetValue(row.DeviceId,out var n)?n:"—")</a></td><td>@Ui.Ago(row.Opened)<span class="sub">@Ui.Date(row.Opened)</span></td><td>@Ui.Ago(row.LastSeen)</td></tr>}
+</tbody></table></div></section>}
