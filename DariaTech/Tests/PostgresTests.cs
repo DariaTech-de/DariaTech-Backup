@@ -303,6 +303,39 @@ public sealed class PostgresTests
   Assert.That(await db.Audit.CountAsync(x=>x.Resource==id.ToString()),Is.EqualTo(2));
  }
 
+ [Test]public async Task FolderBrowseAndDestinationTestAreSignedDeviceQueries()
+ {
+  var(t,site)=await Customer();using var agent=factory.CreateClient(new(){BaseAddress=new Uri("https://localhost")});
+  using var enrolled=await agent.PostAsJsonAsync("/api/v1/agent/enroll",new EnrollmentRequest(await Token(t,site),"Query","Windows","0.1.0"));var identity=(await enrolled.Content.ReadFromJsonAsync<EnrollmentResponse>())!;
+  agent.DefaultRequestHeaders.Authorization=new("Bearer",identity.Credential);agent.DefaultRequestHeaders.Add("X-Device-Id",identity.DeviceId.ToString());
+  using var admin=await Login(UserRole.SuperAdmin);
+  var form=await admin.GetStringAsync($"/BackupEdit?deviceId={identity.DeviceId}");var token=WebUtility.HtmlDecode(Regex.Match(form,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"").Groups[1].Value);
+  async Task<Guid> Start(string handler,Dictionary<string,string> values)
+  {
+   values["__RequestVerificationToken"]=token;using var r=await admin.PostAsync($"/BackupEdit?handler={handler}",new FormUrlEncodedContent(values));Assert.That(r.StatusCode,Is.EqualTo(HttpStatusCode.OK));
+   using var d=System.Text.Json.JsonDocument.Parse(await r.Content.ReadAsStringAsync());Assert.That(d.RootElement.TryGetProperty("id",out var id),Is.True,d.RootElement.ToString());return id.GetGuid();
+  }
+  async Task<System.Text.Json.JsonElement> Query(Guid id)=>System.Text.Json.JsonDocument.Parse(await admin.GetStringAsync($"/BackupEdit?handler=Query&deviceId={identity.DeviceId}&id={id}")).RootElement.Clone();
+  using var key=System.Security.Cryptography.ECDsa.Create();key.ImportFromPem(File.ReadAllText(Path.Combine(directory,"commands.pem")));
+  var browse=await Start("Browse",new(){{"deviceId",identity.DeviceId.ToString()},{"path","D:\\"}});
+  Assert.That((await Query(browse)).GetProperty("done").GetBoolean(),Is.False);
+  var command=CommandProtocol.Verify((await agent.GetFromJsonAsync<SignedCommand[]>("/api/v1/agent/commands"))!.Single(),key,identity.DeviceId,DateTimeOffset.UtcNow);
+  Assert.That(command.Action,Is.EqualTo(RemoteAction.BrowseFolders));Assert.That(command.LocalJobId,Is.EqualTo("0"));Assert.That(command.Catalog!.Prefix,Is.EqualTo("D:\\"));
+  using var withFile=await agent.PostAsJsonAsync($"/api/v1/agent/commands/{browse}/receipt",new CommandReceipt("Completed",null,null,new RestoreCatalog([],[new("D:\\secret.txt",5,false)],false)));Assert.That(withFile.StatusCode,Is.EqualTo(HttpStatusCode.BadRequest),"browse returns folders only");
+  using var folders=await agent.PostAsJsonAsync($"/api/v1/agent/commands/{browse}/receipt",new CommandReceipt("Completed",null,null,new RestoreCatalog([],[new("D:\\Daten\\",null,true),new("D:\\Fotos\\",null,true)],false)));Assert.That(folders.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  var listed=await Query(browse);Assert.That(listed.GetProperty("ok").GetBoolean(),Is.True);Assert.That(listed.GetProperty("folders").EnumerateArray().Select(x=>x.GetString()),Is.EqualTo(new[]{"D:\\Daten\\","D:\\Fotos\\"}));
+  var test=await Start("TestDestination",new(){{"DeviceId",identity.DeviceId.ToString()},{"Name","x"},{"Provider","Files"},{"DestinationKey","ssh"},{"dest.ssh.host","sftp.example"},{"dest.ssh.path","backup"},
+   {"dest.ssh.opt.auth-username","u"},{"dest.ssh.opt.auth-password","test-secret-555"},{"dest.ssh.opt.ssh-fingerprint","ssh-ed25519 256 00:11"},{"createFolder","false"}});
+  var testCommand=CommandProtocol.Verify((await agent.GetFromJsonAsync<SignedCommand[]>("/api/v1/agent/commands"))!.Single(),key,identity.DeviceId,DateTimeOffset.UtcNow);
+  Assert.That(testCommand.Test!.TargetUrl,Is.EqualTo("ssh://sftp.example/backup"));Assert.That(testCommand.Test.Options["auth-password"],Is.EqualTo("test-secret-555"));
+  await using(var store=Db())Assert.That((await store.Commands.SingleAsync(x=>x.Id==test)).EncryptedPayload,Does.Not.Contain("test-secret-555"));
+  using var wrongDetail=await agent.PostAsJsonAsync($"/api/v1/agent/commands/{test}/receipt",new CommandReceipt("Failed",null,"DestinationTestFailed",null,"raw engine text"));Assert.That(wrongDetail.StatusCode,Is.EqualTo(HttpStatusCode.BadRequest),"only fingerprints may be reported");
+  using var mismatch=await agent.PostAsJsonAsync($"/api/v1/agent/commands/{test}/receipt",new CommandReceipt("Failed",null,"DestinationHostKeyMismatch",null,"ssh-ed25519 256 aa:bb:cc"));Assert.That(mismatch.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  var tested=await Query(test);Assert.That(tested.GetProperty("ok").GetBoolean(),Is.False);Assert.That(tested.GetProperty("code").GetString(),Is.EqualTo("DestinationHostKeyMismatch"));Assert.That(tested.GetProperty("detail").GetString(),Is.EqualTo("ssh-ed25519 256 aa:bb:cc"));
+  var plain=new FormUrlEncodedContent(new Dictionary<string,string>{{"DeviceId",identity.DeviceId.ToString()},{"Provider","Files"},{"DestinationKey","ftp"},{"dest.ftp.host","ftp.example"},{"dest.ftp.path","b"},{"__RequestVerificationToken",token}});
+  using var rejected=await admin.PostAsync("/BackupEdit?handler=TestDestination",plain);Assert.That(await rejected.Content.ReadAsStringAsync(),Does.Contain("error"),"plain FTP is not even sent to the device");
+  using var reader=await Login(UserRole.ReadOnly);using var denied=await reader.GetAsync($"/BackupEdit?handler=Query&deviceId={identity.DeviceId}&id={browse}");Assert.That(denied.StatusCode,Is.EqualTo(HttpStatusCode.Forbidden));
+ }
  [Test]public async Task RestoreRequiresIndependentApprovalAndCommandsAreDeviceBound()
  {
   var(t,site)=await Customer();using var agent=factory.CreateClient(new(){BaseAddress=new Uri("https://localhost")});

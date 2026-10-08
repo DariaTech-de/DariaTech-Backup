@@ -16,14 +16,22 @@
  @foreach(var (key,label,icon) in providers){<a asp-page="/BackupEdit" asp-route-deviceId="@Model.DeviceId" asp-route-provider="@key" aria-current="@(Model.Provider==key?"page":null)">@Ui.Icon(icon)@label</a>}
 </nav>}
 
-<form method="post" class="stack">
+<form method="post" class="stack" data-backup-form>
  <input type="hidden" asp-for="DeviceId" /><input type="hidden" asp-for="ManagedJobId" /><input type="hidden" asp-for="Revision" /><input type="hidden" asp-for="Provider" />
 
  <section class="card">
   <div class="card-head"><div><h2><span class="step">1</span>Was wird gesichert?</h2><span class="sub">Quelle auf dem Gerät @Model.Device.Name</span></div></div>
   <div class="field"><label asp-for="Name">Jobname</label><input asp-for="Name" required maxlength="200" placeholder="z. B. Dateiserver täglich" /></div>
   @if(Model.Provider is "Files" or "NAS"){
-   <div class="field"><label asp-for="Sources"><span>Quellordner</span><span class="label-hint">ein absoluter Pfad je Zeile</span></label><textarea asp-for="Sources" required rows="4" placeholder="C:\Users&#10;D:\Daten&#10;/srv/daten"></textarea></div>
+   <div class="field"><label asp-for="Sources"><span>Quellordner</span><span class="label-hint">ein absoluter Pfad je Zeile</span></label><textarea asp-for="Sources" required rows="4" placeholder="C:\Users&#10;D:\Daten&#10;/srv/daten" data-source-list></textarea></div>
+   <div class="browser" data-browser data-device="@Model.DeviceId">
+    <button type="button" class="button secondary" data-browse-root>@Ui.Icon("search")Ordner auf dem Gerät durchsuchen</button>
+    <div class="browser-panel" data-browser-panel hidden>
+     <div class="browser-head"><button type="button" class="link-button" data-browse-root>Laufwerke</button><span class="browser-path code" data-browser-path></span></div>
+     <p class="browser-status" data-browser-status role="status" aria-live="polite"></p>
+     <ul class="browser-list" data-browser-list></ul>
+    </div>
+   </div>
   } else if(Model.Provider=="Proxmox"){
    <div class="field"><label asp-for="ProxmoxGuestIds"><span>Proxmox-Gast-IDs</span><span class="label-hint">durch Kommas getrennt</span></label><input asp-for="ProxmoxGuestIds" required placeholder="101, 102" /></div>
    <p class="hint">@Ui.Icon("info")Der Agent muss auf dem Proxmox-Host installiert sein. Vor jeder Sicherung erstellt vzdump vollständige Snapshot-Archive; Gast-IDs und Staging-Speicher müssen lokal freigegeben sein.</p>
@@ -67,6 +75,12 @@
   } else {
    <partial name="_DestinationPicker" model="new DestinationForm.Picker(Model.DestinationKey ?? Model.Destination.Key, Model.Destination, Model.OptionValues, Model.StoredSecrets, !isNew)" />
   }
+  <div class="dest-test" data-dest-test>
+   <button type="button" class="button secondary" data-test-destination>@Ui.Icon("cloud")Verbindung testen</button>
+   <button type="button" class="button secondary" data-test-create hidden>Ordner anlegen und erneut testen</button>
+   <button type="button" class="button secondary" data-use-hostkey hidden>Gemeldeten Host-Key übernehmen</button>
+   <p class="dest-test-status" data-test-status role="status" aria-live="polite"></p>
+  </div>
  </section>
 
  <section class="card">

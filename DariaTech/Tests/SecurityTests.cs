@@ -74,6 +74,20 @@ public sealed class SecurityTests
   Assert.That(ConfigurationPolicy.Valid(d with{TargetUrl="ssh://storage.example/path",BackendOptions=new(){{"ssh-accept-any-fingerprints","true"}}}),Is.False);
   Assert.That(ConfigurationPolicy.Valid(d with{Sources=["relative/path"]}),Is.False);
  }
+ [Test]public void DeviceQueriesAreBoundToNoJobAndValidateTheirPayload()
+ {
+  var now=DateTimeOffset.UtcNow;var device=Guid.NewGuid();var tenant=Guid.NewGuid();
+  DeviceCommand Make(RemoteAction a,string job,CatalogRequest? c=null,DestinationTest? t=null)=>new(Guid.NewGuid(),tenant,device,job,a,null,now,now.AddMinutes(5),c,Test:t);
+  Assert.That(CommandProtocol.Valid(Make(RemoteAction.BrowseFolders,"0",new(null,null)),device,now),Is.True,"drive list");
+  Assert.That(CommandProtocol.Valid(Make(RemoteAction.BrowseFolders,"0",new(null,"C:\\Users")),device,now),Is.True);
+  Assert.That(CommandProtocol.Valid(Make(RemoteAction.BrowseFolders,"1",new(null,"C:\\Users")),device,now),Is.False,"device queries carry no job");
+  Assert.That(CommandProtocol.Valid(Make(RemoteAction.BrowseFolders,"0",new(now,"C:\\Users")),device,now),Is.False,"no snapshot");
+  var sftp=new DestinationTest("ssh://host/path",new(){{"ssh-fingerprint","ssh-ed25519 256 aa"}},false);
+  Assert.That(CommandProtocol.Valid(Make(RemoteAction.TestDestination,"0",null,sftp),device,now),Is.True);
+  Assert.That(CommandProtocol.Valid(Make(RemoteAction.TestDestination,"0",null,new("ftp://host/path",new(),false)),device,now),Is.False,"plain FTP");
+  Assert.That(CommandProtocol.Valid(Make(RemoteAction.RunBackup,"1",null,sftp),device,now),Is.False,"job commands carry no destination");
+  Assert.That(CommandProtocol.Valid(Make(RemoteAction.RunBackup,"0"),device,now),Is.False);
+ }
  [Test]public void ManagedConfigurationAcceptsEngineDestinationsWithTheirOwnOptionsOnly()
  {
   var d=new ManagedBackupDefinition("Daily",["C:\\Data"],"file:///D:/Backup/","test-only-long-passphrase",new(),30,[],null);

@@ -29,6 +29,9 @@ public static class ConfigurationPolicy
   if(d.Schedule is {} s&&(s.RepeatHours is <1 or >8760||s.Days is null||s.Days.Length is <1 or >7||s.Days.Any(x=>!Enum.IsDefined(x))||s.Days.Distinct().Count()!=s.Days.Length||s.Start.Year is <2020 or >2100))return false;
   return System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(d).Length<=80000;
  }
+ // A destination on its own, validated with the same rules as inside a job definition.
+ public static bool ValidDestination(string? url,Dictionary<string,string>? options)=>url is not null&&options is not null&&
+  Valid(new ManagedBackupDefinition("destination",["/destination"],url,"destination-validation-only",options,1,[],null));
  private static bool PathText(string? s)=>Text(s,1000)&& (s!.StartsWith('/')||Regex.IsMatch(s,@"^[A-Za-z]:[\\/]")||Regex.IsMatch(s,@"^\\\\[^\\/]+\\[^\\/]+(?:\\|$)"));
  private static bool Text(string? s,int max)=>!string.IsNullOrWhiteSpace(s)&&s.Length<=max&&!s.Any(char.IsControl);
 }

@@ -473,3 +473,20 @@ input[readonly]{background:var(--sunken);color:var(--muted)}
 .custom-destination[hidden]{display:none}
 .dest-panel-group{border:0;margin:0;padding:0;min-width:0;display:flex;flex-direction:column;gap:16px}
 .choice-option select{margin-top:10px}
+.browser{display:flex;flex-direction:column;gap:12px;align-items:flex-start}
+.browser-panel{align-self:stretch;border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;background:var(--panel-2)}
+.browser-panel[hidden]{display:none}
+.browser-head{display:flex;flex-wrap:wrap;align-items:center;gap:10px;font-size:13px}
+.browser-status{font-size:13px;color:var(--muted);min-height:1em}
+.browser-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;max-height:320px;overflow:auto}
+.browser-list li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--line)}
+.browser-list li:last-child{border-bottom:0}
+.link-button{background:none!important;border:0;box-shadow:none!important;color:var(--primary)!important;min-height:36px;padding:0 4px;font-weight:500;cursor:pointer;text-align:left;white-space:normal}
+body.dark .link-button{color:var(--accent)!important}
+.link-button:hover{text-decoration:underline;filter:none}
+.button.small{min-height:34px;padding:0 12px;font-size:13px;border-radius:9px}
+.dest-test{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding-top:14px;border-top:1px solid var(--line)}
+.dest-test-status{flex-basis:100%;font-size:13.5px;color:var(--muted);min-height:1em}
+.dest-test-status.good{color:var(--ok-fg)}
+.dest-test-status.bad{color:var(--crit-fg)}
+.button[hidden],button[hidden]{display:none!important}

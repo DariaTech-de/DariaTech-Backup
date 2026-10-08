@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 namespace DariaTech.Console.Pages;
 
 [Authorize(Policy="Admin")]
-public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets):PageModel
+public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets,CommandSigning signer):PageModel
 {
  [BindProperty]public Guid DeviceId {get;set;}
  [BindProperty]public Guid? ManagedJobId {get;set;}
@@ -161,6 +161,54 @@ public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets):PageMo
   var result=ManagedJobId is {} id?await ConfigurationApi.Update(id,new(Revision,definition),db,secrets,HttpContext):await ConfigurationApi.Create(DeviceId,new(0,definition),db,secrets,HttpContext);
   if(result is IStatusCodeHttpResult {StatusCode:>=400}){Error="Die Konfiguration wurde abgelehnt. Bei einer geänderten Quelle, einem neuen Ziel oder Passwort bitte einen neuen Backup-Job anlegen.";return Page();}
   return RedirectToPage("/Device",new{id=DeviceId});
+ }
+ // Folder browser: asks the agent for the sub-folders of a path (null = drives / root).
+ public async Task<IActionResult> OnPostBrowseAsync(Guid deviceId,string? path)
+ {
+  var (command,error)=await CommandApi.RequestDeviceQuery(deviceId,RemoteAction.BrowseFolders,new CatalogRequest(null,string.IsNullOrWhiteSpace(path)?null:path.Trim()),null,db,signer,secrets,HttpContext);
+  return new JsonResult(command is null?new{error}:new{id=command.Id});
+ }
+ // Connection test with the destination exactly as it would be saved (stored secrets are reused for an existing job).
+ public async Task<IActionResult> OnPostTestDestinationAsync(bool createFolder)
+ {
+  var previous=await LoadPrevious();
+  var device=await db.Devices.SingleOrDefaultAsync(x=>x.Id==DeviceId&&x.Active);if(device is null)return NotFound();
+  string? url;Dictionary<string,string> options;
+  if(previous is null&&DestinationMode=="template")
+  {
+   var template=await db.DestinationTemplates.SingleOrDefaultAsync(x=>x.Id==TemplateId);if(template is null)return new JsonResult(new{error="Speicherziel nicht gefunden."});
+   url=template.TargetUrl;options=DestinationTemplates.Options(secrets,template);
+  }
+  else
+  {
+   var key=previous is null?DestinationKey??"":DestinationForm.Parse(previous.TargetUrl).Key;
+   (url,options)=DestinationForm.Read(Request.Form,key,previous?.BackendOptions);
+   if(previous is not null)url=previous.TargetUrl;
+  }
+  if(url is null)return new JsonResult(new{error="Bitte das Ziel vollständig angeben."});
+  var (command,error)=await CommandApi.RequestDeviceQuery(DeviceId,RemoteAction.TestDestination,null,new DestinationTest(url,options,createFolder),db,signer,secrets,HttpContext);
+  return new JsonResult(command is null?new{error}:new{id=command.Id});
+ }
+ public async Task<IActionResult> OnGetQueryAsync(Guid deviceId,Guid id)
+ {
+  var c=await db.Commands.SingleOrDefaultAsync(x=>x.Id==id&&x.DeviceId==deviceId&&x.JobId==null);if(c is null)return NotFound();
+  if(c.Status=="Pending"&&c.Expires<=DateTimeOffset.UtcNow)return new JsonResult(new{done=true,ok=false,message="Das Gerät hat nicht geantwortet. Ist es online und sind Fernbefehle auf dem Gerät freigegeben?"});
+  if(c.Status is "Pending" or "Accepted")return new JsonResult(new{done=false});
+  if(c.Action==RemoteAction.BrowseFolders)
+  {
+   if(c.Status!="Completed"||c.EncryptedCatalog is null)return new JsonResult(new{done=true,ok=false,message="Der Ordner ist auf dem Gerät nicht verfügbar."});
+   var catalog=System.Text.Json.JsonSerializer.Deserialize<RestoreCatalog>(secrets.Unprotect(c.TenantId,$"catalog:{c.Id}",c.EncryptedCatalog))!;
+   ManagementApi.Audit(db,HttpContext,c.TenantId,"device.folders-viewed",c.Id);await db.SaveChangesAsync();
+   return new JsonResult(new{done=true,ok=true,folders=catalog.Files.Select(x=>x.Path),truncated=catalog.Truncated});
+  }
+  return new JsonResult(new{done=true,ok=c.Status=="Completed",code=c.ErrorCode,detail=c.Detail,message=c.Status=="Completed"?"Verbindung erfolgreich: Der Agent erreicht das Ziel mit diesen Zugangsdaten.":c.ErrorCode switch
+  {
+   "DestinationFolderMissing"=>"Der Zielordner existiert noch nicht. Sie können ihn beim Test anlegen lassen.",
+   "DestinationHostKeyMismatch"=>"Der Server meldet einen anderen Host-Key. Prüfen Sie ihn und tragen Sie ihn als Fingerprint ein, wenn er stimmt.",
+   "DestinationCertificateInvalid"=>"Das TLS-Zertifikat des Servers ist ungültig.",
+   "PolicyRejected"=>"Der Agent hat den Test abgelehnt (lokale Richtlinie oder ältere Agent-Version).",
+   _=>"Das Ziel ist nicht erreichbar oder die Zugangsdaten stimmen nicht.",
+  }});
  }
  private async Task<ManagedBackupDefinition?> LoadPrevious()
  {

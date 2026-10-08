@@ -118,7 +118,16 @@ public static class RemoteCommands
    var instance=state.Read<Guid>("engine-instance.bin");if(instance==Guid.Empty)throw new InvalidOperationException("Engine instance identity is required");
    journal[command.Id]=new(command,digest,instance,null,false);state.Write("commands.bin",journal);
    CommandReceipt receipt;
-   try{receipt=command.Action is RemoteAction.ListRestorePoints or RemoteAction.ListRestoreFiles?new("Completed",null,null,await adapter.ReadCatalog(command,ct)):new("Accepted",await adapter.Dispatch(command,options,ct),null);}
+   try
+   {
+    receipt=command.Action switch
+    {
+     RemoteAction.ListRestorePoints or RemoteAction.ListRestoreFiles=>new("Completed",null,null,await adapter.ReadCatalog(command,ct)),
+     RemoteAction.BrowseFolders=>new("Completed",null,null,await adapter.BrowseFolders(command,ct)),
+     RemoteAction.TestDestination=>await adapter.TestDestination(command,ct),
+     _=>new("Accepted",await adapter.Dispatch(command,options,ct),null),
+    };
+   }
    catch(InvalidOperationException){receipt=new("Rejected",null,"PolicyRejected");}
    catch(HttpRequestException){receipt=new("Indeterminate",null,"DispatchIndeterminate");}
    if(state.Read<Guid>("engine-instance.bin")!=instance)receipt=new("Indeterminate",receipt.TaskId,"DispatchIndeterminate");
