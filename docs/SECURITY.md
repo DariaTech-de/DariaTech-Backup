@@ -58,3 +58,7 @@ Central erasure does not delete backup archives on customer storage, agent-local
 ### Local managed engine connection ownership
 
 Managed Windows agents validate the kernel's server-side TCP connection owner and process creation time against the protected identity of their launched engine, before sending any HTTP data or engine credentials. Connections to a foreign loopback listener fail closed; PID reuse and restarts invalidate old identities. The guard runs for each newly established connection, not merely once when checking whether a port is free. Existing unmanaged engine connections are an explicit local trust mode and do not gain this managed-child verification. The local `--check-engine-port PID START_UTC_TICKS PORT` diagnostic sends no credentials or HTTP payload.
+
+### Restore root permissions
+
+On Windows remote restore requires a protected root ACL exposing the root only to SYSTEM/Administrators/TrustedInstaller. All ancestors must have privileged owners and must not let ordinary users delete/replace the child or change permissions. This prevents a user-writable parent from redirecting privileged restores after path validation. Provision outside user profiles, preferably under the protected agent state directory. Existing reparse points are rejected; restore destinations must be new and overwrite stays disabled. File access for the customer is a subsequent deliberate local administrative action.

@@ -79,6 +79,18 @@ try {
  $rejected=Start-Process $agentExe -ArgumentList @('--check-engine-port',$PID.ToString(),((Get-Process -Id $PID).StartTime.ToUniversalTime().Ticks).ToString(),'8210') -Wait -PassThru -NoNewWindow -RedirectStandardError (Join-Path $temporary 'ownership-rejected.txt')
  if(!$rejected.ExitCode){throw 'Foreign process ownership was accepted for the engine port'}
  Write-Host 'PASS: authenticated connection ownership; rejected a foreign owner before sending HTTP data.'
+ $restoreProbe=Join-Path $state 'restore-security-probe';New-Item -ItemType Directory $restoreProbe|Out-Null
+ $rootAcl=New-Object Security.AccessControl.DirectorySecurity;$rootAcl.SetAccessRuleProtection($true,$false);$rootAcl.SetOwner((New-Object Security.Principal.SecurityIdentifier('S-1-5-32-544')))
+ foreach($sid in 'S-1-5-18','S-1-5-32-544'){$rootAcl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier($sid)),'FullControl','ContainerInherit,ObjectInherit','None','Allow')))}
+ Set-Acl $restoreProbe $rootAcl
+ & $agentExe --check-restore-root $restoreProbe
+ if($LASTEXITCODE){throw 'Protected restore root was rejected'}
+ $rootAcl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier('S-1-1-0')),'Read','Allow')));Set-Acl $restoreProbe $rootAcl
+ $rejected=Start-Process $agentExe -ArgumentList @('--check-restore-root',('"'+$restoreProbe+'"')) -Wait -PassThru -NoNewWindow -RedirectStandardError (Join-Path $temporary 'restore-root-rejected.txt')
+ if(!$rejected.ExitCode){throw 'World-readable restore root was accepted'}
+ Remove-Item $restoreProbe -Force
+ Write-Host 'PASS: protected restore root accepted; root exposed to ordinary users rejected.'
+
 
  for($i=0;$i -lt 80;$i++) {
   if(Test-Path $env:FIXTURE_RESULT){$result=Get-Content $env:FIXTURE_RESULT -Raw|ConvertFrom-Json;if($result.enrolled -and $result.heartbeats -gt 0){break}}

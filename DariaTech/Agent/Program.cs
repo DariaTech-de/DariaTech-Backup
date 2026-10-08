@@ -17,6 +17,13 @@ if(args.Length==4&&args[0]=="--check-engine-port")
  return;
 }
 
+if(args.Length==2&&args[0]=="--check-restore-root")
+{
+ try{DuplicatiAdapter.RestoreDestination(args[1],"ownership-diagnostic-"+Guid.NewGuid().ToString("N"));System.Console.WriteLine("Restore root permissions verified");}
+ catch(Exception error){System.Console.Error.WriteLine($"Restore root check rejected ({error.GetType().Name})");Environment.ExitCode=2;}
+ return;
+}
+
 var builder=Host.CreateApplicationBuilder(new HostApplicationBuilderSettings{Args=args,ContentRootPath=AppContext.BaseDirectory});var options=builder.Configuration.GetSection("Agent").Get<AgentOptions>()??new();options.Validate();var state=new ProtectedState(options);
 if(args.Contains("enroll"))
 {

@@ -33,6 +33,7 @@ public sealed partial class DuplicatiAdapter
   if(string.IsNullOrWhiteSpace(root)||!Path.IsPathFullyQualified(root)||!CommandProtocol.SafeFolder(folder))throw new InvalidOperationException("Local restore root required");
   var full=Path.GetFullPath(root);if(!Directory.Exists(full))throw new InvalidOperationException("Restore root must be provisioned locally");
   for(DirectoryInfo? parent=new DirectoryInfo(full);parent is not null;parent=parent.Parent)if((parent.Attributes&FileAttributes.ReparsePoint)!=0)throw new InvalidOperationException("Restore root cannot contain links");
+  RestoreRootSecurity.Validate(full);
   var destination=Path.Combine(full,folder);
   // Each restore goes into a new directory; never overwrite originals or traverse existing junctions.
   if(Directory.Exists(destination)||File.Exists(destination))throw new InvalidOperationException("Restore destination already exists");
