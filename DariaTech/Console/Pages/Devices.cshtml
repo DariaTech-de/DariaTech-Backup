@@ -1,3 +1,14 @@
 @page
 @model DevicesModel
-<h1>Geräte</h1><p>Aktive Agents, nach Handlungsbedarf sortiert.</p><partial name="_Devices" model="Model.Rows" />
+@using DariaTech.Console.Services
+@{ ViewData["Title"] = "Geräte"; var q = Request.Query["q"].ToString(); }
+<div class="page-heading">
+ <div><span class="eyebrow">Überwachen</span><h1>Geräte</h1><p class="lead">@(string.IsNullOrWhiteSpace(q) ? "Alle aktiven Agenten, nach Handlungsbedarf sortiert." : $"Suchergebnisse für „{q}“ · {Model.Rows.Count} Treffer")</p></div>
+ <div class="pill-row" aria-label="Statusübersicht">
+  <span class="status critical">@Model.Rows.Count(x=>x.Status=="Critical") Kritisch</span>
+  <span class="status warning">@Model.Rows.Count(x=>x.Status=="Warning") Warnung</span>
+  <span class="status offline">@Model.Rows.Count(x=>x.Status=="Offline") Offline</span>
+  <span class="status healthy">@Model.Rows.Count(x=>x.Status=="Healthy") Gesund</span>
+ </div>
+</div>
+<section class="card card-flush"><partial name="_Devices" model="Model.Rows" /></section>

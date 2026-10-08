@@ -85,7 +85,7 @@ app.Use(async(c,next)=>
  c.Response.Headers["Content-Security-Policy"]="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'";
  c.Response.Headers["X-Content-Type-Options"]="nosniff";c.Response.Headers["Referrer-Policy"]="no-referrer";c.Response.Headers["Permissions-Policy"]="camera=(), microphone=(), geolocation=()";
  c.Response.Headers["X-Frame-Options"]="DENY";if(c.Request.IsHttps)c.Response.Headers["Strict-Transport-Security"]="max-age=31536000";
- if(!c.Request.Path.StartsWithSegments("/branding")&&!c.Request.Path.StartsWithSegments("/css")&&!c.Request.Path.StartsWithSegments("/js"))c.Response.Headers.CacheControl="no-store";
+ if(!c.Request.Path.StartsWithSegments("/branding")&&!c.Request.Path.StartsWithSegments("/css")&&!c.Request.Path.StartsWithSegments("/js")&&!c.Request.Path.StartsWithSegments("/fonts"))c.Response.Headers.CacheControl="no-store";
  await next();
 });
 app.UseStaticFiles();app.UseRouting();app.UseRateLimiter();app.UseAuthentication();app.UseAuthorization();

@@ -1,4 +1,97 @@
 @page
 @model DeviceModel
 @using DariaTech.Console.Services
-<h1>@Model.Row.Device.Name <span class="status @Model.Row.Status.ToLowerInvariant()">@Model.Row.Status</span></h1><p>@Model.Row.Customer → @Model.Row.Site → @Model.Row.Device.Hostname</p><section class="panel"><dl><dt>Betriebssystem</dt><dd>@Model.Row.Device.OperatingSystem</dd><dt>Agent-Version</dt><dd>@Model.Row.Version</dd><dt>Letzter Heartbeat</dt><dd>@Overview.Time(Model.Row.Device.LastHeartbeat)</dd><dt>Letzter erfolgreicher Lauf</dt><dd>@Overview.Time(Model.Row.LastSuccess)</dd><dt>Letzter fehlgeschlagener Lauf</dt><dd>@Overview.Time(Model.Runs.Where(x=>x.Status==RunStatus.Failed).Select(x=>(DateTimeOffset?)(x.Completed??x.Started)).Max())</dd><dt>Storage</dt><dd>@Overview.Bytes(Model.Row.Storage)</dd></dl></section>@if(Model.Row.Device.Progress is {} progress){<section class="panel"><h2>Aktiver Backup-/Restore-Vorgang</h2><p>@(progress*100)% · @Overview.Bytes(Model.Row.Device.ProgressBytes) · @Model.Row.Device.ProgressFiles Dateien</p></section>}<section class="panel"><h2>Backup-Jobs</h2>@foreach(var j in Model.Jobs){<p><strong>@j.Name</strong> · @j.Ownership · Nächster Lauf: @Overview.Time(j.NextRun)</p>}<p class="muted">Quellen, Ziele, Verschlüsselung, Filter und Retention werden aktuell lokal in der Duplicati-Engine verwaltet.</p></section><section class="panel"><h2>Backup-Historie</h2><table><thead><tr><th>Start / Ereigniszeit</th><th>Status</th><th>Daten</th><th>Dateien</th><th>Fehlercode</th></tr></thead><tbody>@foreach(var r in Model.Runs){<tr><td>@Overview.Time(r.Started)</td><td>@r.Status</td><td>@Overview.Bytes(r.Bytes)</td><td>@(r.Files?.ToString()??"Unbekannt")</td><td>@r.ErrorCode</td></tr>}</tbody></table></section><section class="panel"><h2>Restore und Remote-Aktionen</h2><p>Noch nicht implementiert. Restore bleibt über die lokale Duplicati-Oberfläche verfügbar. Zentrale Remote-Aktionen werden erst mit Autorisierung, Ablaufzeit und Replay-Schutz freigeschaltet.</p><h2>Logs und Aufbewahrung</h2><p>Rohe Logs und Dateipfade bleiben aus Datenschutzgründen lokal. Zentral werden Fehlercodes übertragen. Eine automatische Retention-Prüfung ist noch nicht implementiert.</p></section>
+@using DariaTech.Contracts
+@{
+ var row = Model.Row; var d = row.Device;
+ ViewData["Title"] = d.Name;
+ var today = DateOnly.FromDateTime(DateTime.UtcNow);
+ var strip = Enumerable.Range(0, 30).Select(i => today.AddDays(i - 29)).Select(day => {
+  var runs = Model.Runs.Where(r => DateOnly.FromDateTime(r.Started.UtcDateTime) == day).ToList();
+  var cls = runs.Count == 0 ? "none" : runs.Any(r => r.Status == RunStatus.Failed) ? "critical" : runs.Any(r => r.Status is RunStatus.Warning or RunStatus.Cancelled or RunStatus.Unknown) ? "warning" : runs.Any(r => r.Status == RunStatus.Success) ? "healthy" : "none";
+  return (Day: day, Class: cls, Count: runs.Count);
+ }).ToList();
+ var recent = Model.Runs.Where(r => r.Started >= DateTimeOffset.UtcNow.AddDays(-30) && r.Status != RunStatus.Running).ToList();
+ var recentOk = recent.Count(r => r.Status == RunStatus.Success);
+ var durations = Model.Runs.Where(r => r.Status == RunStatus.Success && r.Completed is not null).Take(20).Select(r => r.Completed!.Value - r.Started).ToList();
+ var lastFailed = Model.Runs.Where(x => x.Status == RunStatus.Failed).Select(x => (DateTimeOffset?)(x.Completed ?? x.Started)).Max();
+}
+<nav class="breadcrumb" aria-label="Brotkrümel"><a href="/Devices">Geräte</a><span aria-hidden="true">/</span><span>@row.Customer</span><span aria-hidden="true">/</span><span>@row.Site</span><span aria-hidden="true">/</span><span aria-current="page">@d.Name</span></nav>
+
+<section class="card device-hero">
+ <span class="device-avatar">@Ui.Icon("server")</span>
+ <div class="device-title">
+  <div class="title-row"><h1>@d.Name</h1><span class="status lg @Ui.StatusClass(row.Status)">@Ui.StatusLabel(row.Status)</span></div>
+  <p class="lead">@d.OperatingSystem · Agent @row.Version · Engine @(d.EngineReachable ? "erreichbar" : "nicht erreichbar") · Letzter Kontakt @Ui.Ago(d.LastHeartbeat)</p>
+ </div>
+ <div class="actions">
+  <button class="button locked" type="button" disabled aria-describedby="remote-hint">@Ui.Icon("lock")Backup jetzt starten</button>
+  <button class="button locked" type="button" disabled aria-describedby="remote-hint">@Ui.Icon("lock")Wiederherstellen</button>
+ </div>
+ <p id="remote-hint" class="hint">@Ui.Icon("info")Fernaktionen werden erst mit signierten, freigabepflichtigen Befehlen freigeschaltet. Backup und Wiederherstellung steuern Sie bis dahin lokal auf dem Gerät.</p>
+</section>
+
+@foreach(var a in Model.Alerts.Take(3)){
+<section class="banner @Ui.SeverityClass(a.Severity)" role="alert">
+ <span class="banner-icon">@Ui.Icon("alert")</span>
+ <div><strong>@Ui.AlertTitle(a.Code)</strong><span>Seit @Ui.Date(a.Opened) · zuletzt erkannt @Ui.Ago(a.LastSeen) · Code <span class="code">@a.Code</span></span></div>
+</section>
+}
+
+@if(d.Progress is {} progress){var p=(int)Math.Round(progress*100);
+<section class="card">
+ <div class="card-head"><h2>Aktiver Backup- oder Restore-Vorgang</h2><span class="mono big">@p %</span></div>
+ <progress max="100" value="@p" aria-label="Fortschritt">@p %</progress>
+ <span class="sub">@Ui.Size(d.ProgressBytes) · @Ui.Number(d.ProgressFiles) Dateien verarbeitet</span>
+</section>
+}
+
+<section class="kpis" aria-label="Kennzahlen">
+ <article class="kpi"><span class="kpi-label">Letzter Erfolg</span><strong>@Ui.Ago(row.LastSuccess)</strong><span class="sub">@Ui.Date(row.LastSuccess)</span></article>
+ <article class="kpi"><span class="kpi-label">Gesicherte Daten</span><strong>@(row.Storage>0?Ui.Size(row.Storage):"—")</strong><span class="sub">@row.Jobs Backup-Job@(row.Jobs==1?"":"s")</span></article>
+ <article class="kpi"><span class="kpi-label">Erfolgsquote · 30 Tage</span><strong>@(recent.Count==0?"—":Ui.Percent(recentOk*100.0/recent.Count)+" %")</strong><span class="sub">@recentOk von @recent.Count Läufen</span></article>
+ <article class="kpi"><span class="kpi-label">Ø Dauer</span><strong>@(durations.Count==0?"—":Ui.Duration(TimeSpan.FromTicks((long)durations.Average(x=>x.Ticks))))</strong><span class="sub">Letzter Fehler: @Ui.Ago(lastFailed)</span></article>
+</section>
+
+<section class="card">
+ <div class="card-head"><h2>Verlauf · 30 Tage</h2><ul class="chart-legend"><li><span class="swatch healthy"></span>Erfolgreich</li><li><span class="swatch warning"></span>Warnung</li><li><span class="swatch critical"></span>Fehlgeschlagen</li><li><span class="swatch none"></span>Kein Lauf</li></ul></div>
+ <ol class="strip">@foreach(var s in strip){<li class="@s.Class" title="@s.Day.ToString("dd.MM.yyyy"): @(s.Count==0?"kein Lauf":s.Count+" Lauf/Läufe")"><span class="sr-only">@s.Day.ToString("dd.MM."): @s.Class</span></li>}</ol>
+ <div class="strip-axis"><span>@strip[0].Day.ToString("d. MMM", System.Globalization.CultureInfo.GetCultureInfo("de-DE"))</span><span>Heute</span></div>
+</section>
+
+<section class="split-main">
+ <article class="card card-flush">
+  <div class="card-head padded"><h2>Backup-Historie</h2><span class="sub">@(Model.Runs.Count>15?$"Letzte 15 von {Model.Runs.Count} Läufen":$"{Model.Runs.Count} Läufe")</span></div>
+  @if(Model.Runs.Count==0){<p class="card-empty padded">@Ui.Icon("info")Für dieses Gerät wurde noch kein Backup gemeldet.</p>}
+  else{
+  <div class="table-wrap flush">
+  <table class="table">
+   <thead><tr><th scope="col">Start</th><th scope="col">Status</th><th scope="col">Dauer</th><th scope="col">Daten</th><th scope="col">Dateien</th><th scope="col">Fehlercode</th></tr></thead>
+   <tbody>@foreach(var r in Model.Runs.Take(15)){<tr><td class="mono">@Ui.Date(r.Started)</td><td><span class="status @Ui.RunClass(r.Status)">@Ui.RunLabel(r.Status)</span></td><td class="mono muted">@(r.Completed is {} end?Ui.Duration(end-r.Started):"—")</td><td class="mono">@Ui.Size(r.Bytes)</td><td class="mono">@(r.Files is {} f?Ui.Number(f):"—")</td><td class="code muted">@(string.IsNullOrEmpty(r.ErrorCode)?"—":r.ErrorCode)</td></tr>}</tbody>
+  </table>
+  </div>}
+ </article>
+
+ <div class="stack">
+  <article class="card">
+   <h2>Backup-Jobs</h2>
+   @if(Model.Jobs.Count==0){<p class="card-empty">@Ui.Icon("info")Noch keine Jobs eingerichtet.</p>}
+   <ul class="job-list">@foreach(var j in Model.Jobs){<li><span class="dot @(j.Active?"healthy":"offline")"></span><span><strong>@j.Name</strong><span class="sub">@Ui.Ownership(j.Ownership) · Nächster Lauf @Ui.In(j.NextRun)</span></span></li>}</ul>
+   <p class="sub">Quellen, Ziele, Verschlüsselung, Filter und Aufbewahrung werden derzeit lokal in der Backup-Engine verwaltet.</p>
+  </article>
+  <article class="card">
+   <h2>System</h2>
+   <dl class="facts">
+    <dt>Hostname</dt><dd class="code">@d.Hostname</dd>
+    <dt>Kunde</dt><dd>@row.Customer</dd>
+    <dt>Standort</dt><dd>@row.Site</dd>
+    <dt>Letzter Heartbeat</dt><dd>@Ui.Date(d.LastHeartbeat)</dd>
+    <dt>Agent</dt><dd class="mono">@row.Version</dd>
+   </dl>
+  </article>
+  <article class="card">
+   <h2>Logs und Datenschutz</h2>
+   <p class="sub">Rohe Logs und Dateipfade bleiben auf dem Gerät. Zentral werden nur Fehlercodes, Zeitpunkte und Mengen übertragen.</p>
+  </article>
+ </div>
+</section>

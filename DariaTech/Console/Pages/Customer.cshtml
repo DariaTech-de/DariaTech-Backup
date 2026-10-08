@@ -1,8 +1,60 @@
 @page
 @model CustomerModel
 @using DariaTech.Console.Services
-<h1>@Model.Customer.Name</h1><p>@Model.Customer.Number · @Model.Customer.Contact · @Model.Customer.Email · @Model.Customer.Phone</p><p>@Model.Customer.Address</p><section class="kpis"><article><small>Healthy</small><strong>@Model.Rows.Count(x=>x.Status=="Healthy")</strong></article><article><small>Warnings</small><strong>@Model.Rows.Count(x=>x.Status=="Warning")</strong></article><article><small>Critical</small><strong>@Model.Rows.Count(x=>x.Status=="Critical")</strong></article><article><small>Offline</small><strong>@Model.Rows.Count(x=>x.Status=="Offline")</strong></article><article><small>Storage-Verbrauch</small><strong>@Overview.Bytes(Model.Rows.Sum(x=>x.Storage))</strong></article></section><p>Letztes erfolgreiches Backup: @Overview.Time(Model.Rows.Select(x=>x.LastSuccess).Max())</p><partial name="_Devices" model="Model.Rows" />
-<section class="panel"><h2>Standorte</h2>@foreach(var site in Model.Sites){<p>@site.Name · @site.Address</p>}@if(Model.CanManage){<form method="post" asp-page-handler="Site"><input type="hidden" name="id" value="@Model.Customer.Id"><label>Name<input name="siteName" maxlength="200" required></label><label>Adresse<input name="address" maxlength="1000"></label><button>Standort anlegen</button></form>}</section>
-@if(Model.CanManage){<section class="panel"><h2>Gerät hinzufügen</h2><form method="post" asp-page-handler="Enroll"><input type="hidden" name="id" value="@Model.Customer.Id"><label>Standort<select name="siteId">@foreach(var site in Model.Sites){<option value="@site.Id">@site.Name</option>}</select></label><label>Gültigkeit in Minuten<input type="number" name="validMinutes" min="5" max="1440" value="60"></label><button>Enrollment-Token erzeugen</button></form>@if(Model.Token is not null){<p>Token einmalig angezeigt. Sicher an den Techniker übergeben.</p><code class="token">@Model.Token</code><p>Agent: enroll --token-file &lt;geschützte Datei&gt;</p>}</section>}
-@if(Model.CanManage){<section class="panel"><h2>Interne Notizen</h2><p>@Model.Customer.Notes</p></section>}
-<div asp-validation-summary="All"></div>
+@{ ViewData["Title"] = Model.Customer.Name; var c = Model.Customer; }
+<nav class="breadcrumb" aria-label="Brotkrümel"><a href="/Customers">Kunden</a><span aria-hidden="true">/</span><span aria-current="page">@c.Name</span></nav>
+<div class="page-heading">
+ <div class="customer-head">
+  <span class="customer-avatar lg" aria-hidden="true">@Ui.Initials(c.Name)</span>
+  <div><span class="eyebrow">@c.Number</span><h1>@c.Name</h1>
+  <ul class="contact-line">
+   @if(!string.IsNullOrEmpty(c.Contact)){<li>@Ui.Icon("users")@c.Contact</li>}
+   @if(!string.IsNullOrEmpty(c.Email)){<li>@Ui.Icon("mail")<a href="mailto:@c.Email">@c.Email</a></li>}
+   @if(!string.IsNullOrEmpty(c.Phone)){<li>@Ui.Icon("phone")@c.Phone</li>}
+   @if(!string.IsNullOrEmpty(c.Address)){<li>@Ui.Icon("pin")@c.Address</li>}
+  </ul></div>
+ </div>
+ @if(Model.CanManage){<div class="actions"><a class="button" href="#enroll">@Ui.Icon("plus")Gerät hinzufügen</a></div>}
+</div>
+<section class="kpis five" aria-label="Kennzahlen">
+ <article class="kpi"><span class="kpi-label"><span class="dot healthy"></span>Gesund</span><strong>@Model.Rows.Count(x=>x.Status=="Healthy")</strong></article>
+ <article class="kpi"><span class="kpi-label"><span class="dot warning"></span>Warnung</span><strong>@Model.Rows.Count(x=>x.Status=="Warning")</strong></article>
+ <article class="kpi"><span class="kpi-label"><span class="dot critical"></span>Kritisch</span><strong>@Model.Rows.Count(x=>x.Status=="Critical")</strong></article>
+ <article class="kpi"><span class="kpi-label"><span class="dot offline"></span>Offline</span><strong>@Model.Rows.Count(x=>x.Status=="Offline")</strong></article>
+ <article class="kpi"><span class="kpi-label">Speicherverbrauch</span><strong>@Ui.Size(Model.Rows.Sum(x=>x.Storage))</strong><span class="sub">Letzter Erfolg @Ui.Ago(Model.Rows.Select(x=>x.LastSuccess).Max())</span></article>
+</section>
+<section class="card card-flush"><div class="card-head padded"><h2>Geräte</h2></div><partial name="_Devices" model="Model.Rows" /></section>
+<section class="split">
+ <article class="card">
+  <div class="card-head"><h2>Standorte</h2><span class="chip">@Model.Sites.Count</span></div>
+  @if(Model.Sites.Count==0){<p class="card-empty">@Ui.Icon("info")Noch kein Standort angelegt.</p>}
+  <ul class="site-list">@foreach(var site in Model.Sites){<li>@Ui.Icon("pin")<span><strong>@site.Name</strong><span class="sub">@(string.IsNullOrEmpty(site.Address)?"Keine Adresse":site.Address)</span></span><span class="chip">@Model.Rows.Count(r=>r.Device.SiteId==site.Id) Geräte</span></li>}</ul>
+  @if(Model.CanManage){
+  <form method="post" asp-page-handler="Site" class="inline-form">
+   <input type="hidden" name="id" value="@c.Id">
+   <div class="field"><label for="siteName">Neuer Standort</label><input id="siteName" name="siteName" maxlength="200" required placeholder="z. B. Hauptsitz"></div>
+   <div class="field"><label for="address">Adresse</label><input id="address" name="address" maxlength="1000"></div>
+   <button class="button secondary">@Ui.Icon("plus")Standort anlegen</button>
+  </form>}
+ </article>
+ @if(Model.CanManage){
+ <article class="card" id="enroll">
+  <div class="card-head"><div><h2>Gerät hinzufügen</h2><span class="sub">Einmaliger Registrierungstoken für den Windows-Installer.</span></div></div>
+  @if(Model.Sites.Count==0){<p class="card-empty">@Ui.Icon("info")Legen Sie zuerst einen Standort an.</p>}
+  else{
+  <form method="post" asp-page-handler="Enroll" class="inline-form">
+   <input type="hidden" name="id" value="@c.Id">
+   <div class="field"><label for="siteId">Standort</label><select id="siteId" name="siteId">@foreach(var site in Model.Sites){<option value="@site.Id">@site.Name</option>}</select></div>
+   <div class="field"><label for="validMinutes">Gültigkeit in Minuten</label><input id="validMinutes" type="number" name="validMinutes" min="5" max="1440" value="60"></div>
+   <button class="button">@Ui.Icon("key")Registrierungstoken erzeugen</button>
+  </form>}
+  @if(Model.Token is not null){
+  <div class="token-box" role="status">
+   <span class="token-head">@Ui.Icon("key")Token wird nur einmal angezeigt</span>
+   <code class="token">@Model.Token</code>
+   <span class="sub">Sicher an den Techniker übergeben. Im Installer eingeben oder per <span class="code">/tokenfile=&lt;geschützte Datei&gt;</span> übergeben.</span>
+  </div>}
+ </article>}
+</section>
+@if(Model.CanManage&&!string.IsNullOrWhiteSpace(c.Notes)){<section class="card"><h2>Interne Notizen</h2><p class="prewrap">@c.Notes</p></section>}
+<partial name="_Errors" model='""' />

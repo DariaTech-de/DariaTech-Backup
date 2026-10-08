@@ -1,3 +1,8 @@
 @page
 @model UsersModel
-<h1>Benutzer</h1><p>Benutzer werden derzeit über den lokalen Provisionierungsbefehl angelegt. TOTP ist für alle Benutzer Pflicht.</p><table><thead><tr><th>E-Mail</th><th>Rolle</th><th>Aktiv</th></tr></thead><tbody>@foreach(var u in Model.Items){<tr><td>@u.Email</td><td>@u.Role</td><td>@u.Active</td></tr>}</tbody></table>
+@using DariaTech.Console.Services
+@{ ViewData["Title"] = "Benutzer"; }
+<div class="page-heading"><div><span class="eyebrow">Verwalten</span><h1>Benutzer</h1><p class="lead">Benutzer werden derzeit über den lokalen Provisionierungsbefehl angelegt. TOTP ist für alle Benutzer Pflicht.</p></div></div>
+<section class="card card-flush"><div class="table-wrap"><table class="table"><thead><tr><th scope="col">Benutzer</th><th scope="col">Rolle</th><th scope="col">Zwei-Faktor</th><th scope="col">Status</th></tr></thead><tbody>
+@foreach(var u in Model.Items){<tr><td><span class="device-cell"><span class="avatar sm" aria-hidden="true">@Ui.Initials(u.Email)</span><strong>@u.Email</strong></span></td><td><span class="tag">@u.Role</span></td><td><span class="status healthy">Aktiv</span></td><td><span class="status @(u.Active?"healthy":"offline")">@(u.Active?"Aktiv":"Deaktiviert")</span></td></tr>}
+</tbody></table></div></section>

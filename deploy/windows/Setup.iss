@@ -18,7 +18,7 @@ SolidCompression=yes
 WizardStyle=modern dark windows11 includetitlebar hidebevels
 WizardSizePercent=120
 WizardBackColor={#BrandBackground}
-WizardImageFile=..\..\branding\{#InstallerImage}
+WizardImageFile=..\..\branding\installer-wizard-100.png,..\..\branding\installer-wizard-150.png,..\..\branding\installer-wizard-200.png
 WizardImageBackColor={#BrandBackground}
 WizardImageStretch=no
 WizardSmallImageBackColor={#BrandBackground}
@@ -27,7 +27,7 @@ DisableProgramGroupPage=yes
 DisableDirPage=yes
 LanguageDetectionMethod=none
 ShowLanguageDialog=no
-WizardSmallImageFile=..\..\branding\{#InstallerImage}
+WizardSmallImageFile=..\..\branding\installer-small-100.png,..\..\branding\installer-small-150.png,..\..\branding\installer-small-200.png
 LicenseFile=..\..\LICENSE
 CloseApplications=yes
 RestartApplications=no
@@ -38,11 +38,22 @@ SetupLogging=no
 Name: "german"; MessagesFile: "compiler:Languages\German.isl"
 
 [Messages]
+SetupAppTitle={#ProductName} – Setup
+SetupWindowTitle={#ProductName} – Setup
 WelcomeLabel1=Willkommen bei {#ProductName}
-WelcomeLabel2=Zuverlässige Datensicherung – betreut von {#CompanyName}.%n%nDieser Assistent installiert den Backup-Agenten und die lokale Backup-Engine. Der Dienst startet automatisch mit Windows und sichert auch ohne angemeldeten Benutzer.%n%nHalten Sie die Console-Adresse und den Registrierungstoken bereit.
+WelcomeLabel2=Zuverlässige Datensicherung – betreut von {#CompanyName}.%n%n•  Läuft als Windows-Dienst und sichert auch ohne angemeldeten Benutzer.%n•  Verschlüsselt Ihre Daten, bevor sie diesen PC verlassen.%n•  Meldet den Sicherungsstatus an Ihre DariaTech Console.%n%nHalten Sie die Console-Adresse und den Registrierungstoken bereit. Die Einrichtung dauert etwa eine Minute.
+WizardLicense=Lizenzhinweise
+LicenseLabel=Die Backup-Engine basiert auf Open-Source-Software (Duplicati, MIT-Lizenz).
+LicenseLabel3=Bitte lesen Sie die folgenden Lizenzhinweise.
+WizardReady=Bereit zur Installation
+ReadyLabel1=Alles ist vorbereitet.
+ReadyLabel2a=Klicken Sie auf „Installieren“, um {#ProductName} einzurichten und dieses Gerät bei Ihrer Console zu registrieren.
+WizardInstalling=Installation läuft
+InstallingLabel=Bitte warten Sie, während {#ProductName} eingerichtet wird. Sie können dieses Fenster minimieren.
 FinishedHeadingLabel={#ProductName} ist bereit
-FinishedLabel=Der Agent wurde installiert und mit Ihrer Console verbunden.%n%nBackup-Jobs richten Sie anschließend in der lokalen Oberfläche unter http://127.0.0.1:8210/ngax ein.%n%nDer Dienst startet künftig automatisch mit Windows.
-BeveledLabel={#CompanyName}
+FinishedLabel=Der Agent ist installiert und mit Ihrer Console verbunden. Der Dienst startet künftig automatisch mit Windows.%n%nNächster Schritt: Richten Sie Ihre Backup-Jobs in der lokalen Oberfläche ein (http://127.0.0.1:8210/ngax).
+ClickFinish=Klicken Sie auf „Fertigstellen“, um den Assistenten zu schließen.
+BeveledLabel={#CompanyName} · {#SupportUrl}
 
 [Files]
 Source: "..\..\artifacts\windows\agent\*"; DestDir: "{app}"; Excludes: "appsettings.json"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -53,6 +64,9 @@ Source: "..\..\LICENSE"; DestDir: "{app}\legal"; Flags: ignoreversion
 Source: "..\..\thirdparty\*"; DestDir: "{app}\legal\thirdparty"; Excludes: "*.dll,*.exe,*.zip,*.nupkg"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\..\DariaTech\Console\wwwroot\legal\management\*"; DestDir: "{app}\legal\management"; Flags: ignoreversion
 
+[Run]
+Filename: "http://127.0.0.1:8210/ngax"; Description: "Lokale Backup-Oberfläche jetzt öffnen"; Flags: postinstall shellexec nowait skipifsilent runasoriginaluser; Check: InstallSucceeded
+
 [UninstallRun]
 Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""{app}\Service.ps1"" -Action Remove -InstallDirectory ""{app}"""; Flags: runhidden waituntilterminated; RunOnceId: "RemoveService"
 
@@ -60,6 +74,11 @@ Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile
 var ConnectionPage: TInputQueryWizardPage;
     Token, TokenFile, ConsoleUrl, EnginePassword, EnginePasswordFile: String;
     SetupError: String;
+
+function InstallSucceeded: Boolean;
+begin
+ Result := SetupError = '';
+end;
 
 function GetCustomSetupExitCode: Integer;
 begin
@@ -81,9 +100,12 @@ begin
  TokenFile := ExpandConstant('{param:tokenfile|}');
  EnginePasswordFile := ExpandConstant('{param:enginepasswordfile|}');
  ConnectionPage := CreateInputQueryPage(wpSelectDir, 'Gerät registrieren',
-  'Mit Ihrer DariaTech Console verbinden', 'Geben Sie die Console-Adresse und den einmaligen Registrierungstoken ein. Das lokale Passwort schützt die Backup-Oberfläche auf diesem PC.');
+  'Mit Ihrer DariaTech Console verbinden',
+  'Der Registrierungstoken gilt einmalig und ordnet dieses Gerät dem richtigen Kunden und Standort zu. ' +
+  'Sie erzeugen ihn in der Console unter Kunden › Gerät hinzufügen.' + #13#10#13#10 +
+  'Das lokale Passwort schützt die Backup-Oberfläche auf diesem PC.');
  ConnectionPage.Add('Console-Adresse (HTTPS):', False);
- ConnectionPage.Add('Registrierungstoken:', True);
+ ConnectionPage.Add('Registrierungstoken (64 Zeichen):', True);
  ConnectionPage.Add('Passwort für die lokale Oberfläche (14–200 Zeichen):', True);
  ConnectionPage.Values[0] := ConsoleUrl;
  ConnectionPage.Values[1] := Token;
@@ -107,9 +129,17 @@ begin
  end;
 end;
 
+procedure ShowStatus(Text: String);
+begin
+ WizardForm.StatusLabel.Caption := Text;
+ WizardForm.FilenameLabel.Caption := '';
+end;
+
 procedure RunHelper(Action: String);
 var Code: Integer;
 begin
+ if Action = 'Prepare' then ShowStatus('Geschütztes Datenverzeichnis wird vorbereitet …')
+ else ShowStatus('Gerät wird bei der Console registriert und der Dienst gestartet …');
  if not Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
   '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + ExpandConstant('{app}\Service.ps1') +
   '" -Action ' + Action + ' -InstallDirectory "' + ExpandConstant('{app}') + '" -ConsoleUrl "' + ConsoleUrl + '"',

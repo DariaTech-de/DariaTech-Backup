@@ -1,3 +1,22 @@
 @page
 @model LicensesModel
-<h1>Lizenzen / Open Source</h1><section class="panel"><h2>Duplicati Backup Engine</h2><p>Copyright (c) 2026 Duplicati Inc. · MIT License. Duplicati ist die zugrunde liegende Backup-Engine.</p><a href="/legal/duplicati/LICENSE.txt">Vollständiger Lizenztext</a><h2>Drittbibliotheken der Engine</h2><ul>@foreach(var item in Model.Libraries){<li>@item <a href="/legal/thirdparty/@Uri.EscapeDataString(item)/licensedata.json">Lizenzinformationen</a></li>}</ul><h2>Management-Ebene</h2><p>.NET / ASP.NET Core (MIT), Entity Framework Core (MIT), Npgsql (PostgreSQL License). <a href="/legal/management/inventory.json">NuGet-Inventar und Copyright-Hinweise</a> · <a href="/legal/management/MIT.txt">MIT</a> · <a href="/legal/management/PostgreSQL.txt">PostgreSQL License</a>. Die Inventarliste enthält zusätzlich Entwicklungsabhängigkeiten.</p></section>
+@using DariaTech.Console.Services
+@{ ViewData["Title"] = "Lizenzen"; }
+<div class="page-heading"><div><span class="eyebrow">Rechtliches</span><h1>Lizenzen und Open Source</h1><p class="lead">Wir danken den Open-Source-Projekten, auf denen diese Lösung aufbaut.</p></div></div>
+<section class="split">
+ <article class="card">
+  <h2>Duplicati Backup Engine</h2>
+  <p>Copyright (c) 2026 Duplicati Inc. · MIT License. Duplicati ist die zugrunde liegende Backup-Engine.</p>
+  <a class="link" href="/legal/duplicati/LICENSE.txt">Vollständiger Lizenztext →</a>
+ </article>
+ <article class="card">
+  <h2>Management-Ebene</h2>
+  <p>.NET / ASP.NET Core (MIT), Entity Framework Core (MIT), Npgsql (PostgreSQL License). Die Inventarliste enthält zusätzlich Entwicklungsabhängigkeiten.</p>
+  <p><a class="link" href="/legal/management/inventory.json">NuGet-Inventar und Copyright-Hinweise</a> · <a class="link" href="/legal/management/MIT.txt">MIT</a> · <a class="link" href="/legal/management/PostgreSQL.txt">PostgreSQL License</a></p>
+  <p>Schriftarten Geist und Geist Mono, Copyright 2024 The Geist Project Authors · SIL Open Font License 1.1. <a class="link" href="/legal/management/OFL-Geist.txt">Lizenztext</a></p>
+ </article>
+</section>
+<section class="card">
+ <h2>Drittbibliotheken der Engine</h2>
+ <ul class="lib-list">@foreach(var item in Model.Libraries){<li><span>@item</span><a href="/legal/thirdparty/@Uri.EscapeDataString(item)/licensedata.json">Lizenzinformationen</a></li>}</ul>
+</section>
