@@ -32,20 +32,21 @@ public static class Privacy
   db.Customers.Remove(customer);var root=await db.Tenants.SingleAsync(x=>x.Id==tenant,ct);root.Name=$"Erased tenant {tenant:N}";
   db.Audit.Add(new AuditEvent{TenantId=tenant,Actor="local-privacy-maintenance",Action="tenant.erasure-completed",Resource=tenant.ToString()});await db.SaveChangesAsync(ct);await tx.CommitAsync(ct);
  }
- public static async Task<(int Runs,int Deliveries,int Alerts,int Tokens)> Prune(ManagementDb db,int days,bool apply,CancellationToken ct=default)
+ public static async Task<(int Runs,int Deliveries,int Alerts,int Tokens,int Commands)> Prune(ManagementDb db,int days,bool apply,CancellationToken ct=default)
  {
   if(days is <30 or >3650)throw new InvalidOperationException("Retention must be 30–3650 days");
   var cutoff=DateTimeOffset.UtcNow.AddDays(-days);
   var runs=db.Runs.Where(x=>(x.Completed!=null&&x.Completed<cutoff)||(x.Completed==null&&x.Status!=DariaTech.Contracts.RunStatus.Running&&x.Started<cutoff));
   var deliveries=db.Deliveries.Where(x=>x.Created<cutoff&&(x.Status=="Sent"||x.Status=="Cancelled"||x.Status=="DeadLetter"));
   var tokens=db.EnrollmentTokens.Where(x=>x.Expires<cutoff);
+  var commands=db.Commands.Where(x=>x.Expires<cutoff&&(x.Status=="Completed"||x.Status=="Failed"||x.Status=="Rejected"||x.Status=="Indeterminate"||x.Status=="Pending"||x.Status=="AwaitingApproval"));
   var alerts=db.Alerts.Where(x=>x.Resolved<cutoff&&!db.Deliveries.Any(d=>d.AlertId==x.Id&&!(d.Created<cutoff&&(d.Status=="Sent"||d.Status=="Cancelled"||d.Status=="DeadLetter"))));
-  var counts=(Runs:await runs.CountAsync(ct),Deliveries:await deliveries.CountAsync(ct),Alerts:await alerts.CountAsync(ct),Tokens:await tokens.CountAsync(ct));
+  var counts=(Runs:await runs.CountAsync(ct),Deliveries:await deliveries.CountAsync(ct),Alerts:await alerts.CountAsync(ct),Tokens:await tokens.CountAsync(ct),Commands:await commands.CountAsync(ct));
   if(!apply)return counts;
   await using var tx=await db.Database.BeginTransactionAsync(ct);await RequireOwner(db,ct);
-  counts.Runs=await runs.ExecuteDeleteAsync(ct);counts.Deliveries=await deliveries.ExecuteDeleteAsync(ct);counts.Tokens=await tokens.ExecuteDeleteAsync(ct);
+  counts.Runs=await runs.ExecuteDeleteAsync(ct);counts.Deliveries=await deliveries.ExecuteDeleteAsync(ct);counts.Tokens=await tokens.ExecuteDeleteAsync(ct);counts.Commands=await commands.ExecuteDeleteAsync(ct);
   counts.Alerts=await db.Alerts.Where(x=>x.Resolved<cutoff&&!db.Deliveries.Any(d=>d.AlertId==x.Id)).ExecuteDeleteAsync(ct);
-  db.Audit.Add(new AuditEvent{Actor="local-privacy-maintenance",Action="retention.pruned",Resource=$"runs={counts.Runs};deliveries={counts.Deliveries};alerts={counts.Alerts};tokens={counts.Tokens}"});await db.SaveChangesAsync(ct);await tx.CommitAsync(ct);return counts;
+  db.Audit.Add(new AuditEvent{Actor="local-privacy-maintenance",Action="retention.pruned",Resource=$"runs={counts.Runs};deliveries={counts.Deliveries};alerts={counts.Alerts};tokens={counts.Tokens};commands={counts.Commands}"});await db.SaveChangesAsync(ct);await tx.CommitAsync(ct);return counts;
  }
  private static async Task RequireOwner(ManagementDb db,CancellationToken ct)
  {

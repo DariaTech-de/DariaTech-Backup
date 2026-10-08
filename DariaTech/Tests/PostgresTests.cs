@@ -256,6 +256,15 @@ public sealed class PostgresTests
   using var unknown=await agent.PostAsJsonAsync("/api/v1/agent/history",new HistoryRequest([request.Runs[0] with{LocalJobId="foreign"}]));Assert.That(unknown.StatusCode,Is.EqualTo(HttpStatusCode.Conflict));
  }
 
+ [Test]public async Task RetentionRemovesOldCatalogsButKeepsActiveCommandsAndAudit()
+ {
+  var(t,site)=await Customer();await using var db=Db();var d=new Device{TenantId=t.Id,SiteId=site.Id};db.Devices.Add(d);var job=new BackupJob{TenantId=t.Id,DeviceId=d.Id,LocalId="retention"};db.Jobs.Add(job);
+  var old=DateTimeOffset.UtcNow.AddDays(-200);var removed=new RemoteCommand{TenantId=t.Id,DeviceId=d.Id,JobId=job.Id,Expires=old,Status="Completed",EncryptedCatalog="test-encrypted-paths"};
+  var active=new RemoteCommand{TenantId=t.Id,DeviceId=d.Id,JobId=job.Id,Expires=old,Status="Accepted"};var recent=new RemoteCommand{TenantId=t.Id,DeviceId=d.Id,JobId=job.Id,Expires=DateTimeOffset.UtcNow,Status="Completed"};db.Commands.AddRange(removed,active,recent);await db.SaveChangesAsync();
+  var preview=await Privacy.Prune(db,180,false);Assert.That(preview.Commands,Is.GreaterThanOrEqualTo(1));Assert.That(await db.Commands.AnyAsync(x=>x.Id==removed.Id),Is.True);
+  await Privacy.Prune(db,180,true);Assert.That(await db.Commands.AnyAsync(x=>x.Id==removed.Id),Is.False);Assert.That(await db.Commands.AnyAsync(x=>x.Id==active.Id),Is.True);Assert.That(await db.Commands.AnyAsync(x=>x.Id==recent.Id),Is.True);Assert.That(await db.Audit.AnyAsync(x=>x.Action=="retention.pruned"),Is.True);
+ }
+
  [Test]public async Task PrivacyErasureRemovesSecretsAndCustomerDataWhilePreservingAudit()
  {
   var(t,site)=await Customer();await using var db=Db();var d=new Device{TenantId=t.Id,SiteId=site.Id,Name="Private device",Active=false};db.Devices.Add(d);
