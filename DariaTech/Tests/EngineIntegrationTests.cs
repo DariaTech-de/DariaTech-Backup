@@ -41,6 +41,7 @@ public sealed class EngineIntegrationTests
    using var run=await client.PostAsync($"/api/v1/backup/{id}/run",null,ct.Token);run.EnsureSuccessStatusCode();using var task=JsonDocument.Parse(await run.Content.ReadAsStringAsync(ct.Token));var taskId=DuplicatiAdapter.Get(task.RootElement,"ID").ToString();
    await WaitTask(client,taskId,ct.Token,password,passphrase);
    var key=Path.Combine(dir,"agent.key");await File.WriteAllTextAsync(key,Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),ct.Token);
+   if(!OperatingSystem.IsWindows())File.SetUnixFileMode(key,UnixFileMode.UserRead|UnixFileMode.UserWrite);
    var options=new AgentOptions{EngineUrl=client.BaseAddress!.ToString(),StateDirectory=Path.Combine(dir,"agent"),LinuxKeyFile=key};var state=new ProtectedState(options);state.Write("engine-credential.bin",password);
    using var adapter=new DuplicatiAdapter(options,state);var jobs=await adapter.ReadJobs(ct.Token);Assert.That(jobs,Has.Length.EqualTo(1));Assert.That(jobs[0].LastRun?.Status,Is.EqualTo(RunStatus.Success));Assert.That(jobs[0].LastRun?.Files,Is.EqualTo(1));Assert.That(jobs[0].LastRun?.Bytes,Is.EqualTo(bytes.Length));
    Assert.That(Directory.GetFiles(destination),Is.Not.Empty);Assert.That(Directory.GetFiles(destination).All(x=>x.EndsWith(".aes")),Is.True);
