@@ -3,6 +3,7 @@
 set -euo pipefail
 umask 077
 rid="${1:?Native RID required}"
+node_bin="${2:?Absolute CI Node executable required}"
 repo="$(cd "$(dirname "$0")/../../.." && pwd -P)"
 if [ "$(uname -s)" = Darwin ]; then work="$(mktemp -d /private/tmp/dariatech-ci.XXXXXXXX)"; else work="$(mktemp -d)"; fi
 node_pid=''
@@ -14,7 +15,7 @@ cleanup() {
   update-ca-certificates >/dev/null 2>&1 || true
  else
   launchctl kill SIGTERM system/de.dariatech.dariatechbackupagent 2>/dev/null || true
-  if [ -f "$work/ca.pem" ]; then security remove-trusted-cert -d "$work/ca.pem" 2>/dev/null || true; fi
+  # This CI VM is destroyed after the job. Do not invoke an interactive keychain cleanup operation.
  fi
  rm -rf "$work"
 }
@@ -23,8 +24,7 @@ openssl req -x509 -newkey rsa:2048 -nodes -keyout "$work/ca.key" -out "$work/ca.
 openssl req -new -newkey rsa:2048 -nodes -keyout "$work/server.key" -out "$work/server.csr" -subj /CN=localhost >/dev/null 2>&1
 printf '%s\n' 'subjectAltName=IP:127.0.0.1,DNS:localhost' 'extendedKeyUsage=serverAuth' > "$work/extensions"
 openssl x509 -req -in "$work/server.csr" -CA "$work/ca.pem" -CAkey "$work/ca.key" -CAcreateserial -out "$work/server.pem" -days 1 -extfile "$work/extensions" >/dev/null 2>&1
-export FIXTURE_PASSWORD="$(openssl rand -hex 32)"
-openssl pkcs12 -export -out "$work/server.pfx" -inkey "$work/server.key" -in "$work/server.pem" -certfile "$work/ca.pem" -passout env:FIXTURE_PASSWORD
+export FIXTURE_SERVER_KEY="$work/server.key" FIXTURE_SERVER_CERT="$work/server.pem" FIXTURE_CA="$work/ca.pem"
 if [ "$(uname -s)" = Linux ]; then
  install -m 644 "$work/ca.pem" /usr/local/share/ca-certificates/dariatech-ci.crt
  update-ca-certificates >/dev/null
@@ -42,14 +42,19 @@ else
  state='/Library/Application Support/DariaTechBackup/state'
 fi
 export FIXTURE_TOKEN="$(openssl rand -hex 32)"
-export FIXTURE_PFX="$work/server.pfx" FIXTURE_RESULT="$work/result.json" FIXTURE_ENGINE_PASSWORD="$(openssl rand -hex 32)"
+export FIXTURE_RESULT="$work/result.json" FIXTURE_ENGINE_PASSWORD="$(openssl rand -hex 32)"
 printf '%s' "$FIXTURE_TOKEN" > "$work/token"
 mkdir -p "$state"
 chmod 700 "$state"
 printf '%s' "$FIXTURE_ENGINE_PASSWORD" > "$state/engine-password.txt"
-node "$repo/deploy/unix/tests/console-fixture.cjs" >/dev/null 2>&1 &
+"$node_bin" "$repo/deploy/unix/tests/console-fixture.cjs" >"$work/fixture.log" 2>&1 &
 node_pid=$!
-for attempt in {1..40}; do if curl --silent --fail https://127.0.0.1:18443/health >/dev/null; then break; fi; sleep 0.25; done
+for attempt in {1..40}; do
+ if ! kill -0 "$node_pid" 2>/dev/null; then cat "$work/fixture.log"; exit 1; fi
+ if curl --silent --fail --connect-timeout 2 --max-time 3 https://127.0.0.1:18443/health >/dev/null; then break; fi
+ sleep 0.25
+done
+curl --silent --fail --connect-timeout 2 --max-time 3 https://127.0.0.1:18443/health >/dev/null
 printf '%s\n' 'CI: installing the native service'
 bash "$repo/artifacts/unix/$rid/payload/install.sh" --console-url https://127.0.0.1:18443 --enrollment-token-file "$work/token"
 for attempt in {1..90}; do

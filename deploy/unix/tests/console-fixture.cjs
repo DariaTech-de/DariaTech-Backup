@@ -3,7 +3,7 @@ const https=require('node:https'),fs=require('node:fs'),crypto=require('node:cry
 const device=crypto.randomUUID(),credential=crypto.randomBytes(32).toString('hex').toUpperCase();
 let enrollments=0,heartbeats=0;
 function record(){fs.writeFileSync(process.env.FIXTURE_RESULT,JSON.stringify({enrolled:enrollments===1,enrollments,heartbeats}));}
-https.createServer({pfx:fs.readFileSync(process.env.FIXTURE_PFX),passphrase:process.env.FIXTURE_PASSWORD},(req,res)=>{
+https.createServer({key:fs.readFileSync(process.env.FIXTURE_SERVER_KEY),cert:fs.readFileSync(process.env.FIXTURE_SERVER_CERT),ca:fs.readFileSync(process.env.FIXTURE_CA)},(req,res)=>{
  if(req.url==='/health'){res.end('{}');return;}
  let text='';req.on('data',data=>{text+=data;if(text.length>262144)req.destroy();});req.on('end',()=>{
   res.setHeader('content-type','application/json');

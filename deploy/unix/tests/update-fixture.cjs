@@ -1,6 +1,6 @@
 // CI-only HTTPS fixture using independently signed real native packages.
 const https=require('node:https'),fs=require('node:fs'),crypto=require('node:crypto');
-const tls={pfx:fs.readFileSync(process.env.FIXTURE_PFX),passphrase:process.env.FIXTURE_PASSWORD};
+const tls={key:fs.readFileSync(process.env.FIXTURE_SERVER_KEY),cert:fs.readFileSync(process.env.FIXTURE_SERVER_CERT),ca:fs.readFileSync(process.env.FIXTURE_CA)};
 const bytes=fs.readFileSync(process.env.UPDATE_ARTIFACT),key=fs.readFileSync(process.env.UPDATE_PRIVATE_KEY);
 const device=crypto.randomUUID(),credential=crypto.randomBytes(32).toString('hex').toUpperCase();
 const release=crypto.randomUUID(),deployments={bad:crypto.randomUUID(),tampered:crypto.randomUUID(),good:crypto.randomUUID()};

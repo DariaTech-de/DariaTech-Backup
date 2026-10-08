@@ -8,7 +8,8 @@ public sealed record CommandInput(Guid JobId,RemoteAction Action,RestoreSelectio
  [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] SaasRestoreSelection? SaasRestore=null,
  [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] ProxmoxRestoreSelection? ProxmoxRestore=null);
 public sealed record DeviceCommand(Guid Id,Guid TenantId,Guid DeviceId,string LocalJobId,RemoteAction Action,RestoreSelection? Restore,DateTimeOffset Issued,DateTimeOffset Expires,CatalogRequest? Catalog=null,
- [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] SaasRestoreSelection? SaasRestore=null);
+ [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] SaasRestoreSelection? SaasRestore=null,
+ [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] ProxmoxRestoreSelection? ProxmoxRestore=null);
 public sealed record SignedCommand(string Payload,string Signature);
 public sealed record CommandReceipt(string Status,long? TaskId,string? ErrorCode,RestoreCatalog? Catalog=null);
 public static class CommandProtocol

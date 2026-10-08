@@ -52,7 +52,7 @@ jobs:
           DARIATECH_ENGINE_NATIVE: ${{ github.workspace }}/artifacts/unix/${{ matrix.rid }}/payload/agent/engine/Duplicati.Server
         run: dotnet test DariaTech/Tests/DariaTech.Tests.csproj -c Release --no-build --filter "FullyQualifiedName~UnixSecurityTests|Category=UnixNative"
       - name: Check package and real service installation
-        run: sudo --preserve-env=PATH bash deploy/unix/tests/Smoke.sh "${{ matrix.rid }}"
+        run: sudo --preserve-env=PATH bash deploy/unix/tests/Smoke.sh "${{ matrix.rid }}" "$(command -v node)"
       - name: Build distinct candidate version for signed update
         run: |
           mkdir -p "artifacts/update/${{ matrix.rid }}"
@@ -62,7 +62,7 @@ jobs:
           rm -rf "artifacts/unix/${{ matrix.rid }}"
           mv "artifacts/unix/${{ matrix.rid }}-original" "artifacts/unix/${{ matrix.rid }}"
       - name: Test actual signed update with independent native supervisor
-        run: sudo --preserve-env=PATH bash deploy/unix/tests/ApprovedUpdate.sh "${{ matrix.rid }}"
+        run: sudo --preserve-env=PATH bash deploy/unix/tests/ApprovedUpdate.sh "${{ matrix.rid }}" "$(command -v node)"
       - uses: actions/upload-artifact@v4
         with:
           name: DariaTechBackupAgent-${{ matrix.rid }}-pilot
