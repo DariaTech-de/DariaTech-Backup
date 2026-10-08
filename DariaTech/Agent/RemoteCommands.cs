@@ -9,6 +9,9 @@ public sealed partial class DuplicatiAdapter
  public async Task<long> Dispatch(DeviceCommand command,AgentOptions options,CancellationToken ct)
  {
   var jobs=await ReadJobs(ct);if(jobs.All(x=>x.LocalId!=command.LocalJobId))throw new InvalidOperationException("Backup job no longer exists");
+  var cloudBindings=state.Read<Dictionary<string,SaasJobBinding>>("saas-bindings.bin")??[];
+  if(command.Action==RemoteAction.RunBackup&&cloudBindings.TryGetValue(command.LocalJobId,out var cloud))await RequireSaasProvider(cloud.Source,false,ct);
+  if(command.Action==RemoteAction.RestoreSaas)return await RestoreSaas(command,ct);
   HttpResponseMessage response;
   if(command.Action==RemoteAction.StopBackup)
   {
@@ -21,7 +24,19 @@ public sealed partial class DuplicatiAdapter
    response=await client.PostAsJsonAsync($"/api/v1/backup/{command.LocalJobId}/restore",new{paths=restore.Paths,time=restore.Snapshot.ToUniversalTime().ToString("O"),restore_path=destination,overwrite=false,permissions=false,skip_metadata=true},ct);
   }
   else response=await client.PostAsync($"/api/v1/backup/{command.LocalJobId}/{(command.Action==RemoteAction.RunBackup?"run":"verify")}",null,ct);
-  using(response){response.EnsureSuccessStatusCode();using var result=JsonDocument.Parse(await response.Content.ReadAsStreamAsync(ct));if(!long.TryParse(Get(result.RootElement,"ID").ToString(),out var id)||id<1)throw new HttpRequestException("Invalid engine task receipt");return id;}
+  using(response)
+  {
+   response.EnsureSuccessStatusCode();using var result=JsonDocument.Parse(await response.Content.ReadAsStreamAsync(ct));
+   if(!long.TryParse(Get(result.RootElement,"ID").ToString(),out var id)||id<1)throw new HttpRequestException("Invalid engine task receipt");
+   if(command.Action==RemoteAction.RunBackup&&cloudBindings.ContainsKey(command.LocalJobId))
+   {
+    var tasks=state.Read<Dictionary<long,CloudTaskBinding>>("cloud-tasks.bin")??[];
+    foreach(var expired in tasks.Where(x=>x.Value.Dispatched<DateTimeOffset.UtcNow.AddDays(-1)).Select(x=>x.Key).ToArray())tasks.Remove(expired);
+    if(tasks.Count>=1000)throw new InvalidOperationException("Cloud task journal exceeds retention bound");
+    tasks[id]=new(command.LocalJobId,DateTimeOffset.UtcNow);state.Write("cloud-tasks.bin",tasks);
+   }
+   return id;
+  }
  }
  public async Task<CommandReceipt> TaskReceipt(long id,CancellationToken ct)
  {
@@ -30,6 +45,26 @@ public sealed partial class DuplicatiAdapter
   // Engine tasks can return normally with a failed result (notably partial restores).
   // Never forward raw exception/error text, and never turn this into a successful receipt.
   if(status=="Completed"&&(!string.IsNullOrWhiteSpace(Get(result.RootElement,"ErrorMessage").ToString())||!string.IsNullOrWhiteSpace(Get(result.RootElement,"Exception").ToString())))return new("Failed",id,"EngineTaskFailed");
+  if(status=="Completed"&&(state.Read<Dictionary<long,CloudTaskBinding>>("cloud-tasks.bin")??[]).TryGetValue(id,out var cloud))
+  {
+   // Native providers can report failed directory enumeration as Warning. A cloud
+   // task is successful only when its own structured backup result is Success.
+   var started=Date(Get(result.RootElement,"TaskStarted"));var finished=Date(Get(result.RootElement,"TaskFinished"));
+   if(started is null||finished is null)return new("Indeterminate",id,"DispatchIndeterminate");
+   using var logs=await client.GetAsync($"/api/v1/backup/{Uri.EscapeDataString(cloud.LocalJobId)}/log?pagesize=100",ct);logs.EnsureSuccessStatusCode();
+   using var entries=JsonDocument.Parse(await logs.Content.ReadAsStreamAsync(ct));
+   foreach(var entry in entries.RootElement.EnumerateArray())
+   {
+    if(Get(entry,"Type").ToString()!="Result"||Get(entry,"Message").GetString() is not {} message)continue;
+    try
+    {
+     using var payload=JsonDocument.Parse(message);var run=ParseResult(payload.RootElement,default);
+     if(run is null||run.Started<started.Value.AddSeconds(-3)||run.Started>finished.Value.AddSeconds(3))continue;
+     return run.Status==RunStatus.Success?new("Completed",id,null):new("Failed",id,"EngineTaskFailed");
+    }catch(JsonException){}
+   }
+   return new("Indeterminate",id,"DispatchIndeterminate");
+  }
   return status switch {"Completed"=>new("Completed",id,null),"Failed"=>new("Failed",id,"EngineTaskFailed"),_=>new("Accepted",id,null)};
  }
  public static string RestoreDestination(string? root,string folder)
@@ -45,6 +80,7 @@ public sealed partial class DuplicatiAdapter
  }
 }
 
+public sealed record CloudTaskBinding(string LocalJobId,DateTimeOffset Dispatched);
 public sealed record CommandJournalEntry(DeviceCommand Command,string Digest,Guid EngineInstance,CommandReceipt? Receipt,bool Reported);
 public static class RemoteCommands
 {

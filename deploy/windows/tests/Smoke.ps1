@@ -70,8 +70,14 @@ try {
  $headers=@{Authorization='Bearer '+$auth.AccessToken}
  $jobs=Invoke-RestMethod http://127.0.0.1:8210/api/v1/backups -Headers $headers
  if($jobs.Count -ne 0){throw 'Installer created unsolicited backup jobs'}
- $engine=Get-CimInstance Win32_Process -Filter "Name='Duplicati.Server.exe'"
- if(!$engine -or $engine.CommandLine.Contains($password)){throw 'Engine missing or password exposed on command line'}
+ $engine=$null
+ for($attempt=0;$attempt -lt 40;$attempt++) {
+  $owned=Get-NetTCPConnection -LocalPort 8210 -State Listen -ErrorAction SilentlyContinue|Select-Object -First 1
+  if($owned){$engine=Get-CimInstance Win32_Process -Filter ("ProcessId="+$owned.OwningProcess)}
+  if($engine -and $engine.Name -eq 'Duplicati.Server.exe' -and $engine.CommandLine){break}
+  Start-Sleep -Milliseconds 250
+ }
+ if(!$engine -or !$engine.CommandLine -or $engine.Name -ne 'Duplicati.Server.exe' -or $engine.CommandLine.Contains($password)){throw 'Listening engine metadata unavailable or password exposed on command line'}
  $agentExe=Join-Path (Join-Path ${env:ProgramFiles} 'DariaTech Backup') 'DariaTech.Agent.exe'
  $engineProcess=Get-Process -Id $engine.ProcessId;$ticks=$engineProcess.StartTime.ToUniversalTime().Ticks
  & $agentExe --check-engine-port $engine.ProcessId $ticks 8210

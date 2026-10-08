@@ -1,0 +1,44 @@
+@page
+@model BackupEditModel
+<h1>@(Model.ManagedJobId is null?"Backup-Job anlegen":"Backup-Konfiguration ändern")</h1>
+<p>@Model.Device.Name · @Model.Provider</p>
+@if(Model.Error is not null){<p role="alert">@Model.Error</p>}
+@if(Model.ManagedJobId is null){<p><a asp-page="/BackupEdit" asp-route-deviceId="@Model.DeviceId" asp-route-provider="Files">Dateien</a> · <a asp-page="/BackupEdit" asp-route-deviceId="@Model.DeviceId" asp-route-provider="Microsoft365">Microsoft 365</a> · <a asp-page="/BackupEdit" asp-route-deviceId="@Model.DeviceId" asp-route-provider="GoogleWorkspace">Google Workspace</a></p>}
+<form method="post">
+ <input type="hidden" asp-for="DeviceId" /><input type="hidden" asp-for="ManagedJobId" /><input type="hidden" asp-for="Revision" /><input type="hidden" asp-for="Provider" />
+ <label asp-for="Name">Jobname</label><input asp-for="Name" required maxlength="200" />
+ @if(Model.Provider=="Files"){<label asp-for="Sources">Quellordner · ein absoluter Pfad je Zeile</label><textarea asp-for="Sources" required></textarea>}
+ else{
+  <fieldset><legend>@Model.Provider</legend>
+  <label asp-for="DirectoryTenant">@(Model.Provider=="Microsoft365"?"Microsoft-Tenant-ID":"Google-Workspace-Domain")</label><input asp-for="DirectoryTenant" required />
+  @if(Model.Provider=="Microsoft365"){<label asp-for="ClientId">Anwendungs-ID</label><input asp-for="ClientId" /><label for="ClientSecret">Client Secret · leer lassen, um bestehendes Secret zu erhalten</label><input type="password" name="ClientSecret" id="ClientSecret" autocomplete="new-password" />}
+  @if(Model.Provider=="GoogleWorkspace"){<label asp-for="AdminEmail">Delegierter Workspace-Administrator</label><input asp-for="AdminEmail" type="email" required /><label for="ServiceAccountJson">Service-Account-JSON mit Domain-wide Delegation</label><textarea name="ServiceAccountJson" id="ServiceAccountJson" autocomplete="off"></textarea>}
+  <label asp-for="RootTypes">Bereiche</label><select asp-for="RootTypes" multiple>
+  @foreach(var root in Model.Provider=="Microsoft365"?new[]{"Users","Groups","Sites"}:new[]{"Users","Groups","SharedDrives","Sites","OrganizationalUnits"}){<option value="@root">@root</option>}
+  </select>
+  <label asp-for="UserTypes">Benutzerdaten</label><select asp-for="UserTypes" multiple>
+  @foreach(var type in Model.Provider=="Microsoft365"?new[]{"Profile","Mailbox","Calendar","Contacts","Tasks","Notes","Planner","Chats"}:new[]{"Gmail","Drive","Calendar","Contacts","Tasks","Keep","Chat"}){<option value="@type">@type</option>}
+  </select><p>M365 OneDrive und SharePoint werden über Sites erfasst. Die tatsächliche Abdeckung hängt von Berechtigungen, Lizenz und Provider-Unterstützung ab.</p>
+  </fieldset>
+ }
+ <fieldset><legend>Backup-Ziel und Verschlüsselung</legend>
+ <label asp-for="TargetUrl">Ziel · file, s3, ssh, webdav oder webdavs</label><input asp-for="TargetUrl" required />
+ <label for="Passphrase">Backup-Passphrase · mindestens 14 Zeichen; bei Änderungen leer lassen zum Erhalten</label><input type="password" name="Passphrase" id="Passphrase" autocomplete="new-password" />
+ <label asp-for="AuthUsername">Storage-Benutzer</label><input asp-for="AuthUsername" />
+ <label for="AuthPassword">Storage-Passwort</label><input type="password" name="AuthPassword" id="AuthPassword" autocomplete="new-password" />
+ <label asp-for="AwsAccessKeyId">S3 Access Key ID</label><input asp-for="AwsAccessKeyId" />
+ <label for="AwsSecretKey">S3 Secret Access Key</label><input type="password" name="AwsSecretKey" id="AwsSecretKey" autocomplete="new-password" />
+ <label asp-for="S3Server">S3 Server</label><input asp-for="S3Server" />
+ <label asp-for="S3Region">S3 Region</label><input asp-for="S3Region" />
+ <label asp-for="SshFingerprint">SFTP Host-Key-Fingerprint</label><input asp-for="SshFingerprint" />
+ </fieldset>
+ <fieldset><legend>Zeitplan und Aufbewahrung</legend>
+ <label asp-for="FirstRun">Erster geplanter Lauf · UTC; leer für manuelle Ausführung</label><input asp-for="FirstRun" type="datetime-local" asp-format="{0:yyyy-MM-ddTHH:mm}" />
+ <label asp-for="RepeatHours">Wiederholung in Stunden</label><input asp-for="RepeatHours" type="number" min="1" max="8760" />
+ <label asp-for="Days">Wochentage</label><select asp-for="Days" multiple>@foreach(var day in Enum.GetValues<DayOfWeek>()){<option value="@day">@day</option>}</select>
+ <label asp-for="KeepVersions">Aufzubewahrende Versionen</label><input asp-for="KeepVersions" type="number" min="1" max="10000" />
+ <label asp-for="Excludes">Ausschlussfilter · einer je Zeile</label><textarea asp-for="Excludes"></textarea>
+ </fieldset>
+ <p>Secrets werden verschlüsselt gespeichert und nur an den zugeordneten Agenten übertragen. Der Agent benötigt die lokale Freigabe für zentrale Konfiguration; SaaS benötigt zusätzlich die lokale Tenant-Freigabe und einen geeigneten Provider.</p>
+ <button type="submit">Konfiguration speichern</button>
+</form>

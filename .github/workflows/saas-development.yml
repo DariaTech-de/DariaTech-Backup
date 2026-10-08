@@ -1,8 +1,8 @@
 name: SaaS development integration
 on:
   push:
-    branches: [master, 'feature/saas-*']
-    paths: ['tests/SaasIntegration/**', 'proprietary/**', '.github/workflows/saas-development.yml', 'global.json', 'Directory.Build.props']
+    branches: [master, 'feature/*saas*']
+    paths: ['DariaTech/**', 'tests/SaasIntegration/**', 'proprietary/**', '.github/workflows/saas-development.yml', 'global.json', 'Directory.Build.props']
   pull_request:
     paths: ['tests/SaasIntegration/**', 'proprietary/**', '.github/workflows/saas-development.yml']
   workflow_dispatch:
@@ -27,3 +27,25 @@ jobs:
       - name: Offline provider and licensing contract checks
         run: dotnet run --project tests/SaasIntegration/SaasIntegration.csproj -c Release --no-build
       # Intentionally no package, publish or upload-artifact step.
+
+  native-managed-saas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DO_NOT_TRACK: '1'
+      USAGEREPORTER_Duplicati_LEVEL: none
+      AUTOUPDATER_Duplicati_SKIP_UPDATE: '1'
+      DARIATECH_PROVIDER_NEGATIVE_AUTH: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - name: Build original complete engine for development only
+        run: dotnet build Executables/Duplicati.Server/Duplicati.Server.csproj -c Release -p:DariaTechOssOnly=false
+      - name: Test managed SaaS jobs against original engine and invalid provider authentication
+        run: dotnet test DariaTech/Tests/DariaTech.Tests.csproj -c Release --filter Category=SaasNative
+        env:
+          DARIATECH_ENGINE_SAAS_DLL: ${{ github.workspace }}/Executables/Duplicati.Server/bin/Release/net10.0/Duplicati.Server.dll
+      # Restricted binaries and credentials are never uploaded or released.

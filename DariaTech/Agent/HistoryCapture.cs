@@ -29,7 +29,7 @@ public sealed partial class DuplicatiAdapter
      if(id<=cursor.Committed){complete=true;continue;}
      if(Get(log,"Type").GetString()!="Result")continue;
      var message=Get(log,"Message").GetString();if(message is null)continue;
-     try{using var result=JsonDocument.Parse(message);var run=ParseResult(result.RootElement,default);if(run is not null)cursor.Captured.Add(new(job.LocalId,id,run));}catch(JsonException){}
+     try{using var result=JsonDocument.Parse(message);var run=CloudOutcome(job.LocalId,ParseResult(result.RootElement,default));if(run is not null)cursor.Captured.Add(new(job.LocalId,id,run));}catch(JsonException){}
     }
     if(complete)
     {

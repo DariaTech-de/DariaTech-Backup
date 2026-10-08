@@ -5,7 +5,8 @@ public sealed record BackupFilter(bool Include,string Expression);
 public sealed record BackupSchedule(DateTimeOffset Start,int RepeatHours,DayOfWeek[] Days);
 // Secrets enter through authenticated TLS and are encrypted at rest. Never return this DTO to management GETs.
 public sealed record ManagedBackupDefinition(string Name,string[] Sources,string TargetUrl,string Passphrase,
-    Dictionary<string,string> BackendOptions,int KeepVersions,BackupFilter[] Filters,BackupSchedule? Schedule);
+    Dictionary<string,string> BackendOptions,int KeepVersions,BackupFilter[] Filters,BackupSchedule? Schedule,
+    [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] SaasSource? Saas=null);
 public sealed record ConfigurationInput(long ExpectedRevision,ManagedBackupDefinition Definition);
 public sealed record ConfigurationAssignment(Guid JobId,long Revision,ManagedBackupDefinition Definition);
 public sealed record ConfigurationReceipt(long Revision,string? LocalJobId,string Status);
@@ -18,7 +19,7 @@ public static class ConfigurationPolicy
  };
  public static bool Valid(ManagedBackupDefinition? d)
  {
-  if(d is null||!Text(d.Name,200)||d.Sources is null||d.Sources.Length is <1 or >100||d.Sources.Any(x=>!PathText(x))
+  if(d is null||!Text(d.Name,200)||d.Sources is null||(d.Saas is null?(d.Sources.Length is <1 or >100||d.Sources.Any(x=>!PathText(x))):(d.Sources.Length!=0||!SaasPolicy.Valid(d.Saas)))
     ||!Text(d.Passphrase,200)||d.Passphrase.Length<14||d.KeepVersions is <1 or >10000
     ||!Uri.TryCreate(d.TargetUrl,UriKind.Absolute,out var uri)||uri.Scheme is not ("file" or "s3" or "ssh" or "webdav" or "webdavs")
     ||!string.IsNullOrEmpty(uri.UserInfo)||!string.IsNullOrEmpty(uri.Query)||!string.IsNullOrEmpty(uri.Fragment)

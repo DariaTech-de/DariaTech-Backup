@@ -1,0 +1,116 @@
+using DariaTech.Contracts;
+using DariaTech.Console.Api;
+using DariaTech.Console.Data;
+using DariaTech.Console.Security;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.EntityFrameworkCore;
+namespace DariaTech.Console.Pages;
+
+[Authorize(Policy="Admin")]
+public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets):PageModel
+{
+ [BindProperty]public Guid DeviceId {get;set;}
+ [BindProperty]public Guid? ManagedJobId {get;set;}
+ [BindProperty]public long Revision {get;set;}
+ [BindProperty]public string Name {get;set;}="";
+ [BindProperty]public string Provider {get;set;}="Files";
+ [BindProperty]public string? Sources {get;set;}="";
+ [BindProperty]public string TargetUrl {get;set;}="";
+ [BindProperty]public string? Passphrase {get;set;}
+ [BindProperty]public int KeepVersions {get;set;}=30;
+ [BindProperty]public int RepeatHours {get;set;}=24;
+ [BindProperty]public DayOfWeek[] Days {get;set;}=Enum.GetValues<DayOfWeek>();
+ [BindProperty]public DateTimeOffset? FirstRun {get;set;}
+ [BindProperty]public string? DirectoryTenant {get;set;}="";
+ [BindProperty]public string? ClientId {get;set;}="";
+ [BindProperty]public string? ClientSecret {get;set;}
+ [BindProperty]public string? RefreshToken {get;set;}
+ [BindProperty]public string? ServiceAccountJson {get;set;}
+ [BindProperty]public string? AdminEmail {get;set;}="";
+ [BindProperty]public string[] RootTypes {get;set;}=[];
+ [BindProperty]public string[] UserTypes {get;set;}=[];
+ [BindProperty]public string? AuthUsername {get;set;}="";
+ [BindProperty]public string? AuthPassword {get;set;}
+ [BindProperty]public string? AwsAccessKeyId {get;set;}="";
+ [BindProperty]public string? AwsSecretKey {get;set;}
+ [BindProperty]public string? S3Server {get;set;}="";
+ [BindProperty]public string? S3Region {get;set;}="";
+ [BindProperty]public string? SshFingerprint {get;set;}="";
+ [BindProperty]public string? Excludes {get;set;}="";
+ public Device Device {get;private set;}=null!;
+ public string? Error {get;private set;}
+ public async Task<IActionResult> OnGetAsync(Guid deviceId,Guid? id,string provider="Files")
+ {
+  DeviceId=deviceId;ManagedJobId=id;
+  if(await LoadPrevious() is {} previous)
+  {
+   Name=previous.Name;Sources=string.Join(Environment.NewLine,previous.Sources);TargetUrl=previous.TargetUrl;KeepVersions=previous.KeepVersions;
+   FirstRun=previous.Schedule?.Start;Days=previous.Schedule?.Days??Enum.GetValues<DayOfWeek>();RepeatHours=previous.Schedule?.RepeatHours??24;
+   Provider=previous.Saas?.Provider.ToString()??"Files";DirectoryTenant=previous.Saas?.DirectoryTenant??"";
+   RootTypes=previous.Saas?.RootTypes??[];UserTypes=previous.Saas?.UserTypes??[];
+   ClientId=previous.Saas?.Credentials.GetValueOrDefault(Provider=="Microsoft365"?"office365-client-id":"google-client-id")??"";
+   AdminEmail=previous.Saas?.Credentials.GetValueOrDefault("google-admin-email")??"";
+   AuthUsername=previous.BackendOptions.GetValueOrDefault("auth-username")??"";AwsAccessKeyId=previous.BackendOptions.GetValueOrDefault("aws-access-key-id")??"";
+   S3Server=previous.BackendOptions.GetValueOrDefault("s3-server-name")??"";S3Region=previous.BackendOptions.GetValueOrDefault("s3-region")??"";SshFingerprint=previous.BackendOptions.GetValueOrDefault("ssh-fingerprint")??"";
+   Excludes=string.Join(Environment.NewLine,previous.Filters.Where(x=>!x.Include).Select(x=>x.Expression));
+  }
+  else if(id is not null)return NotFound();
+  else
+  {
+   Provider=provider;RootTypes=provider=="Microsoft365"?["Users","Groups","Sites"]:["Users","SharedDrives"];
+   UserTypes=provider=="Microsoft365"?["Mailbox","Calendar","Contacts"]:["Gmail","Drive","Calendar"];
+  }
+  Device=await db.Devices.SingleOrDefaultAsync(x=>x.Id==DeviceId&&x.Active)??null!;
+  return Device is null?NotFound():Page();
+ }
+ public async Task<IActionResult> OnPostAsync()
+ {
+  var previous=await LoadPrevious();
+  if(ManagedJobId is not null&&previous is null)return NotFound();
+  Device=await db.Devices.SingleOrDefaultAsync(x=>x.Id==DeviceId&&x.Active)??null!;if(Device is null)return NotFound();
+  var validBinding=ModelState.IsValid;
+  var storage=previous is null?new Dictionary<string,string>():new(previous.BackendOptions);
+  Set(storage,"auth-username",AuthUsername);Set(storage,"auth-password",AuthPassword);
+  Set(storage,"aws-access-key-id",AwsAccessKeyId);Set(storage,"aws-secret-access-key",AwsSecretKey);
+  Set(storage,"s3-server-name",S3Server);Set(storage,"s3-region",S3Region);Set(storage,"ssh-fingerprint",SshFingerprint);
+  if(Uri.TryCreate(TargetUrl,UriKind.Absolute,out var target)&&target.Scheme is "s3" or "webdav")storage["use-ssl"]="true";
+  SaasSource? cloud=null;
+  if(Provider!="Files")
+  {
+   if(!Enum.TryParse<SaasProvider>(Provider,out var kind)||!Enum.IsDefined(kind))validBinding=false;
+   else
+   {
+    var credentials=previous?.Saas is {} old&&old.Provider==kind?new Dictionary<string,string>(old.Credentials):new();
+    if(kind==SaasProvider.Microsoft365){Set(credentials,"office365-client-id",ClientId);Set(credentials,"office365-client-secret",ClientSecret);}
+    else
+    {
+     Set(credentials,"google-admin-email",AdminEmail);
+     if(!string.IsNullOrWhiteSpace(ServiceAccountJson)){credentials.Clear();credentials["google-admin-email"]=AdminEmail??"";credentials["google-service-account-json"]=ServiceAccountJson;}
+     else if(!credentials.ContainsKey("google-service-account-json")){Set(credentials,"google-client-id",ClientId);Set(credentials,"google-client-secret",ClientSecret);Set(credentials,"google-refresh-token",RefreshToken);}
+    }
+    cloud=new(kind,DirectoryTenant??"",credentials,RootTypes,UserTypes);
+   }
+  }
+  var definition=new ManagedBackupDefinition(Name,cloud is null?Lines(Sources):[],TargetUrl,
+   string.IsNullOrEmpty(Passphrase)?previous?.Passphrase??"":Passphrase,storage,KeepVersions,
+   (previous?.Filters.Where(x=>x.Include)??[]).Concat(Lines(Excludes).Select(x=>new BackupFilter(false,x))).ToArray(),FirstRun is {} first?new(first.ToUniversalTime(),RepeatHours,Days):null,cloud);
+  // Remove all posted secret values before redisplaying any validation error.
+  Passphrase=ClientSecret=RefreshToken=ServiceAccountJson=AuthPassword=AwsSecretKey=null;ModelState.Clear();
+  if(!validBinding||!ConfigurationPolicy.Valid(definition)){Error="Bitte Quelle, Zugangsdaten, Ziel, Verschlüsselung und Zeitplan prüfen.";return Page();}
+  var result=ManagedJobId is {} id?await ConfigurationApi.Update(id,new(Revision,definition),db,secrets,HttpContext):await ConfigurationApi.Create(DeviceId,new(0,definition),db,secrets,HttpContext);
+  if(result is IStatusCodeHttpResult {StatusCode:>=400}){Error="Die Konfiguration wurde abgelehnt. Bei einer geänderten Quelle, einem neuen Ziel oder Passwort bitte einen neuen Backup-Job anlegen.";return Page();}
+  return RedirectToPage("/Device",new{id=DeviceId});
+ }
+ private async Task<ManagedBackupDefinition?> LoadPrevious()
+ {
+  if(ManagedJobId is not {} id)return null;
+  var job=await db.ManagedJobs.SingleOrDefaultAsync(x=>x.Id==id&&x.DeviceId==DeviceId);if(job is null)return null;
+  if(HttpContext.Request.Method=="GET")Revision=job.LatestRevision;
+  var revision=await db.ConfigurationRevisions.SingleAsync(x=>x.ManagedJobId==id&&x.Revision==job.LatestRevision);
+  return ConfigurationApi.Read(secrets,revision);
+ }
+ private static string[] Lines(string? text)=>(text??"").Split(['\r','\n'],StringSplitOptions.RemoveEmptyEntries|StringSplitOptions.TrimEntries);
+ private static void Set(Dictionary<string,string> destination,string key,string? value){if(!string.IsNullOrEmpty(value))destination[key]=value;}
+}

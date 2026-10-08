@@ -25,10 +25,10 @@
   <p class="lead">@d.OperatingSystem · Agent @row.Version · Engine @(d.EngineReachable ? "erreichbar" : "nicht erreichbar") · Letzter Kontakt @Ui.Ago(d.LastHeartbeat)</p>
  </div>
  <div class="actions">
-  <button class="button locked" type="button" disabled aria-describedby="remote-hint">@Ui.Icon("lock")Backup jetzt starten</button>
-  <button class="button locked" type="button" disabled aria-describedby="remote-hint">@Ui.Icon("lock")Wiederherstellen</button>
+  @if(User.IsInRole("SuperAdmin")||User.IsInRole("Administrator")||User.IsInRole("Technician")){<a class="button" href="#backup-jobs">@Ui.Icon("server")Backup-Aktionen / Restore</a>}
+  @if(User.IsInRole("SuperAdmin")||User.IsInRole("Administrator")){<a class="button" asp-page="/BackupEdit" asp-route-deviceId="@d.Id">Backup-Job anlegen</a>}
  </div>
- <p id="remote-hint" class="hint">@Ui.Icon("info")Signierte Fernbefehle (Backup, Stopp, Wiederherstellung mit zusätzlicher Freigabe) stehen über die Management-API bereit. Die Bedienung direkt in dieser Oberfläche folgt.</p>
+ <p id="remote-hint" class="hint">@Ui.Icon("info")Backup-Aktionen werden am jeweiligen Job angefordert. Remote-Restore benötigt eine zweite Administratorfreigabe und die lokale Freigabe des Agenten.</p>
 </section>
 
 @foreach(var a in Model.Alerts.Take(3)){
@@ -74,10 +74,11 @@
 
  <div class="stack">
   <article class="card">
-   <h2>Backup-Jobs</h2>
+   <h2 id="backup-jobs">Backup-Jobs</h2>
    @if(Model.Jobs.Count==0){<p class="card-empty">@Ui.Icon("info")Noch keine Jobs eingerichtet.</p>}
-   <ul class="job-list">@foreach(var j in Model.Jobs){<li><span class="dot @(j.Active?"healthy":"offline")"></span><span><strong>@j.Name</strong><span class="sub">@Ui.Ownership(j.Ownership) · Nächster Lauf @Ui.In(j.NextRun)</span></span></li>}</ul>
-   <p class="sub">Lokal verwaltete Jobs werden in der Backup-Engine gepflegt; zentral verwaltete Jobs über die Management-API.</p>
+   <ul class="job-list">@foreach(var j in Model.Jobs){<li><span class="dot @(j.Active?"healthy":"offline")"></span><span><strong>@j.Name</strong><span class="sub">@Ui.Ownership(j.Ownership) · Nächster Lauf @Ui.In(j.NextRun)</span></span>@if(User.IsInRole("SuperAdmin")||User.IsInRole("Administrator")||User.IsInRole("Technician")){<a asp-page="/JobActions" asp-route-id="@j.Id">Aktionen / Restore</a>}</li>}</ul>
+   @if(User.IsInRole("SuperAdmin")||User.IsInRole("Administrator")){@foreach(var managed in Model.Managed){<p class="sub">@managed.Name · @managed.Status · Revision @managed.AppliedRevision / @managed.LatestRevision · <a asp-page="/BackupEdit" asp-route-deviceId="@d.Id" asp-route-id="@managed.Id">Konfiguration ändern</a></p>}}
+   <p class="sub">Lokal verwaltete Jobs werden in der Backup-Engine gepflegt. Zentrale Jobs verwenden versionierte, verschlüsselte Konfigurationen.</p>
   </article>
   <article class="card">
    <h2>System</h2>
