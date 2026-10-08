@@ -24,6 +24,7 @@ public sealed class NativeSaasTests
   start.Environment["DUPLICATI__WEBSERVICE_PASSWORD"]=password;start.Environment["SETTINGS_ENCRYPTION_KEY"]=dbKey;
   start.Environment["DO_NOT_TRACK"]="1";start.Environment["USAGEREPORTER_Duplicati_LEVEL"]="none";start.Environment["AUTOUPDATER_Duplicati_SKIP_UPDATE"]="1";
   using var process=Process.Start(start)!;var output=process.StandardOutput.ReadToEndAsync();var errors=process.StandardError.ReadToEndAsync();
+  var safeMasks=new List<string>{password,dbKey};var failed=false;
   var oldEnvironment=Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT");var oldMode=Environment.GetEnvironmentVariable("DARIATECH_SAAS_TESTS");
   try
   {
@@ -39,7 +40,7 @@ public sealed class NativeSaasTests
    using var rsa=RSA.Create(2048);
    var account=JsonSerializer.Serialize(new{type="service_account",project_id="dariatech-development-negative-test",private_key_id="not-a-live-key",private_key=rsa.ExportPkcs8PrivateKeyPem(),client_email="test@dariatech-development-negative-test.iam.gserviceaccount.com",client_id="123456789",token_uri="https://oauth2.googleapis.com/token"});
    var google=new SaasSource(SaasProvider.GoogleWorkspace,"test.invalid",new(){{"google-admin-email","admin@test.invalid"},{"google-service-account-json",account}},["Users"],["Gmail","Drive"]);
-   var office=SaasTests.Office();
+   var office=SaasTests.Office();safeMasks.AddRange(office.Credentials.Values);safeMasks.Add(account);safeMasks.Add(rsa.ExportPkcs8PrivateKeyPem());
    var options=new AgentOptions{EngineUrl=client.BaseAddress.ToString(),StateDirectory=Path.Combine(directory,"agent"),LinuxKeyFile=Path.Combine(directory,"agent.key"),ManageEngine=true,AllowSaasWorkloads=true,AllowedSaasTenants=[office.DirectoryTenant,google.DirectoryTenant],AllowUnlicensedSaasDevelopment=true};
    File.WriteAllText(options.LinuxKeyFile,Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
    if(!OperatingSystem.IsWindows())File.SetUnixFileMode(options.LinuxKeyFile,UnixFileMode.UserRead|UnixFileMode.UserWrite);
@@ -70,10 +71,18 @@ public sealed class NativeSaasTests
     }
    }
   }
+  catch{failed=true;throw;}
   finally
   {
    Environment.SetEnvironmentVariable("DOTNET_ENVIRONMENT",oldEnvironment);Environment.SetEnvironmentVariable("DARIATECH_SAAS_TESTS",oldMode);
-   if(!process.HasExited)process.Kill(true);await process.WaitForExitAsync();await output;await errors;Directory.Delete(directory,true);
+   if(!process.HasExited)process.Kill(true);await process.WaitForExitAsync();var nativeLog=(await output)+"\n"+(await errors);
+   if(failed)
+   {
+    foreach(var mask in safeMasks.Where(x=>!string.IsNullOrEmpty(x)))nativeLog=nativeLog.Replace(mask,"[REDACTED]",StringComparison.Ordinal);
+    nativeLog=System.Text.RegularExpressions.Regex.Replace(nativeLog,@"-----BEGIN [^-]+-----.*?-----END [^-]+-----","[REDACTED KEY]",System.Text.RegularExpressions.RegexOptions.Singleline);
+    TestContext.Error.WriteLine(nativeLog[^Math.Min(nativeLog.Length,12000)..]);
+   }
+   Directory.Delete(directory,true);
   }
  }
 }

@@ -39,7 +39,7 @@ EOF
   printf '%s\n%s\n' "$password" "$password" | smbpasswd -c "$fixture/smb.conf" -s -a root >/dev/null
   printf 'username=root\npassword=%s\n' "$password" > "$fixture/credentials"
   unset password
-  smbd -F --no-process-group -s "$fixture/smb.conf" > "$fixture/server.log" 2>&1 &
+  setsid smbd -F --no-process-group -s "$fixture/smb.conf" > "$fixture/server.log" 2>&1 &
   printf '%s' "$!" > "$fixture/server.pid"
   for attempt in {1..40}; do
    if mount -t cifs //127.0.0.1/dariatech "$mountpoint" -o "credentials=$fixture/credentials,port=1445,ro,nosuid,nodev,noexec,vers=3.1.1,uid=$uid,file_mode=0600,dir_mode=0700" 2>"$fixture/mount.log"; then break; fi
