@@ -101,12 +101,35 @@ try {
  $credentialHash=(Get-FileHash (Join-Path $state 'engine-credential.bin')).Hash
  $configFile=Join-Path (Join-Path ${env:ProgramFiles} 'DariaTech Backup') 'appsettings.json'
  $configuration=Get-Content $configFile -Raw|ConvertFrom-Json
+ # Exercise selection of a separately installed engine using the OSS fixture.
+ # This validates the BYOL boundary; it does not claim a licensed SaaS backup.
+ $externalRoot=Join-Path ${env:ProgramFiles} ('DariaTech External Engine Fixture-'+[Guid]::NewGuid())
+ New-Item -ItemType Directory $externalRoot | Out-Null
+ $engineAcl=New-Object Security.AccessControl.DirectorySecurity
+ $engineAcl.SetAccessRuleProtection($true,$false)
+ $engineAcl.SetOwner((New-Object Security.Principal.SecurityIdentifier('S-1-5-32-544')))
+ foreach($sid in 'S-1-5-18','S-1-5-32-544'){$engineAcl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier($sid)),'FullControl','ContainerInherit,ObjectInherit','None','Allow')))}
+ Set-Acl $externalRoot $engineAcl
+ Copy-Item (Join-Path (Split-Path $agentExe) 'engine/*') $externalRoot -Recurse
+ $externalExe=Join-Path $externalRoot 'Duplicati.Server.exe'
+ & $agentExe --check-engine-installation $externalExe
+ if($LASTEXITCODE){throw 'Protected external engine was rejected'}
+ $engineAcl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier('S-1-1-0')),'Write','ContainerInherit,ObjectInherit','None','Allow')))
+ Set-Acl $externalRoot $engineAcl
+ $rejected=Start-Process $agentExe -ArgumentList @('--check-engine-installation',('"'+$externalExe+'"')) -Wait -PassThru -NoNewWindow -RedirectStandardError (Join-Path $temporary 'external-engine-rejected.txt')
+ if(!$rejected.ExitCode){throw 'User-writable external engine was accepted'}
+ $engineAcl.RemoveAccessRuleAll((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier('S-1-1-0')),'Write','ContainerInherit,ObjectInherit','None','Allow')))
+ Set-Acl $externalRoot $engineAcl
+ $configuration.Agent | Add-Member ExternalEngineExecutable $externalExe -Force
  $configuration.Agent | Add-Member AllowManagedConfiguration $true -Force
  $configuration.Agent | Add-Member CommandPublicKeyFile (Join-Path $state 'commands-public.pem') -Force
  $configuration.Agent | Add-Member RestoreRoot (Join-Path $state 'Restores') -Force
  $configuration | ConvertTo-Json -Depth 5 | Set-Content $configFile -Encoding UTF8
  Invoke-Setup @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/console=https://localhost:18443')
  $preserved=Get-Content $configFile -Raw|ConvertFrom-Json
+ if($preserved.Agent.ExternalEngineExecutable -ne $externalExe){throw 'Upgrade discarded external engine selection'}
+ $selected=Get-CimInstance Win32_Process -Filter "Name='Duplicati.Server.exe'"
+ if($selected.ExecutablePath -ne $externalExe){throw 'Agent did not launch the selected external engine'}
  if(!$preserved.Agent.AllowManagedConfiguration -or $preserved.Agent.CommandPublicKeyFile -ne $configuration.Agent.CommandPublicKeyFile -or $preserved.Agent.RestoreRoot -ne $configuration.Agent.RestoreRoot){throw 'Upgrade discarded local management opt-in or trust settings'}
  if((Get-FileHash (Join-Path $state 'identity.bin')).Hash -ne $identityHash -or (Get-FileHash (Join-Path $state 'engine-credential.bin')).Hash -ne $credentialHash){throw 'Upgrade changed enrolled identity or engine credential'}
  Stop-Service DariaTechBackupAgent
@@ -125,5 +148,6 @@ try {
  Stop-Service DariaTechBackupAgent -Force -ErrorAction SilentlyContinue
  Stop-Process -Id $fixture.Id -Force -ErrorAction SilentlyContinue
  Remove-Item "Cert:\LocalMachine\Root\$($cert.Thumbprint)","Cert:\LocalMachine\My\$($cert.Thumbprint)" -ErrorAction SilentlyContinue
+ if($externalRoot -and (Test-Path $externalRoot)){Remove-Item $externalRoot -Recurse -Force -ErrorAction SilentlyContinue}
  Remove-Item $temporary -Recurse -Force -ErrorAction SilentlyContinue
 }

@@ -11,6 +11,7 @@ public sealed class ManagedEngine(AgentOptions options,ProtectedState state,ILog
  protected override async Task ExecuteAsync(CancellationToken ct)
  {
   if(!OperatingSystem.IsWindows())throw new PlatformNotSupportedException("Installer-managed engine requires Windows");
+  var executable=EngineInstallation.Resolve(options);
   var credential=state.Read<string>("engine-credential.bin");
   if(credential is null)
   {
@@ -35,8 +36,6 @@ public sealed class ManagedEngine(AgentOptions options,ProtectedState state,ILog
   // A failed installer attempt may have left an already-consumed input file.
   File.Delete(Path.Combine(options.StateDirectory,"enrollment-token.txt"));
   File.Delete(Path.Combine(options.StateDirectory,"engine-password.txt"));
-  var executable=Path.Combine(AppContext.BaseDirectory,"engine","Duplicati.Server.exe");
-  if(!File.Exists(executable))throw new InvalidOperationException("Bundled engine missing");
   // Duplicati creates its own leaf directory with canonical, non-inherited ACLs.
   // Pre-creating it here would correctly be rejected as an insecure existing folder.
   var data=Path.Combine(options.StateDirectory,"engine");

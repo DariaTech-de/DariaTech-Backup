@@ -17,6 +17,13 @@ if(args.Length==4&&args[0]=="--check-engine-port")
  return;
 }
 
+if(args.Length==2&&args[0]=="--check-engine-installation")
+{
+ try{EngineInstallation.ValidateExternal(args[1]);System.Console.WriteLine("External engine installation permissions verified");}
+ catch(Exception error){System.Console.Error.WriteLine($"Engine installation check rejected ({error.GetType().Name})");Environment.ExitCode=2;}
+ return;
+}
+
 if(args.Length==2&&args[0]=="--check-restore-root")
 {
  try{DuplicatiAdapter.RestoreDestination(args[1],"ownership-diagnostic-"+Guid.NewGuid().ToString("N"));System.Console.WriteLine("Restore root permissions verified");}

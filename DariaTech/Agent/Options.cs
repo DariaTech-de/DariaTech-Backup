@@ -14,9 +14,11 @@ public sealed class AgentOptions
  public string? RestoreRoot {get;set;}
  public bool AllowManagedConfiguration {get;set;}
  public bool ManageEngine {get;set;}
+ public string? ExternalEngineExecutable {get;set;}
  public string Version=>typeof(AgentOptions).Assembly.GetName().Version?.ToString()??"unknown";
  public void Validate()
  {
+  if(!string.IsNullOrWhiteSpace(ExternalEngineExecutable)&&(!ManageEngine||AllowAgentUpdates))throw new InvalidOperationException("External engine requires managed operation and separate manual engine/agent updates");
   if(AllowRemoteCommands&&!ManageEngine)throw new InvalidOperationException("Remote commands require an installer-managed engine instance");
   if(AllowRemoteCommands&&(string.IsNullOrWhiteSpace(CommandPublicKeyFile)||!File.Exists(CommandPublicKeyFile)))throw new InvalidOperationException("Pinned command public key required");
   if(AllowAgentUpdates&&(!ManageEngine||string.IsNullOrWhiteSpace(UpdatePublicKeyFile)||!File.Exists(UpdatePublicKeyFile)||UpdateDownloadHosts.Length==0))throw new InvalidOperationException("Managed engine and pinned update key required");

@@ -57,7 +57,7 @@ if ($Action -eq 'Prepare') {
  if (Get-NetTCPConnection -LocalPort 8210 -State Listen -ErrorAction SilentlyContinue) { throw 'Port 8210 is in use; stop the conflicting application before installation' }
  $agentConfiguration=@{ConsoleUrl=$uri.AbsoluteUri.TrimEnd('/');EngineUrl='http://127.0.0.1:8210';StateDirectory=$state;HeartbeatSeconds=60;ManageEngine=$true}
  if ($old -and $old.Agent) {
-  foreach($property in 'AllowManagedConfiguration','AllowRemoteCommands','CommandPublicKeyFile','RestoreRoot','AllowAgentUpdates','UpdatePublicKeyFile','UpdateDownloadHosts') {
+  foreach($property in 'ExternalEngineExecutable','AllowManagedConfiguration','AllowRemoteCommands','CommandPublicKeyFile','RestoreRoot','AllowAgentUpdates','UpdatePublicKeyFile','UpdateDownloadHosts') {
    if ($old.Agent.PSObject.Properties.Name -contains $property) { $agentConfiguration[$property]=$old.Agent.$property }
   }
  }
