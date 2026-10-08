@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
@@ -61,6 +62,51 @@ public static class UnixServices
    using(var writer=new StreamWriter(stream)){writer.Write(content);writer.Flush();stream.Flush(true);}
    File.Move(temporary,path,true);
   }finally{if(File.Exists(temporary))File.Delete(temporary);}
+ }
+ public static async Task Stop(CancellationToken ct)
+ {
+  RequireRoot();
+  if(OperatingSystem.IsMacOS())
+  {
+   if(!await Exists(ct))return;
+   await Control("/bin/launchctl",["bootout","system/"+MacLabel],ct);
+   // bootout can acknowledge removal before launchd finishes draining the job.
+   for(var i=0;i<120;i++){if(!await Exists(ct))return;await Task.Delay(500,ct);}
+   throw new InvalidOperationException("launchd service did not finish unloading");
+  }
+  if(await Control("/usr/bin/systemctl",["stop",ServiceName+".service"],ct)!=0)throw new InvalidOperationException("systemd rejected service stop");
+ }
+ public static async Task Start(CancellationToken ct)
+ {
+  RequireRoot();
+  if(OperatingSystem.IsMacOS())
+  {
+   var plist="/Library/LaunchDaemons/"+MacLabel+".plist";UnixPrivatePaths.TrustedFile(plist);
+   for(var i=0;i<40;i++)
+   {
+    if(await Control("/bin/launchctl",["bootstrap","system",plist],ct)==0)return;
+    // A successful asynchronous registration is visible even when launchctl's
+    // immediate result is transient EIO. Stop() must have drained the old job.
+    if(await Exists(ct))return;
+    await Task.Delay(500,ct);
+   }
+   throw new InvalidOperationException("launchd rejected service start");
+  }
+  if(await Control("/usr/bin/systemctl",["start",ServiceName+".service"],ct)!=0)throw new InvalidOperationException("systemd rejected service start");
+ }
+ private static void RequireRoot()
+ {
+  if(OperatingSystem.IsWindows()||UnixPrivatePaths.EffectiveUserId!=0)throw new InvalidOperationException("Native service control requires root");
+ }
+ private static async Task<bool> Exists(CancellationToken ct)=>await Control("/bin/launchctl",["print","system/"+MacLabel],ct)==0;
+ private static async Task<int> Control(string executable,string[] args,CancellationToken ct)
+ {
+  var info=new ProcessStartInfo(executable){UseShellExecute=false,RedirectStandardOutput=true,RedirectStandardError=true};foreach(var arg in args)info.ArgumentList.Add(arg);
+  using var process=Process.Start(info)??throw new InvalidOperationException("Native service control unavailable");
+  using var timeout=CancellationTokenSource.CreateLinkedTokenSource(ct);timeout.CancelAfter(TimeSpan.FromSeconds(60));
+  var stdout=process.StandardOutput.ReadToEndAsync(timeout.Token);var stderr=process.StandardError.ReadToEndAsync(timeout.Token);
+  try{await process.WaitForExitAsync(timeout.Token);await stdout;await stderr;return process.ExitCode;}
+  finally{if(!process.HasExited)process.Kill(true);}
  }
  private static string Quote(string value)
  {

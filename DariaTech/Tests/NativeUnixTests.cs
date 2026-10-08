@@ -97,6 +97,45 @@ public sealed class NativeUnixTests
   }
   finally{if(engine is not null){await engine.StopAsync(CancellationToken.None);engine.Dispose();}Directory.Delete(root,true);}
  }
+ [Test,Category("UnixNas")]
+ public async Task RealCifsSourceProducesEncryptedBackupAndByteIdenticalRestore()
+ {
+  if(!OperatingSystem.IsLinux()){Assert.Ignore("CIFS acceptance runs on native Linux");return;}
+  var executable=Environment.GetEnvironmentVariable("DARIATECH_ENGINE_NATIVE");var agent=Environment.GetEnvironmentVariable("DARIATECH_AGENT_NATIVE");
+  var nas=Environment.GetEnvironmentVariable("DARIATECH_NAS_SOURCE");
+  if(string.IsNullOrWhiteSpace(executable)||string.IsNullOrWhiteSpace(agent)||string.IsNullOrWhiteSpace(nas))throw new InvalidOperationException("Native package and real NAS mount are required");
+  var root=UnixSecurityTests.TemporaryDirectory();ManagedEngine? engine=null;
+  try
+  {
+   using var timeout=new CancellationTokenSource(TimeSpan.FromMinutes(4));
+   var options=UnixSecurityTests.Options(root);options.ManageEngine=true;options.ExternalEngineExecutable=executable;options.SourceCheckExecutable=agent;
+   using(var port=new TcpListener(IPAddress.Loopback,0)){port.Start();options.EngineUrl="https://127.0.0.1:"+((IPEndPoint)port.LocalEndpoint).Port;}
+   options.RestoreRoot=Path.Combine(root,"restore");UnixPrivatePaths.Directory(options.RestoreRoot,true);
+   options.ConfigurationFile=Path.Combine(root,"agent.json");UnixProvisioning.WritePrivate(options.ConfigurationFile,UnixProvisioning.Serialize(options));options.Validate();
+   var state=new ProtectedState(options);var identity=new AgentIdentity(Guid.NewGuid(),Convert.ToHexString(RandomNumberGenerator.GetBytes(32)));state.Write("identity.bin",identity);
+   engine=new(options,state,NullLogger<ManagedEngine>.Instance);await engine.StartAsync(timeout.Token);
+   using var adapter=new DuplicatiAdapter(options,state);await WaitForEngine(adapter,timeout.Token);
+   var file=Path.Combine(nas,"restore-check.bin");var original=await File.ReadAllBytesAsync(file,timeout.Token);
+   var storage=Path.Combine(root,"storage");Directory.CreateDirectory(storage);
+   var definition=new ManagedBackupDefinition("Actual CIFS backup",[nas+"/"],new Uri(storage+Path.DirectorySeparatorChar).AbsoluteUri,"test-only-encryption-passphrase",new(),30,[],null,
+    SourceMounts:[new(nas,"cifs","//127.0.0.1/dariatech")]);
+   var id=await adapter.ApplyConfiguration(new(Guid.NewGuid(),1,definition),timeout.Token);
+   var command=new DeviceCommand(Guid.NewGuid(),Guid.NewGuid(),identity.DeviceId,id,RemoteAction.RunBackup,null,DateTimeOffset.UtcNow,DateTimeOffset.UtcNow.AddMinutes(5));
+   var task=await adapter.Dispatch(command,options,timeout.Token);CommandReceipt receipt;
+   do{await Task.Delay(100,timeout.Token);receipt=await adapter.TaskReceipt(task,timeout.Token);}while(receipt.Status=="Accepted");
+   Assert.That(receipt.Status,Is.EqualTo("Completed"));
+   var report=(await adapter.ReadJobs(timeout.Token)).Single(x=>x.LocalId==id);
+   Assert.That(report.LastRun?.Status,Is.EqualTo(RunStatus.Success));Assert.That(report.LastRun?.Bytes,Is.EqualTo(original.Length));
+   Assert.That(Directory.GetFiles(storage),Is.Not.Empty);Assert.That(Directory.GetFiles(storage).All(x=>x.EndsWith(".aes",StringComparison.Ordinal)),Is.True);
+   var points=await adapter.ReadCatalog(command with{Action=RemoteAction.ListRestorePoints},timeout.Token);
+   var restore=command with{Action=RemoteAction.Restore,Restore=new(points.Points[0].Time,[file],"nas-recovery")};
+   task=await adapter.Dispatch(restore,options,timeout.Token);
+   do{await Task.Delay(100,timeout.Token);receipt=await adapter.TaskReceipt(task,timeout.Token);}while(receipt.Status=="Accepted");
+   Assert.That(receipt.Status,Is.EqualTo("Completed"));
+   Assert.That(await File.ReadAllBytesAsync(Directory.GetFiles(options.RestoreRoot,"restore-check.bin",SearchOption.AllDirectories).Single(),timeout.Token),Is.EqualTo(original));
+  }
+  finally{if(engine is not null){await engine.StopAsync(CancellationToken.None);engine.Dispose();}Directory.Delete(root,true);}
+ }
  private static async Task WaitForEngine(DuplicatiAdapter adapter,CancellationToken ct)
  {
   for(var i=0;i<150;i++){try{await adapter.ReadJobs(ct);return;}catch(Exception error)when(error is HttpRequestException or InvalidOperationException){await Task.Delay(100,ct);}}

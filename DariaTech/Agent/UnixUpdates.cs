@@ -101,8 +101,8 @@ public static class UnixUpdates
   if(signed!=journal.Manifest||signed.Platform!=options.Platform||signed.Version==options.Version||Version.Parse(signed.Version)<=Version.Parse(options.Version))throw new CryptographicException("Unix update signature, version or platform rejected");
   _=state;
  }
- private static Task Stop(CancellationToken ct)=>OperatingSystem.IsMacOS()?Run("/bin/launchctl",["bootout","system/"+UnixServices.MacLabel],ct):Run("/usr/bin/systemctl",["stop",UnixServices.ServiceName+".service"],ct);
- private static Task Start(CancellationToken ct)=>OperatingSystem.IsMacOS()?Run("/bin/launchctl",["bootstrap","system","/Library/LaunchDaemons/"+UnixServices.MacLabel+".plist"],ct):Run("/usr/bin/systemctl",["start",UnixServices.ServiceName+".service"],ct);
+ private static Task Stop(CancellationToken ct)=>UnixServices.Stop(ct);
+ private static Task Start(CancellationToken ct)=>UnixServices.Start(ct);
  private static async Task WaitForEngine(AgentOptions options,ProtectedState state,CancellationToken ct)
  {
   using var timeout=CancellationTokenSource.CreateLinkedTokenSource(ct);timeout.CancelAfter(TimeSpan.FromSeconds(90));using var adapter=new DuplicatiAdapter(options,state);

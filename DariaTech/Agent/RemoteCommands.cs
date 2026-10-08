@@ -29,7 +29,7 @@ public sealed partial class DuplicatiAdapter
   {
    response.EnsureSuccessStatusCode();using var result=JsonDocument.Parse(await response.Content.ReadAsStreamAsync(ct));
    if(!long.TryParse(Get(result.RootElement,"ID").ToString(),out var id)||id<1)throw new HttpRequestException("Invalid engine task receipt");
-   if(command.Action==RemoteAction.RunBackup&&cloudBindings.ContainsKey(command.LocalJobId))
+   if(command.Action==RemoteAction.RunBackup&&(cloudBindings.ContainsKey(command.LocalJobId)||(state.Read<Dictionary<string,string>>("source-jobs.bin")??[]).ContainsKey(command.LocalJobId)))
    {
     var tasks=state.Read<Dictionary<long,CloudTaskBinding>>("cloud-tasks.bin")??[];
     foreach(var expired in tasks.Where(x=>x.Value.Dispatched<DateTimeOffset.UtcNow.AddDays(-1)).Select(x=>x.Key).ToArray())tasks.Remove(expired);

@@ -40,7 +40,7 @@ if [[ ! "$service" =~ ^[A-Za-z][A-Za-z0-9]{1,60}$ ]] || [[ ! "$label" =~ ^de\.da
 if [[ "$expected" == linux-* ]]; then
  systemctl stop "$service.service" 2>/dev/null || true
 else
- launchctl bootout "system/$label" 2>/dev/null || true
+ "$stage/DariaTech.Agent" --service-stop
 fi
 previous="$prefix.previous"
 if [ -L "$previous" ]; then printf '%s\n' 'Unsafe previous installation path.' >&2; exit 2; fi
@@ -50,7 +50,7 @@ mv "$stage" "$prefix"
 if ! "$prefix/DariaTech.Agent" "${initialize[@]}"; then
  rm -rf "$prefix"
  if [ -d "$previous" ]; then mv "$previous" "$prefix"; fi
- if [[ "$expected" == linux-* ]]; then systemctl start "$service.service" 2>/dev/null || true; else launchctl bootstrap system "/Library/LaunchDaemons/$label.plist" 2>/dev/null || true; fi
+ if [[ "$expected" == linux-* ]]; then systemctl start "$service.service" 2>/dev/null || true; else "$prefix/DariaTech.Agent" --service-start 2>/dev/null || true; fi
  printf '%s\n' 'Initialization failed; the previous installation was restored.' >&2
  exit 2
 fi
@@ -63,7 +63,8 @@ if [[ "$expected" == linux-* ]]; then
 else
  plist="/Library/LaunchDaemons/$label.plist"
  "$prefix/DariaTech.Agent" --write-service-file "$config"
- launchctl bootstrap system "$plist"
+ "$prefix/DariaTech.Agent" --service-start
  launchctl print "system/$label" >/dev/null
 fi
-printf '%s\n' 'DariaTech Backup Agent installed. Enrollment and heartbeats complete after network connectivity is available.'
+"$prefix/DariaTech.Agent" --service-health "$config"
+printf '%s\n' 'DariaTech Backup Agent installed and enrollment/local engine verified. Heartbeats will continue over HTTPS.'

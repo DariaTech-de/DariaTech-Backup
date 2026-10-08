@@ -31,6 +31,30 @@ if(args.Length==3&&args[0]=="--apply-unix-update")
  catch(Exception error){System.Console.Error.WriteLine($"Verified Unix update failed ({error.GetType().Name}); retained state and previous binaries are available.");Environment.ExitCode=2;}
  return;
 }
+if(args.Length==2&&args[0]=="--service-health")
+{
+ try
+ {
+  var serviceOptions=SourceChecks.ReadOptions(args[1]);var serviceState=new ProtectedState(serviceOptions);
+  using var deadline=new CancellationTokenSource(TimeSpan.FromSeconds(90));
+  while(serviceState.Read<AgentIdentity>("identity.bin") is null)await Task.Delay(500,deadline.Token);
+  using var adapter=new DuplicatiAdapter(serviceOptions,serviceState);
+  while(true)
+  {
+   try{await adapter.ReadJobs(deadline.Token);break;}
+   catch(Exception error)when(error is HttpRequestException or InvalidOperationException){await Task.Delay(500,deadline.Token);}
+  }
+  System.Console.WriteLine("Enrolled native agent and authenticated local engine are healthy.");
+ }
+ catch(Exception error){System.Console.Error.WriteLine($"Agent startup not verified ({error.GetType().Name}); retained service/state can retry when connectivity and enrollment are corrected.");Environment.ExitCode=2;}
+ return;
+}
+if(args.Length==1&&args[0] is "--service-stop" or "--service-start")
+{
+ try{using var deadline=new CancellationTokenSource(TimeSpan.FromMinutes(2));if(args[0]=="--service-stop")await UnixServices.Stop(deadline.Token);else await UnixServices.Start(deadline.Token);}
+ catch(Exception error){System.Console.Error.WriteLine($"Native service control failed ({error.GetType().Name}); installation was not reported complete.");Environment.ExitCode=2;}
+ return;
+}
 if(args.Length==1&&args[0]=="--service-name"){System.Console.WriteLine(UnixServices.ServiceName);return;}
 if(args.Length==1&&args[0]=="--service-label"){System.Console.WriteLine(UnixServices.MacLabel);return;}
 if(args.Length==2&&args[0]=="--write-service-file"){UnixServices.Write(args[1]);return;}

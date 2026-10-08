@@ -62,7 +62,7 @@ public sealed partial class DuplicatiAdapter
  private void BindSourceJob(string localId,ConfigurationAssignment assignment)
  {
   var jobs=state.Read<Dictionary<string,string>>("source-jobs.bin")??[];
-  if(assignment.Definition.Proxmox is not null)jobs[localId]=SourceChecks.BindingKey(assignment.JobId,assignment.Revision);
+  if(assignment.Definition.Proxmox is not null||SourceChecks.RequiredMounts(agentOptions,assignment.Definition).Length>0)jobs[localId]=SourceChecks.BindingKey(assignment.JobId,assignment.Revision);
   else jobs.Remove(localId);
   state.Write("source-jobs.bin",jobs);
  }

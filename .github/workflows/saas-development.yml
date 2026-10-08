@@ -1,7 +1,7 @@
 name: SaaS development integration
 on:
   push:
-    branches: [master, 'feature/*saas*']
+    branches: [master, 'feature/*saas*', 'feature/managed-sources']
     paths: ['DariaTech/**', 'tests/SaasIntegration/**', 'proprietary/**', '.github/workflows/saas-development.yml', 'global.json', 'Directory.Build.props']
   pull_request:
     paths: ['tests/SaasIntegration/**', 'proprietary/**', '.github/workflows/saas-development.yml']

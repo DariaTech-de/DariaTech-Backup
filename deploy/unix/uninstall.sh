@@ -15,7 +15,7 @@ if [ "$(uname -s)" = Linux ]; then
  rm -f "/etc/systemd/system/$service.service"
  systemctl daemon-reload
 else
- launchctl bootout "system/$label"
+ "$prefix/DariaTech.Agent" --service-stop
  rm -f "/Library/LaunchDaemons/$label.plist"
 fi
 rm -rf "$prefix"

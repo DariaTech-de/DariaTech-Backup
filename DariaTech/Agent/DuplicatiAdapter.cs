@@ -61,7 +61,7 @@ public sealed partial class DuplicatiAdapter : IDisposable
   var fraction=Get(root,"OverallProgress").TryGetDouble(out var f)&&double.IsFinite(f)?Math.Clamp(f,0,1):0;
   return new ProgressReport(id,Number(Get(root,"TaskID")),fraction,Number(Get(root,"ProcessedFileSize")),Number(Get(root,"ProcessedFileCount")));
  }
- private RunReport? CloudOutcome(string localId,RunReport? run)=>run is {Status:RunStatus.Warning}&&(state.Read<Dictionary<string,SaasJobBinding>>("saas-bindings.bin")??[]).ContainsKey(localId)
+ private RunReport? CloudOutcome(string localId,RunReport? run)=>run is {Status:RunStatus.Warning}&&((state.Read<Dictionary<string,SaasJobBinding>>("saas-bindings.bin")??[]).ContainsKey(localId)||(state.Read<Dictionary<string,string>>("source-jobs.bin")??[]).ContainsKey(localId))
   ?run with{Status=RunStatus.Failed,ErrorCode="BackupFailed"}:run;
  public static RunReport? ParseResult(JsonElement result,JsonElement metadata)
  {
