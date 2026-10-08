@@ -238,6 +238,17 @@ public sealed class PostgresTests
   await db.Entry(user).ReloadAsync();Assert.That(user.SessionVersion,Is.EqualTo(originalVersion));
   File.Delete(passwordFile);File.Delete(output);
  }
+
+ [Test]public async Task HistoricalRunsAreDeviceBoundAndIdempotent()
+ {
+  var(t,site)=await Customer();using var agent=factory.CreateClient(new(){BaseAddress=new Uri("https://localhost")});using var enrolled=await agent.PostAsJsonAsync("/api/v1/agent/enroll",new EnrollmentRequest(await Token(t,site),"History","Windows","0.1.0"));var identity=(await enrolled.Content.ReadFromJsonAsync<EnrollmentResponse>())!;
+  agent.DefaultRequestHeaders.Authorization=new("Bearer",identity.Credential);agent.DefaultRequestHeaders.Add("X-Device-Id",identity.DeviceId.ToString());
+  using var heartbeat=await agent.PostAsJsonAsync("/api/v1/agent/heartbeat",new HeartbeatRequest("0.1.0","Windows",true,[new("1","History",null,null)]));Assert.That(heartbeat.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  var now=DateTimeOffset.UtcNow;var request=new HistoryRequest([new("1",1,new("historical-1",now.AddDays(-2),now.AddDays(-2).AddMinutes(5),RunStatus.Success,100,1,null,null,null)),new("1",2,new("historical-2",now.AddDays(-1),now.AddDays(-1).AddMinutes(5),RunStatus.Failed,100,1,null,null,"BackupFailed"))]);
+  using var saved=await agent.PostAsJsonAsync("/api/v1/agent/history",request);Assert.That(saved.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));using var replay=await agent.PostAsJsonAsync("/api/v1/agent/history",request);Assert.That(replay.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  await using var db=Db();var job=await db.Jobs.SingleAsync(x=>x.DeviceId==identity.DeviceId);Assert.That(await db.Runs.CountAsync(x=>x.JobId==job.Id),Is.EqualTo(2));
+  using var unknown=await agent.PostAsJsonAsync("/api/v1/agent/history",new HistoryRequest([request.Runs[0] with{LocalJobId="foreign"}]));Assert.That(unknown.StatusCode,Is.EqualTo(HttpStatusCode.Conflict));
+ }
  private sealed class TestFactory(string cs,string dir):WebApplicationFactory<Program>
  {
   protected override void ConfigureWebHost(IWebHostBuilder b)

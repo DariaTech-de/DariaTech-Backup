@@ -10,9 +10,9 @@ public sealed partial class DuplicatiAdapter : IDisposable
 {
  private readonly HttpClient client;
  private readonly ProtectedState state;
- public DuplicatiAdapter(AgentOptions options,ProtectedState store)
+ public DuplicatiAdapter(AgentOptions options,ProtectedState store,HttpMessageHandler? handler=null)
  {
-  state=store;client=new HttpClient(new HttpClientHandler{AllowAutoRedirect=false,UseProxy=false}){BaseAddress=new Uri(options.EngineUrl),Timeout=TimeSpan.FromSeconds(15)};
+  state=store;client=new HttpClient(handler??new HttpClientHandler{AllowAutoRedirect=false,UseProxy=false}){BaseAddress=new Uri(options.EngineUrl),Timeout=TimeSpan.FromSeconds(15)};
  }
  public async Task<JobReport[]> ReadJobs(CancellationToken ct)
  {
@@ -68,7 +68,7 @@ public sealed partial class DuplicatiAdapter : IDisposable
   var status=parsed.ToLowerInvariant() switch {"success"=>RunStatus.Success,"warning"=>RunStatus.Warning,"error"=>RunStatus.Failed,"fatal"=>RunStatus.Failed,_=>RunStatus.Unknown};
   if(Get(result,"Interrupted").ValueKind==JsonValueKind.True)status=RunStatus.Cancelled;
   var error=status switch {RunStatus.Failed=>"BackupFailed",RunStatus.Warning=>"BackupWarning",RunStatus.Cancelled=>"Cancelled",_=>null};
-  return new RunReport($"backup:{start.Value.UtcTicks}",start.Value,end,status,NullableNumber(Get(result,"SizeOfExaminedFiles")),NullableNumber(Get(result,"ExaminedFiles")),NullableNumber(Get(metadata,"TargetFilesSize")),null,error);
+  return new RunReport($"backup:{start.Value.UtcTicks}",start.Value,end,status,NullableNumber(Get(result,"SizeOfExaminedFiles")),NullableNumber(Get(result,"ExaminedFiles")),NullableNumber(Get(Get(result,"BackendStatistics"),"KnownFileSize"))??NullableNumber(Get(metadata,"TargetFilesSize")),null,error);
  }
  public static JsonElement Get(JsonElement e,string name)
  {

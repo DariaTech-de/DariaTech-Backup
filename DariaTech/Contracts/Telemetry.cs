@@ -9,3 +9,5 @@ public sealed record RunReport(string LocalRunId, DateTimeOffset Started, DateTi
     RunStatus Status, long? Bytes, long? Files, long? StorageBytes, double? Progress, string? ErrorCode);
 public sealed record ProgressReport(string LocalJobId,long TaskId,double Fraction,long Bytes,long Files);
 public sealed record HeartbeatRequest(string AgentVersion, string OperatingSystem, bool EngineReachable, JobReport[] Jobs,ProgressReport? ActiveOperation=null);
+public sealed record RunHistoryItem(string LocalJobId,long RecordId,RunReport Run);
+public sealed record HistoryRequest(RunHistoryItem[] Runs);

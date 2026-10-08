@@ -43,11 +43,18 @@ public sealed class Worker(AgentOptions options,ProtectedState state,ILogger<Wor
     // Bound disk use. Lost older snapshots are explicitly reported, never claimed delivered.
     if(queue.Count>1440){queue.RemoveAt(0);log.LogWarning("Telemetry outbox full; oldest snapshot discarded");}
     state.Write("outbox.bin",queue);
+    var telemetryDelivered=false;
     while(queue.Count>0)
     {
      using var result=await client.PostAsJsonAsync("/api/v1/agent/heartbeat",queue[0],ct);
      if(!result.IsSuccessStatusCode){log.LogWarning("Console rejected telemetry with HTTP {Code}",(int)result.StatusCode);break;}
-     queue.RemoveAt(0);state.Write("outbox.bin",queue);
+     queue.RemoveAt(0);state.Write("outbox.bin",queue);telemetryDelivered=true;
+    }
+    if(reachable&&telemetryDelivered)
+    {
+     try{await adapter.CaptureHistory(client,jobs,ct);}
+     catch(OperationCanceledException)when(ct.IsCancellationRequested){throw;}
+     catch(Exception ex){log.LogWarning("History capture or delivery failed ({Type})",ex.GetType().Name);}
     }
    }
    catch(OperationCanceledException)when(ct.IsCancellationRequested){break;}

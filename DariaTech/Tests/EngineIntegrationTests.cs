@@ -65,6 +65,9 @@ public sealed class EngineIntegrationTests
    var journal=state.Read<Dictionary<Guid,CommandJournalEntry>>("commands.bin")!;
    journal[command.Id]=journal[command.Id] with{Receipt=new("Accepted",remoteTask,null)};state.Write("commands.bin",journal);state.Write("engine-instance.bin",Guid.NewGuid());
    await RemoteCommands.Synchronize(console,adapter,options,state,command.DeviceId,ct.Token);Assert.That(fixture.Receipts.Last().Status,Is.EqualTo("Indeterminate"));
+   using var historyReceiver=new HistoryFixtureHandler();using var historyConsole=new HttpClient(historyReceiver){BaseAddress=new Uri("https://test-only.invalid")};
+   await adapter.CaptureHistory(historyConsole,await adapter.ReadJobs(ct.Token),ct.Token);Assert.That(historyReceiver.Runs.Count(x=>x.LocalJobId==id),Is.GreaterThanOrEqualTo(2));
+   var captured=historyReceiver.Runs.Count;await adapter.CaptureHistory(historyConsole,await adapter.ReadJobs(ct.Token),ct.Token);Assert.That(historyReceiver.Runs.Count,Is.EqualTo(captured));
    File.Delete(Path.Combine(source,"restore-check.bin"));
    using var restored=await client.PostAsJsonAsync($"/api/v1/backup/{id}/restore",new{paths=new[]{Path.Combine(source,"restore-check.bin")},time="now",restore_path=restore,overwrite=true,permissions=false,skip_metadata=true},ct.Token);restored.EnsureSuccessStatusCode();using var restoreTask=JsonDocument.Parse(await restored.Content.ReadAsStringAsync(ct.Token));await WaitTask(client,DuplicatiAdapter.Get(restoreTask.RootElement,"ID").ToString(),ct.Token,password,passphrase);
    var file=Directory.GetFiles(restore,"restore-check.bin",SearchOption.AllDirectories).Single();Assert.That(await File.ReadAllBytesAsync(file,ct.Token),Is.EqualTo(bytes));
@@ -73,6 +76,12 @@ public sealed class EngineIntegrationTests
   {
    if(!server.HasExited)server.Kill(true);await server.WaitForExitAsync();await output;await error;Directory.Delete(dir,true);
   }
+ }
+ private sealed class HistoryFixtureHandler:HttpMessageHandler
+ {
+  public List<RunHistoryItem> Runs {get;}=[];
+  protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct)
+  {Runs.AddRange((await request.Content!.ReadFromJsonAsync<HistoryRequest>(ct))!.Runs);return new(HttpStatusCode.NoContent);}
  }
  private sealed class CommandFixtureHandler(SignedCommand envelope):HttpMessageHandler
  {
