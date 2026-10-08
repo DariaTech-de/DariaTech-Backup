@@ -100,3 +100,26 @@ The protected write-ahead command journal is flushed before calling the engine. 
 The agent also pages the engine's local result log by stable record ID. A protected atomic spool holds pagination continuation, parsed allowlisted backup statistics and pending deliveries together. Large backlogs continue across service restarts; the cursor advances only with durable captured statistics, and queued batches are removed only after authenticated Console acceptance. Replayed delivery is idempotent by job/run identity. Raw messages/errors, source/target paths and credentials never leave the agent through this channel. Old runs use the result's own backend statistics; absent historical storage usage remains unknown rather than borrowing today's size.
 
 This captures every parseable Backup result still available in the local engine database, not logs already pruned/deleted before enrollment or failures with no structured Backup result. Such hard errors remain explicit generic EngineOperationFailed incidents from engine metadata. Keep the engine databases until the agent has delivered their history. Deleting a local job/database before capture can destroy its local evidence; management cannot reconstruct it from nonexistent data.
+
+## Protected remote restore root (Windows)
+
+Provision locally as an administrator, outside ordinary user profiles. Remote restore deliberately refuses an exposed root or untrusted ancestry. For example:
+
+```powershell
+$restoreRoot = Join-Path $env:ProgramData 'DariaTechBackup\Restores'
+New-Item -ItemType Directory -Path $restoreRoot -Force | Out-Null
+$restoreAcl = New-Object Security.AccessControl.DirectorySecurity
+$restoreAcl.SetAccessRuleProtection($true, $false)
+$restoreAcl.SetOwner((New-Object Security.Principal.SecurityIdentifier('S-1-5-32-544')))
+foreach ($sid in 'S-1-5-18','S-1-5-32-544') {
+    $identity = New-Object Security.Principal.SecurityIdentifier($sid)
+    $rule = New-Object Security.AccessControl.FileSystemAccessRule($identity,'FullControl','ContainerInherit,ObjectInherit','None','Allow')
+    $restoreAcl.AddAccessRule($rule)
+}
+Set-Acl -Path $restoreRoot -AclObject $restoreAcl
+& "$env:ProgramFiles\DariaTech Backup\DariaTech.Agent.exe" --check-restore-root $restoreRoot
+```
+
+Only after the check succeeds, set Agent:RestoreRoot to that path in the protected local configuration. New restore folders inherit restricted permissions. Grant customer access afterwards through a deliberate local administrator action. No existing destination is overwritten.
+
+Managed engine HTTP connections verify the Windows kernel's connection-owner PID and creation time against the protected launched-child identity before transmitting credentials. Task completion with a nonempty upstream ErrorMessage/Exception is reported Failed/EngineTaskFailed; raw text is never forwarded.
