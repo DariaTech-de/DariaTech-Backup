@@ -249,6 +249,37 @@ public sealed class PostgresTests
   await using var db=Db();var job=await db.Jobs.SingleAsync(x=>x.DeviceId==identity.DeviceId);Assert.That(await db.Runs.CountAsync(x=>x.JobId==job.Id),Is.EqualTo(2));
   using var unknown=await agent.PostAsJsonAsync("/api/v1/agent/history",new HistoryRequest([request.Runs[0] with{LocalJobId="foreign"}]));Assert.That(unknown.StatusCode,Is.EqualTo(HttpStatusCode.Conflict));
  }
+
+ [Test]public async Task PrivacyErasureRemovesSecretsAndCustomerDataWhilePreservingAudit()
+ {
+  var(t,site)=await Customer();await using var db=Db();var d=new Device{TenantId=t.Id,SiteId=site.Id,Name="Private device",Active=false};db.Devices.Add(d);
+  var job=new ManagedJob{TenantId=t.Id,DeviceId=d.Id,Name="Private job",LatestRevision=1};db.ManagedJobs.Add(job);db.ConfigurationRevisions.Add(new ConfigurationRevision{TenantId=t.Id,ManagedJobId=job.Id,Revision=1,EncryptedConfiguration="test-only-encrypted-placeholder"});
+  db.Audit.Add(new AuditEvent{TenantId=t.Id,Actor="test",Action="customer.created",Resource=t.Id.ToString()});await db.SaveChangesAsync();
+  Assert.ThrowsAsync<InvalidOperationException>(async()=>await Privacy.EraseCustomer(db,t.Id,true));
+  var customer=await db.Customers.SingleAsync(x=>x.TenantId==t.Id);customer.Active=false;await db.SaveChangesAsync();
+  await Privacy.EraseCustomer(db,t.Id,false);Assert.That(await db.ConfigurationRevisions.AnyAsync(x=>x.TenantId==t.Id),Is.True);
+  await Privacy.EraseCustomer(db,t.Id,true);Assert.That(await db.Customers.AnyAsync(x=>x.TenantId==t.Id),Is.False);Assert.That(await db.ConfigurationRevisions.AnyAsync(x=>x.TenantId==t.Id),Is.False);Assert.That(await db.Devices.AnyAsync(x=>x.TenantId==t.Id),Is.False);
+  Assert.That(await db.Audit.CountAsync(x=>x.TenantId==t.Id),Is.EqualTo(3));Assert.That((await db.Tenants.SingleAsync(x=>x.Id==t.Id)).Name,Does.StartWith("Erased tenant"));
+ }
+
+ [Test]public async Task OrdinaryDatabaseRoleCannotBypassRevisionImmutabilityOrEraseCustomer()
+ {
+  var(t,site)=await Customer();await using var owner=Db();var d=new Device{TenantId=t.Id,SiteId=site.Id,Active=false};owner.Devices.Add(d);var j=new ManagedJob{TenantId=t.Id,DeviceId=d.Id,LatestRevision=1};owner.ManagedJobs.Add(j);owner.ConfigurationRevisions.Add(new ConfigurationRevision{TenantId=t.Id,ManagedJobId=j.Id,Revision=1,EncryptedConfiguration="test-only-envelope"});var customer=await owner.Customers.SingleAsync(x=>x.TenantId==t.Id);customer.Active=false;await owner.SaveChangesAsync();
+  var role="dt_limited_"+Guid.NewGuid().ToString("N");var password=Tokens.Create();
+  // Role name/password are locally generated alphanumeric test fixtures, never user input.
+  var quotedRole=new Npgsql.NpgsqlCommandBuilder().QuoteIdentifier(role);await owner.Database.OpenConnectionAsync();
+  await using(var ddl=new Npgsql.NpgsqlCommand($"CREATE ROLE {quotedRole} LOGIN PASSWORD '{password}'; GRANT USAGE ON SCHEMA public TO {quotedRole}; GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO {quotedRole}; GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA public TO {quotedRole};",(Npgsql.NpgsqlConnection)owner.Database.GetDbConnection()))await ddl.ExecuteNonQueryAsync();
+  try
+  {
+   var limitedConnection=new Npgsql.NpgsqlConnectionStringBuilder(connection){Username=role,Password=password}.ConnectionString;
+   await using var limited=new ManagementDb(new DbContextOptionsBuilder<ManagementDb>().UseNpgsql(limitedConnection).Options,new TenantScope(new HttpContextAccessor()){Maintenance=true});
+   Assert.ThrowsAsync<UnauthorizedAccessException>(async()=>await Privacy.EraseCustomer(limited,t.Id,true));
+   await limited.Database.ExecuteSqlInterpolatedAsync($"SELECT set_config('dariatech.erase_tenant',{t.Id.ToString()},false)");
+   Assert.ThrowsAsync<Npgsql.PostgresException>(async()=>await limited.ConfigurationRevisions.Where(x=>x.TenantId==t.Id).ExecuteDeleteAsync());
+   Assert.That(await owner.ConfigurationRevisions.AnyAsync(x=>x.TenantId==t.Id),Is.True);
+  }
+  finally{Npgsql.NpgsqlConnection.ClearAllPools();await using var ddl=new Npgsql.NpgsqlCommand($"DROP OWNED BY {quotedRole}; DROP ROLE {quotedRole};",(Npgsql.NpgsqlConnection)owner.Database.GetDbConnection());await ddl.ExecuteNonQueryAsync();}
+ }
  private sealed class TestFactory(string cs,string dir):WebApplicationFactory<Program>
  {
   protected override void ConfigureWebHost(IWebHostBuilder b)

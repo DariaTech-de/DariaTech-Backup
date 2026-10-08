@@ -72,10 +72,16 @@ if(args.Contains("--protect-smtp-password"))
  if(!OperatingSystem.IsWindows())File.SetUnixFileMode(output,UnixFileMode.UserRead|UnixFileMode.UserWrite);
  return 0;
 }
-if(args.Contains("--migrate")||args.Contains("--bootstrap-user")||args.Contains("--recover-user"))
+if(args.Contains("--migrate")||args.Contains("--bootstrap-user")||args.Contains("--recover-user")||args.Contains("--erase-customer")||args.Contains("--prune-history"))
 {
  using var s=app.Services.CreateScope();s.ServiceProvider.GetRequiredService<TenantScope>().Maintenance=true;
  var db=s.ServiceProvider.GetRequiredService<ManagementDb>();
+ if(args.Contains("--erase-customer"))
+ {
+  if(!Guid.TryParse(builder.Configuration["Privacy:TenantId"],out var tenant))throw new InvalidOperationException("Privacy:TenantId required");
+  await Privacy.EraseCustomer(db,tenant,builder.Configuration.GetValue<bool>("Privacy:Apply"));System.Console.WriteLine(builder.Configuration.GetValue<bool>("Privacy:Apply")?"Central customer erasure completed; audit pseudonymous references retained":"Dry run valid; no data erased. Set Privacy:Apply=true for deliberate erasure.");return 0;
+ }
+ if(args.Contains("--prune-history")){var counts=await Privacy.Prune(db,builder.Configuration.GetValue<int>("Privacy:RetentionDays",180),builder.Configuration.GetValue<bool>("Privacy:Apply"));System.Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new{counts.Runs,counts.Deliveries,counts.Alerts,counts.Tokens,Applied=builder.Configuration.GetValue<bool>("Privacy:Apply")}));return 0;}
  if(args.Contains("--migrate")){await db.Database.MigrateAsync();return 0;}
  if(args.Contains("--recover-user")){await Provisioning.RecoverUser(db,s.ServiceProvider.GetRequiredService<ISecretStore>(),builder.Configuration);return 0;}
  await Provisioning.CreateUser(db,s.ServiceProvider.GetRequiredService<ISecretStore>(),builder.Configuration);return 0;
