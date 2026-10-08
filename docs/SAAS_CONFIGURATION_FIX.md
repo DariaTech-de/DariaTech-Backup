@@ -98,6 +98,37 @@ bestand die native SaaS-Integration einschließlich beider Provider und ungülti
 Zugangsdaten. Die maskierungsbezogenen Engine-Regressionen und der Offline-
 Providervertrag bestehen ebenfalls.
 
+### Abschlussbefund für Codecommit `032a4651ac52ba7379a6f15092f905ff2956a801`
+
+Lokal bestanden 70 NUnit-Tests ohne Fehler oder übersprungene Fälle:
+32 Management-/Sicherheitstests, 23 PostgreSQL-Integrationstests, 11 Engine-
+Maskierungstests, 1 native SaaS-Prüfung für beide Provider und 3 reale Engine-/
+Unix-native Prüfungen. Zusätzlich bestanden 14 Offline-Providerprüfungen.
+Management-Build, vollständiger Entwicklungs-Engine-Build und das self-contained
+Linux-x64-OSS-Paket sind erfolgreich; eingeschränkte Provider-Assemblies fehlen
+im OSS-Paket. Ein erster Paketrestore brach mit MSB4166 ab; die Wiederholung
+nach beendetem Buildserver war erfolgreich, ohne Quellcodeänderung.
+
+GitHub-CI: [SaaS](https://github.com/DariaTech-de/DariaTech-Backup/actions/runs/37816031481),
+[OSS/Management](https://github.com/DariaTech-de/DariaTech-Backup/actions/runs/37816031678)
+und [Windows](https://github.com/DariaTech-de/DariaTech-Backup/actions/runs/37816031580)
+sind erfolgreich. In der [Unix-Matrix](https://github.com/DariaTech-de/DariaTech-Backup/actions/runs/37816031689)
+sind Linux x64/ARM64 und macOS Intel erfolgreich.
+
+**Offen: macOS ARM64 Update-Abnahme.** Der Job `113444782463` besteht Paketbau,
+native Backup-/Restore- und Sicherheitsprüfungen sowie die erste Dienstinstallation,
+scheitert aber in `ApprovedUpdate.sh` beim erneuten Installieren vor dem eigentlichen
+Update mit `Agent startup not verified (TaskCanceledException)`, Exitcode 2.
+Der betroffene `--service-health`-Pfad wartet auf Identität und authentifizierte
+Engine-Erreichbarkeit. Die verfügbaren Logs unterscheiden diese beiden Phasen
+nicht und enthalten keine ausreichende Dienstdiagnose für eine bewiesene Ursache.
+Start-/Enrollment-/launchd-Code und die Update-Testfixture wurden in dieser
+Korrektur nicht geändert. Der Befund ist keine erneute HTTP-500-SaaS-Reproduktion;
+die komplette Unix-Matrix darf dennoch nicht als grün gelten. Nächster Schritt:
+geschützte Dienst-/Fixture-Diagnose auf einem macOS-ARM64-Testhost erfassen und
+die zweite Initialisierung gezielt reproduzieren, bevor Startparameter geändert
+oder eine Plattformfreigabe erteilt wird.
+
 ## Verbleibende Aufgaben
 
 - Erfolgreiche Live-SaaS-Sicherung und Objekt-Restore in eigenen Microsoft-/Google-
