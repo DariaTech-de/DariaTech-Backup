@@ -16,9 +16,9 @@ public sealed class JobActionsModel(ManagementDb db,CommandSigning signer,ISecre
  [BindProperty]public Guid JobId {get;set;}
  [BindProperty]public RemoteAction Action {get;set;}
  [BindProperty]public DateTimeOffset Snapshot {get;set;}=DateTimeOffset.UtcNow;
- [BindProperty]public string Paths {get;set;}="";
- [BindProperty]public string DestinationFolder {get;set;}="";
- [BindProperty]public string ProviderTarget {get;set;}="";
+ [BindProperty]public string? Paths {get;set;}="";
+ [BindProperty]public string? DestinationFolder {get;set;}="";
+ [BindProperty]public string? ProviderTarget {get;set;}="";
  [BindProperty]public bool ConfirmProviderWrites {get;set;}
  [BindProperty]public string? Prefix {get;set;}
  public BackupJob Job {get;private set;}=null!;
@@ -50,8 +50,8 @@ public sealed class JobActionsModel(ManagementDb db,CommandSigning signer,ISecre
  {
   if(!await Load())return NotFound();
   var paths=(Paths??"").Split(['\r','\n'],StringSplitOptions.RemoveEmptyEntries|StringSplitOptions.TrimEntries);
-  RestoreSelection? file=Action==RemoteAction.Restore?new(Snapshot.ToUniversalTime(),paths,DestinationFolder):null;
-  SaasRestoreSelection? cloud=Action==RemoteAction.RestoreSaas?new(Managed?.AppliedRevision??0,Snapshot.ToUniversalTime(),paths,ProviderTarget,ConfirmProviderWrites):null;
+  RestoreSelection? file=Action==RemoteAction.Restore?new(Snapshot.ToUniversalTime(),paths,DestinationFolder??""):null;
+  SaasRestoreSelection? cloud=Action==RemoteAction.RestoreSaas?new(Managed?.AppliedRevision??0,Snapshot.ToUniversalTime(),paths,ProviderTarget??"",ConfirmProviderWrites):null;
   CatalogRequest? catalog=Action==RemoteAction.ListRestoreFiles?new(Snapshot.ToUniversalTime(),string.IsNullOrWhiteSpace(Prefix)?null:Prefix):null;
   if(!ModelState.IsValid){Error="Bitte Eingaben prüfen.";return Page();}
   var result=await CommandApi.Request(new(JobId,Action,file,15,catalog,cloud),db,signer,secrets,HttpContext);

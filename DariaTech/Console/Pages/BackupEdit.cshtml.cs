@@ -16,29 +16,29 @@ public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets):PageMo
  [BindProperty]public long Revision {get;set;}
  [BindProperty]public string Name {get;set;}="";
  [BindProperty]public string Provider {get;set;}="Files";
- [BindProperty]public string Sources {get;set;}="";
+ [BindProperty]public string? Sources {get;set;}="";
  [BindProperty]public string TargetUrl {get;set;}="";
  [BindProperty]public string? Passphrase {get;set;}
  [BindProperty]public int KeepVersions {get;set;}=30;
  [BindProperty]public int RepeatHours {get;set;}=24;
  [BindProperty]public DayOfWeek[] Days {get;set;}=Enum.GetValues<DayOfWeek>();
  [BindProperty]public DateTimeOffset? FirstRun {get;set;}
- [BindProperty]public string DirectoryTenant {get;set;}="";
- [BindProperty]public string ClientId {get;set;}="";
+ [BindProperty]public string? DirectoryTenant {get;set;}="";
+ [BindProperty]public string? ClientId {get;set;}="";
  [BindProperty]public string? ClientSecret {get;set;}
  [BindProperty]public string? RefreshToken {get;set;}
  [BindProperty]public string? ServiceAccountJson {get;set;}
- [BindProperty]public string AdminEmail {get;set;}="";
+ [BindProperty]public string? AdminEmail {get;set;}="";
  [BindProperty]public string[] RootTypes {get;set;}=[];
  [BindProperty]public string[] UserTypes {get;set;}=[];
- [BindProperty]public string AuthUsername {get;set;}="";
+ [BindProperty]public string? AuthUsername {get;set;}="";
  [BindProperty]public string? AuthPassword {get;set;}
- [BindProperty]public string AwsAccessKeyId {get;set;}="";
+ [BindProperty]public string? AwsAccessKeyId {get;set;}="";
  [BindProperty]public string? AwsSecretKey {get;set;}
- [BindProperty]public string S3Server {get;set;}="";
- [BindProperty]public string S3Region {get;set;}="";
- [BindProperty]public string SshFingerprint {get;set;}="";
- [BindProperty]public string Excludes {get;set;}="";
+ [BindProperty]public string? S3Server {get;set;}="";
+ [BindProperty]public string? S3Region {get;set;}="";
+ [BindProperty]public string? SshFingerprint {get;set;}="";
+ [BindProperty]public string? Excludes {get;set;}="";
  public Device Device {get;private set;}=null!;
  public string? Error {get;private set;}
  public async Task<IActionResult> OnGetAsync(Guid deviceId,Guid? id,string provider="Files")
@@ -87,10 +87,10 @@ public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets):PageMo
     else
     {
      Set(credentials,"google-admin-email",AdminEmail);
-     if(!string.IsNullOrWhiteSpace(ServiceAccountJson)){credentials.Clear();credentials["google-admin-email"]=AdminEmail;credentials["google-service-account-json"]=ServiceAccountJson;}
+     if(!string.IsNullOrWhiteSpace(ServiceAccountJson)){credentials.Clear();credentials["google-admin-email"]=AdminEmail??"";credentials["google-service-account-json"]=ServiceAccountJson;}
      else if(!credentials.ContainsKey("google-service-account-json")){Set(credentials,"google-client-id",ClientId);Set(credentials,"google-client-secret",ClientSecret);Set(credentials,"google-refresh-token",RefreshToken);}
     }
-    cloud=new(kind,DirectoryTenant,credentials,RootTypes,UserTypes);
+    cloud=new(kind,DirectoryTenant??"",credentials,RootTypes,UserTypes);
    }
   }
   var definition=new ManagedBackupDefinition(Name,cloud is null?Lines(Sources):[],TargetUrl,

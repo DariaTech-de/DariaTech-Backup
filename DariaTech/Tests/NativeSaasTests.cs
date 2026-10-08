@@ -52,8 +52,8 @@ public sealed class NativeSaasTests
     var assignment=new ConfigurationAssignment(Guid.NewGuid(),1,definition);
     var id=await adapter.ApplyConfiguration(assignment,timeout.Token);
     Assert.That(await adapter.ApplyConfiguration(assignment,timeout.Token),Is.EqualTo(id));
-    using var jobs=JsonDocument.Parse(await client.GetStringAsync("/api/v1/backups",timeout.Token));
-    var backup=jobs.RootElement.EnumerateArray().Select(x=>DuplicatiAdapter.Get(x,"Backup")).Single(x=>DuplicatiAdapter.Get(x,"ID").ToString()==id);
+    using var details=JsonDocument.Parse(await client.GetStringAsync("/api/v1/backup/"+id,timeout.Token));
+    var backup=DuplicatiAdapter.Get(details.RootElement,"Backup");
     Assert.That(DuplicatiAdapter.Get(backup,"Sources")[0].ToString(),Does.Contain("|"+SaasPolicy.Key(source.Provider)+"://").And.Not.Contain("test-only-not-a-provider"));
     var settings=DuplicatiAdapter.Get(backup,"Settings");Assert.That(settings.EnumerateArray().Any(x=>DuplicatiAdapter.Get(x,"Name").ToString()=="store-metadata-content-in-database"),Is.True);
     // Optional explicit negative integration: real provider authentication with synthetic,
