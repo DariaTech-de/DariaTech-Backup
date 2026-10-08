@@ -3,11 +3,12 @@
 <h1>@(Model.ManagedJobId is null?"Backup-Job anlegen":"Backup-Konfiguration ändern")</h1>
 <p>@Model.Device.Name · @Model.Provider</p>
 @if(Model.Error is not null){<p role="alert">@Model.Error</p>}
-@if(Model.ManagedJobId is null){<p><a asp-page="/BackupEdit" asp-route-deviceId="@Model.DeviceId" asp-route-provider="Files">Dateien</a> · <a asp-page="/BackupEdit" asp-route-deviceId="@Model.DeviceId" asp-route-provider="Microsoft365">Microsoft 365</a> · <a asp-page="/BackupEdit" asp-route-deviceId="@Model.DeviceId" asp-route-provider="GoogleWorkspace">Google Workspace</a></p>}
+@if(Model.ManagedJobId is null){<p><a asp-page="/BackupEdit" asp-route-deviceId="@Model.DeviceId" asp-route-provider="Files">Dateien</a> · <a asp-page="/BackupEdit" asp-route-deviceId="@Model.DeviceId" asp-route-provider="NAS">NAS-Freigabe</a> · <a asp-page="/BackupEdit" asp-route-deviceId="@Model.DeviceId" asp-route-provider="Proxmox">Proxmox VM/LXC</a> · <a asp-page="/BackupEdit" asp-route-deviceId="@Model.DeviceId" asp-route-provider="Microsoft365">Microsoft 365</a> · <a asp-page="/BackupEdit" asp-route-deviceId="@Model.DeviceId" asp-route-provider="GoogleWorkspace">Google Workspace</a></p>}
 <form method="post">
  <input type="hidden" asp-for="DeviceId" /><input type="hidden" asp-for="ManagedJobId" /><input type="hidden" asp-for="Revision" /><input type="hidden" asp-for="Provider" />
  <label asp-for="Name">Jobname</label><input asp-for="Name" required maxlength="200" />
- @if(Model.Provider=="Files"){<label asp-for="Sources">Quellordner · ein absoluter Pfad je Zeile</label><textarea asp-for="Sources" required></textarea>}
+ @if(Model.Provider is "Files" or "NAS"){<label asp-for="Sources">Quellordner · ein absoluter Pfad je Zeile</label><textarea asp-for="Sources" required></textarea>}
+ else if(Model.Provider=="Proxmox"){<label asp-for="ProxmoxGuestIds">Proxmox-Gast-IDs · durch Kommas getrennt</label><input asp-for="ProxmoxGuestIds" required /><p>Der Agent muss auf dem Proxmox-Host installiert sein. Vor jeder Sicherung erstellt vzdump vollständige Snapshot-Archive. Gast-IDs, Staging-Speicher und Dateiquellen müssen lokal freigegeben sein.</p>}
  else{
   <fieldset><legend>@Model.Provider</legend>
   <label asp-for="DirectoryTenant">@(Model.Provider=="Microsoft365"?"Microsoft-Tenant-ID":"Google-Workspace-Domain")</label><input asp-for="DirectoryTenant" required />
@@ -21,6 +22,7 @@
   </select><p>M365 OneDrive und SharePoint werden über Sites erfasst. Die tatsächliche Abdeckung hängt von Berechtigungen, Lizenz und Provider-Unterstützung ab.</p>
   </fieldset>
  }
+ @if(Model.Provider=="NAS"){<label asp-for="SourceMounts">Erwartete NAS-Mounts · Mountpunkt|Dateisystem|Remote-Quelle je Zeile</label><textarea asp-for="SourceMounts" required></textarea><p>Beispiel: /mnt/kunde|nfs4|nas.example:/daten. Die Freigabe wird lokal durch das Betriebssystem eingehängt. Jede Sicherung prüft die tatsächliche Mount-Identität; Zugangsdaten gehören nicht in dieses Feld.</p>}
  <fieldset><legend>Backup-Ziel und Verschlüsselung</legend>
  <label asp-for="TargetUrl">Ziel · file, s3, ssh, webdav oder webdavs</label><input asp-for="TargetUrl" required />
  <label for="Passphrase">Backup-Passphrase · mindestens 14 Zeichen; bei Änderungen leer lassen zum Erhalten</label><input type="password" name="Passphrase" id="Passphrase" autocomplete="new-password" />

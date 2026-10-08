@@ -4,6 +4,21 @@ using System.Text.Json;
 using DariaTech.Agent;
 using DariaTech.Contracts;
 
+if(args.Length==4&&args[0]=="--check-managed-source")
+{
+ if(!string.Equals(Environment.GetEnvironmentVariable("DUPLICATI__OPERATIONNAME"),"Backup",StringComparison.OrdinalIgnoreCase))return;
+ try
+ {
+  var sourceOptions=SourceChecks.ReadOptions(args[1]);var sourceState=new ProtectedState(sourceOptions);
+  var job=Guid.Parse(args[2]);var revision=long.Parse(args[3],System.Globalization.CultureInfo.InvariantCulture);
+  var binding=(sourceState.Read<Dictionary<string,ManagedSourceBinding>>("source-bindings.bin")??[]).GetValueOrDefault(SourceChecks.BindingKey(job,revision))??throw new InvalidOperationException("Source revision not found");
+  using var deadline=new CancellationTokenSource(TimeSpan.FromMinutes(binding.Proxmox is null?1:120));
+  await SourceChecks.Check(sourceOptions,binding,deadline.Token);
+ }
+ catch(Exception error){System.Console.Error.WriteLine($"Managed source preflight failed ({error.GetType().Name}); no backup was started.");Environment.ExitCode=2;}
+ return;
+}
+
 if(args.Length==3&&args[0]=="--apply-unix-update")
 {
  try{using var deadline=new CancellationTokenSource(TimeSpan.FromMinutes(20));await UnixUpdates.Apply(args[1],args[2],deadline.Token);}

@@ -64,7 +64,7 @@ public static class ConfigurationApi
    var old=await db.ConfigurationRevisions.SingleAsync(x=>x.ManagedJobId==id&&x.Revision==job.LatestRevision);
    var definition=Read(secrets,old);
    // Rotating the backup passphrase or destination silently makes the existing chain inaccessible.
-   if(definition.Passphrase!=input.Definition.Passphrase||definition.TargetUrl!=input.Definition.TargetUrl||!SaasPolicy.SameDirectory(definition.Saas,input.Definition.Saas))return Results.Conflict(new{code="NewBackupChainRequired"});
+   if(definition.Passphrase!=input.Definition.Passphrase||definition.TargetUrl!=input.Definition.TargetUrl||!SaasPolicy.SameDirectory(definition.Saas,input.Definition.Saas)||(definition.Proxmox is null)!=(input.Definition.Proxmox is null))return Results.Conflict(new{code="NewBackupChainRequired"});
    job.LatestRevision++;job.Name=input.Definition.Name;job.Status="Pending";AddRevision(db,secrets,job,input.Definition);
    ManagementApi.Audit(db,ctx,job.TenantId,"backup.configuration-changed",job.Id);await db.SaveChangesAsync();await tx.CommitAsync();return Results.Ok(job);
  }

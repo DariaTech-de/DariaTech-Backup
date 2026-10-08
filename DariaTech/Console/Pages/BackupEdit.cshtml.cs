@@ -16,6 +16,8 @@ public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets):PageMo
  [BindProperty]public long Revision {get;set;}
  [BindProperty]public string Name {get;set;}="";
  [BindProperty]public string Provider {get;set;}="Files";
+ [BindProperty]public string? SourceMounts {get;set;}
+ [BindProperty]public string? ProxmoxGuestIds {get;set;}
  [BindProperty]public string? Sources {get;set;}="";
  [BindProperty]public string TargetUrl {get;set;}="";
  [BindProperty]public string? Passphrase {get;set;}
@@ -48,7 +50,9 @@ public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets):PageMo
   {
    Name=previous.Name;Sources=string.Join(Environment.NewLine,previous.Sources);TargetUrl=previous.TargetUrl;KeepVersions=previous.KeepVersions;
    FirstRun=previous.Schedule?.Start;Days=previous.Schedule?.Days??Enum.GetValues<DayOfWeek>();RepeatHours=previous.Schedule?.RepeatHours??24;
-   Provider=previous.Saas?.Provider.ToString()??"Files";DirectoryTenant=previous.Saas?.DirectoryTenant??"";
+   Provider=previous.Proxmox is not null?"Proxmox":previous.SourceMounts is not null?"NAS":previous.Saas?.Provider.ToString()??"Files";
+   ProxmoxGuestIds=previous.Proxmox is {} guests?string.Join(',',guests.GuestIds):null;
+   SourceMounts=previous.SourceMounts is {} mounts?string.Join(Environment.NewLine,mounts.Select(m=>m.MountPoint+"|"+m.FileSystemType+"|"+m.RemoteSource)):null;DirectoryTenant=previous.Saas?.DirectoryTenant??"";
    RootTypes=previous.Saas?.RootTypes??[];UserTypes=previous.Saas?.UserTypes??[];
    ClientId=previous.Saas?.Credentials.GetValueOrDefault(Provider=="Microsoft365"?"office365-client-id":"google-client-id")??"";
    AdminEmail=previous.Saas?.Credentials.GetValueOrDefault("google-admin-email")??"";
@@ -77,7 +81,7 @@ public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets):PageMo
   Set(storage,"s3-server-name",S3Server);Set(storage,"s3-region",S3Region);Set(storage,"ssh-fingerprint",SshFingerprint);
   if(Uri.TryCreate(TargetUrl,UriKind.Absolute,out var target)&&target.Scheme is "s3" or "webdav")storage["use-ssl"]="true";
   SaasSource? cloud=null;
-  if(Provider!="Files")
+  if(Provider is not ("Files" or "NAS" or "Proxmox"))
   {
    if(!Enum.TryParse<SaasProvider>(Provider,out var kind)||!Enum.IsDefined(kind))validBinding=false;
    else
@@ -93,9 +97,22 @@ public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets):PageMo
     cloud=new(kind,DirectoryTenant??"",credentials,RootTypes,UserTypes);
    }
   }
-  var definition=new ManagedBackupDefinition(Name,cloud is null?Lines(Sources):[],TargetUrl,
+  SourceMountRequirement[]? sourceMounts=null;ProxmoxSource? proxmox=null;
+  if(Provider=="NAS")
+  {
+   var mounts=Lines(SourceMounts).Select(x=>x.Split('|')).ToArray();
+   if(mounts.Length==0||mounts.Any(x=>x.Length!=3))validBinding=false;
+   else sourceMounts=mounts.Select(x=>new SourceMountRequirement(x[0],x[1],x[2])).ToArray();
+  }
+  if(Provider=="Proxmox")
+  {
+   var ids=(ProxmoxGuestIds??"").Split(',',StringSplitOptions.RemoveEmptyEntries|StringSplitOptions.TrimEntries);
+   if(ids.Length==0||ids.Any(x=>!int.TryParse(x,out _)))validBinding=false;
+   else proxmox=new(ids.Select(x=>int.Parse(x,System.Globalization.CultureInfo.InvariantCulture)).ToArray());
+  }
+  var definition=new ManagedBackupDefinition(Name,cloud is null&&proxmox is null?Lines(Sources):[],TargetUrl,
    string.IsNullOrEmpty(Passphrase)?previous?.Passphrase??"":Passphrase,storage,KeepVersions,
-   (previous?.Filters.Where(x=>x.Include)??[]).Concat(Lines(Excludes).Select(x=>new BackupFilter(false,x))).ToArray(),FirstRun is {} first?new(first.ToUniversalTime(),RepeatHours,Days):null,cloud);
+   (previous?.Filters.Where(x=>x.Include)??[]).Concat(Lines(Excludes).Select(x=>new BackupFilter(false,x))).ToArray(),FirstRun is {} first?new(first.ToUniversalTime(),RepeatHours,Days):null,cloud,sourceMounts,proxmox);
   // Remove all posted secret values before redisplaying any validation error.
   Passphrase=ClientSecret=RefreshToken=ServiceAccountJson=AuthPassword=AwsSecretKey=null;ModelState.Clear();
   if(!validBinding||!ConfigurationPolicy.Valid(definition)){Error="Bitte Quelle, Zugangsdaten, Ziel, Verschlüsselung und Zeitplan prüfen.";return Page();}

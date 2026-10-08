@@ -8,6 +8,7 @@ public sealed partial class DuplicatiAdapter
  public async Task<string> ApplyConfiguration(ConfigurationAssignment assignment,CancellationToken ct)
  {
   if(!ConfigurationPolicy.Valid(assignment.Definition))throw new InvalidOperationException("Configuration rejected");
+  SourceChecks.AuthorizeFiles(agentOptions,assignment.Definition.Sources);
   if(assignment.Definition.Saas is {} source)await RequireSaasProvider(source,false,ct);
   if(await HasPendingTasks(ct))throw new InvalidOperationException("Configuration cannot change while engine tasks are active");
   using var list=await client.GetAsync("/api/v1/backups",ct);list.EnsureSuccessStatusCode();
@@ -21,13 +22,29 @@ public sealed partial class DuplicatiAdapter
   // No script options, database paths, custom modules or arbitrary engine API supplied by the Console.
   var settings=definition.BackendOptions.Select(x=>new{Name=x.Key,Value=x.Value}).ToList();
   settings.AddRange(new[]{new{Name="encryption-module",Value="aes"},new{Name="passphrase",Value=definition.Passphrase},
-   new{Name="keep-versions",Value=definition.KeepVersions.ToString(System.Globalization.CultureInfo.InvariantCulture)},new{Name="disable-module",Value="console-password-input"}});
+   new{Name="keep-versions",Value=definition.KeepVersions.ToString(System.Globalization.CultureInfo.InvariantCulture)},new{Name="abort-if-source-missing",Value="true"},new{Name="disable-module",Value="console-password-input"}});
   var mountPoint=Path.Combine(Path.GetPathRoot(Path.GetFullPath(agentOptions.StateDirectory))!,"DariaTechCloud",assignment.JobId.ToString("D"));
   var sources=definition.Sources;
   if(definition.Saas is {} saas)
   {
    settings.AddRange(SaasPolicy.Options(saas).Select(x=>new{Name=x.Key,Value=x.Value}));
    sources=["@"+mountPoint+"|"+SaasPolicy.Key(saas.Provider)+"://"];
+  }
+  var requiredMounts=SourceChecks.RequiredMounts(agentOptions,definition);
+  if(definition.Proxmox is {} guests)
+  {
+   if(definition.Filters.Length>0)throw new InvalidOperationException("Image archives cannot be partially excluded");
+   sources=[ProxmoxWorkloads.Authorize(agentOptions,assignment.JobId,guests)+Path.DirectorySeparatorChar];
+  }
+  if(requiredMounts.Length>0||definition.Proxmox is not null||agentOptions.AllowProxmoxSnapshots&&definition.Saas is null)
+  {
+   var binding=new ManagedSourceBinding(assignment.JobId,assignment.Revision,sources,requiredMounts,definition.Proxmox);
+   // Immutable revision in the hook prevents a failed engine PUT from changing the old job's preflight.
+   SourceChecks.Bind(state,binding);
+   settings.Add(new{Name="run-script-before-required",Value=SourceChecks.Hook(agentOptions,assignment.JobId,assignment.Revision)});
+   settings.Add(new{Name="run-script-with-arguments",Value="true"});
+   settings.Add(new{Name="run-script-timeout",Value=definition.Proxmox is null?"60s":"0s"});
+   settings.Add(new{Name="symlink-policy",Value="ignore"});
   }
   var previousSchedule=matches.Length==1?Get(matches[0],"Schedule"):default;
   var schedule=definition.Schedule is {} sc?new {ID=Get(previousSchedule,"ID").ValueKind==JsonValueKind.Number&&Get(previousSchedule,"ID").TryGetInt64(out var sid)?sid:0L,Time=sc.Start.UtcDateTime,Repeat=$"{sc.RepeatHours}h",AllowedDays=sc.Days.Select(x=>x.ToString()).ToArray()}:null;

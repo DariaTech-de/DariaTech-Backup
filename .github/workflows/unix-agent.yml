@@ -48,6 +48,7 @@ jobs:
           dotnet build DariaTech.slnx -c Release --no-restore
       - name: Check Unix security and actual managed native backup/restore
         env:
+          DARIATECH_AGENT_NATIVE: ${{ github.workspace }}/artifacts/unix/${{ matrix.rid }}/payload/agent/DariaTech.Agent
           DARIATECH_ENGINE_NATIVE: ${{ github.workspace }}/artifacts/unix/${{ matrix.rid }}/payload/agent/engine/Duplicati.Server
         run: dotnet test DariaTech/Tests/DariaTech.Tests.csproj -c Release --no-build --filter "FullyQualifiedName~UnixSecurityTests|Category=UnixNative"
       - name: Check package and real service installation
