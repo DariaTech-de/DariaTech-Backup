@@ -13,7 +13,7 @@ cleanup() {
   rm -f /usr/local/share/ca-certificates/dariatech-ci.crt
   update-ca-certificates >/dev/null 2>&1 || true
  else
-  launchctl bootout system/de.dariatech.dariatechbackupagent 2>/dev/null || true
+  launchctl kill SIGTERM system/de.dariatech.dariatechbackupagent 2>/dev/null || true
   if [ -f "$work/ca.pem" ]; then security remove-trusted-cert -d "$work/ca.pem" 2>/dev/null || true; fi
  fi
  rm -rf "$work"
@@ -54,7 +54,11 @@ for attempt in {1..90}; do
  if [ -f "$work/result.json" ] && python3 -c 'import json,sys;assert json.load(open(sys.argv[1]))["heartbeats"]>0' "$work/result.json" 2>/dev/null; then break; fi
  sleep 1
 done
-python3 -c 'import json,sys;v=json.load(open(sys.argv[1]));assert v["enrolled"] and v["heartbeats"]>0' "$work/result.json"
+if ! python3 -c 'import json,sys;v=json.load(open(sys.argv[1]));assert v["enrolled"] and v["heartbeats"]>0' "$work/result.json"; then
+ if [ "$(uname -s)" = Linux ]; then journalctl -u DariaTechBackupAgent.service -n 70 --no-pager; else launchctl print system/de.dariatech.dariatechbackupagent; fi
+ printf '%s\\n' 'FAIL: service did not enroll and authenticate the native engine' >&2
+ exit 1
+fi
 test -s "$state/identity.bin"
 test ! -e "$state/enrollment-token.txt"
 test ! -e "$state/engine-password.txt"

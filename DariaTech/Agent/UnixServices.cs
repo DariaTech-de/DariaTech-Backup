@@ -34,7 +34,9 @@ public static class UnixServices
     new XElement("key","Umask"),new XElement("integer","63"),
     new XElement("key","AbandonProcessGroup"),new XElement("false"),
     new XElement("key","ExitTimeOut"),new XElement("integer","45"),
-    new XElement("key","ThrottleInterval"),new XElement("integer","10"));
+    new XElement("key","ThrottleInterval"),new XElement("integer","10"),
+    new XElement("key","StandardOutPath"),new XElement("string","/Library/Application Support/DariaTechBackup/state/agent-service.log"),
+    new XElement("key","StandardErrorPath"),new XElement("string","/Library/Application Support/DariaTechBackup/state/agent-service.log"));
    content=new XDocument(new XDeclaration("1.0","UTF-8",null),new XDocumentType("plist","-//Apple//DTD PLIST 1.0//EN","http://www.apple.com/DTDs/PropertyList-1.0.dtd",null),new XElement("plist",new XAttribute("version","1.0"),dictionary)).ToString();
   }
   else
