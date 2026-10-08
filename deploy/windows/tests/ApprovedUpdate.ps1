@@ -69,6 +69,20 @@ try {
  if((Get-Service DariaTechBackupAgent).Status -ne 'Running'){throw 'Agent did not restart after approved update'}
  if(!(Get-NetTCPConnection -LocalPort 8210 -State Listen -ErrorAction SilentlyContinue)){throw 'Bundled engine did not restart after approved update'}
  Write-Host 'PASS: rejected bad signature and tampered binary; signed two-version remote update; identity/trust retained; actual service and engine restarted.'
+ # Fault injection for operator recovery: service offline and a missing installed binary.
+ # Use exactly the already approved artifact; never synthesize an unsigned replacement or downgrade.
+ $approvedHash=(Get-FileHash $newInstaller -Algorithm SHA256).Hash
+ Stop-Service DariaTechBackupAgent;Remove-Item $exe -Force
+ if((Get-Service DariaTechBackupAgent).Status -ne 'Stopped' -or (Test-Path $exe)){throw 'Recovery fault injection failed'}
+ if((Get-FileHash $newInstaller -Algorithm SHA256).Hash -ne $approvedHash){throw 'Recovery artifact changed'}
+ $repair=Start-Process $newInstaller -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/console=https://localhost:18444') -PassThru -Wait
+ if($repair.ExitCode -ne 0){throw 'Verified installer recovery failed'}
+ if((Get-Service DariaTechBackupAgent).Status -ne 'Running' -or [Diagnostics.FileVersionInfo]::GetVersionInfo($exe).FileVersion -ne $newVersion){throw 'Recovery did not restore the approved running agent'}
+ if((Get-FileHash (Join-Path $state 'identity.bin')).Hash -ne $identityHash){throw 'Recovery changed enrollment identity'}
+ $restored=Get-Content $configFile -Raw|ConvertFrom-Json
+ if(!$restored.Agent.AllowAgentUpdates -or $restored.Agent.UpdatePublicKeyFile -ne $publicKey){throw 'Recovery lost pinned update trust'}
+ Write-Host 'PASS: offline/missing-binary recovery from the verified approved installer; enrollment and pinned trust retained.'
+
  $key.Dispose()
 } finally {
  if(Get-Service DariaTechBackupAgent -ErrorAction SilentlyContinue){Stop-Service DariaTechBackupAgent -Force; & sc.exe delete DariaTechBackupAgent | Out-Null}
