@@ -1,5 +1,6 @@
 name: Unix agent integration
 on:
+  workflow_call:
   workflow_dispatch:
   push:
     paths:
@@ -15,7 +16,7 @@ on:
       - 'deploy/unix/**'
       - 'scripts/build-unix-agent.py'
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  group: unix-agent-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 permissions:
   contents: read

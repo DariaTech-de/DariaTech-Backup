@@ -489,11 +489,43 @@ public sealed class PostgresTests
   db.Runs.Add(new BackupRun{TenantId=t.Id,JobId=job.Id,LocalRunId="recovered",Started=now,Completed=now.AddMinutes(1),Status=RunStatus.Success,QuotaTotalBytes=100,QuotaFreeBytes=90,QuotaError=false,RetentionError=false});db.Commands.Add(new RemoteCommand{TenantId=t.Id,DeviceId=d.Id,JobId=job.Id,Action=RemoteAction.VerifyBackup,Expires=now.AddMinutes(1),Status="Completed"});await db.SaveChangesAsync();await Monitoring.Evaluate(db,new(),now.AddMinutes(2));
   Assert.That(await db.Alerts.CountAsync(x=>x.DeviceId==d.Id&&x.Resolved==null),Is.EqualTo(0));
  }
+ [Test]public async Task AddDeviceWizardShowsPlatformPackageAndInstallCommandWithOneTimeToken()
+ {
+  var(t,site)=await Customer();await using var db=Db();var customer=await db.Customers.IgnoreQueryFilters().SingleAsync(x=>x.TenantId==t.Id);
+  using var admin=await Login(UserRole.SuperAdmin);
+  string Token(string html){var m=Regex.Match(html,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");Assert.That(m.Success,Is.True);return WebUtility.HtmlDecode(m.Groups[1].Value);}
+  async Task<HttpResponseMessage> Enroll(string platform)=>await admin.PostAsync($"/Customer?id={customer.Id}&handler=Enroll",new FormUrlEncodedContent(new Dictionary<string,string>{
+   {"id",customer.Id.ToString()},{"siteId",site.Id.ToString()},{"validMinutes","30"},{"platform",platform},{"__RequestVerificationToken",Token(await admin.GetStringAsync($"/Customer?id={customer.Id}"))}}));
+  var page=await admin.GetStringAsync($"/Customer?id={customer.Id}");
+  Assert.That(page,Does.Contain("value=\"osx-arm64\"").And.Contain("value=\"linux-arm64\"").And.Contain("Betriebssystem des Geräts"));
+  // No published release reachable: the token is still issued and the page points to the releases page.
+  using(var fallback=await Enroll("linux-x64"))
+  {
+   var html=WebUtility.HtmlDecode(await fallback.Content.ReadAsStringAsync());Assert.That(fallback.StatusCode,Is.EqualTo(HttpStatusCode.OK));
+   Assert.That(html,Does.Contain("Kein veröffentlichtes Agent-Paket").And.Contain("/releases"));
+   Assert.That(fallback.Headers.CacheControl?.NoStore,Is.True);
+  }
+  var sha=new string('a',64);var url="https://github.com/DariaTech-de/DariaTech-Backup/releases/download/agent-v0.2.0/DariaTechBackupSetup-win-x64.exe";
+  factory.Services.GetRequiredService<AgentReleases>().Use(new("0.2.0","agent-v0.2.0",DateTimeOffset.UtcNow,[new("win-x64","Windows","DariaTechBackupSetup-win-x64.exe",sha,42_000_000,url)],true,"https://github.com/DariaTech-de/DariaTech-Backup/releases/tag/agent-v0.2.0"));
+  using(var windows=await Enroll("win-x64"))
+  {
+   var html=WebUtility.HtmlDecode(await windows.Content.ReadAsStringAsync());
+   var token=Regex.Match(html,"<code class=\"token\">([0-9A-F]{64})</code>").Groups[1].Value;Assert.That(token,Has.Length.EqualTo(64));
+   Assert.That(await db.EnrollmentTokens.IgnoreQueryFilters().CountAsync(x=>x.TenantId==t.Id&&x.TokenHash==Tokens.Hash(token)),Is.EqualTo(1));
+Assert.That(html,Does.Contain("Agent 0.2.0 · Pilot").And.Contain(url).And.Contain(sha.ToUpperInvariant()).And.Contain($"-Value \"{token}\"").And.Contain("\"/console=https://localhost\",\"/tokenfile=$t\""));
+  }
+  // A platform without a published package falls back instead of showing another platform's file.
+  using(var mac=await Enroll("osx-arm64")){var html=WebUtility.HtmlDecode(await mac.Content.ReadAsStringAsync());Assert.That(html,Does.Contain("Kein veröffentlichtes Agent-Paket").And.Not.Contain(url));}
+  using(var invalid=await Enroll("freebsd-x64"))Assert.That(invalid.StatusCode,Is.EqualTo(HttpStatusCode.BadRequest));
+  using var customerAdmin=await Login(UserRole.CustomerAdmin,t.Id);
+  using var denied=await customerAdmin.PostAsync($"/Customer?id={customer.Id}&handler=Enroll",new FormUrlEncodedContent(new Dictionary<string,string>{{"id",customer.Id.ToString()},{"siteId",site.Id.ToString()},{"validMinutes","30"},{"platform","win-x64"},{"__RequestVerificationToken",Token(await customerAdmin.GetStringAsync($"/Customer?id={customer.Id}"))}}));
+  Assert.That(denied.StatusCode,Is.Not.EqualTo(HttpStatusCode.OK));
+ }
  private sealed class TestFactory(string cs,string dir):WebApplicationFactory<Program>
  {
   protected override void ConfigureWebHost(IWebHostBuilder b)
   {
-   b.UseEnvironment("Development");b.ConfigureAppConfiguration((_,c)=>c.AddInMemoryCollection(new Dictionary<string,string?>{{"ConnectionStrings:Management",cs},{"Security:MasterKeyFile",Path.Combine(dir,"master.key")},{"Security:KeyDirectory",Path.Combine(dir,"keys")},{"Monitoring:PollSeconds","3600"},{"Commands:SigningKeyFile",Path.Combine(dir,"commands.pem")},{"Updates:PublicKeyFile",Path.Combine(dir,"commands.pem")}}));
+   b.UseEnvironment("Development");b.ConfigureAppConfiguration((_,c)=>c.AddInMemoryCollection(new Dictionary<string,string?>{{"ConnectionStrings:Management",cs},{"Security:MasterKeyFile",Path.Combine(dir,"master.key")},{"Security:KeyDirectory",Path.Combine(dir,"keys")},{"Monitoring:PollSeconds","3600"},{"Commands:SigningKeyFile",Path.Combine(dir,"commands.pem")},{"Updates:PublicKeyFile",Path.Combine(dir,"commands.pem")},{"Agents:ApiBase","http://127.0.0.1:9"}}));
   }
  }
 }

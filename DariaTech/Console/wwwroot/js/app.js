@@ -115,3 +115,10 @@ document.querySelectorAll('[data-destination-mode]').forEach(radio => radio.addE
   });
  }
 })();
+// Copy the generated install command.
+document.querySelectorAll('[data-copy]').forEach(button => button.addEventListener('click', async () => {
+ const source = button.parentElement?.querySelector('[data-copy-source]');
+ if (!source) return;
+ try { await navigator.clipboard.writeText(source.textContent ?? ''); button.textContent = 'Kopiert'; }
+ catch { getSelection()?.selectAllChildren(source); button.textContent = 'Markiert – mit Strg+C kopieren'; }
+}));

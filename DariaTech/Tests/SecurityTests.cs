@@ -20,6 +20,30 @@ public sealed class SecurityTests
   Assert.That(start.ArgumentList,Does.Contain("--require-db-encryption-key=true"));
   Assert.Throws<InvalidOperationException>(()=>ManagedEngine.CreateStartInfo("engine.exe","data","http://example.com:8210","password","key"));
  }
+ [Test]public void AgentReleaseManifestAcceptsOnlyThisRepositoryAndPlatformsAndKeepsTokenOutOfArguments()
+ {
+  const string repo="DariaTech-de/DariaTech-Backup";const string tag="agent-v0.2.0";var prefix=$"https://github.com/{repo}/releases/download/{tag}/";var sha=new string('b',64);
+  string Manifest(params object[] assets)=>JsonSerializer.Serialize(new{version="0.2.0",tag,created=DateTimeOffset.UtcNow,assets});
+  var parsed=DariaTech.Console.Services.AgentReleases.Parse(Manifest(
+   new{platform="linux-x64",label="Linux",file="a.tar.gz",sha256=sha,size=10,url=prefix+"a.tar.gz"},
+   new{platform="linux-x64",label="Dup",file="b.tar.gz",sha256=sha,size=10,url=prefix+"b.tar.gz"},
+   new{platform="osx-arm64",label="Mac",file="m.tar.gz",sha256=sha,size=10,url="https://evil.example/m.tar.gz"},
+   new{platform="osx-x64",label="Mac",file="m.tar.gz",sha256="xyz",size=10,url=prefix+"m.tar.gz"},
+   new{platform="win-x64",label="Win",file="w.exe",sha256=sha,size=10,url=prefix+"sub/w.exe"},
+   new{platform="freebsd-x64",label="BSD",file="f.tar.gz",sha256=sha,size=10,url=prefix+"f.tar.gz"}),repo,tag,true,"page")!;
+  Assert.That(parsed.Assets.Select(x=>x.Platform),Is.EqualTo(new[]{"linux-x64"}));Assert.That(parsed.Assets[0].File,Is.EqualTo("a.tar.gz"));
+  Assert.That(DariaTech.Console.Services.AgentReleases.Parse(Manifest(new{platform="linux-x64",label="L",file="a",sha256=sha,size=10,url=prefix+"a"}),repo,"agent-v0.3.0",false,"p"),Is.Null,"tag must match the release");
+  Assert.That(DariaTech.Console.Services.AgentReleases.Parse(Manifest(new{platform="linux-x64",label="L",file="a",sha256=sha,size=10,url=prefix+"a"}),"Other/Repo",tag,false,"p"),Is.Null);
+  var token=new string('C',64);var asset=parsed.Assets[0];
+  foreach(var platform in DariaTech.Console.Services.AgentReleases.Platforms)
+  {
+   var command=DariaTech.Console.Services.AgentReleases.Command(platform,asset,"https://backup.example",token);
+   Assert.That(command,Does.Contain(asset.Url).And.Contain("https://backup.example"));
+   Assert.That(command.Split('\n').Count(x=>x.Contains(token)),Is.EqualTo(1),"the token is written once into a protected file");
+   if(platform=="win-x64")Assert.That(command,Does.Contain("Get-FileHash").And.Contain("/tokenfile=$t").And.Contain(sha.ToUpperInvariant()));
+   else Assert.That(command,Does.Contain("--enrollment-token-file").And.Contain("install -m 600").And.Contain(sha+"  ").And.Contain(platform.StartsWith("osx")?"shasum -a 256":"sha256sum"));
+  }
+ }
  [Test]public void TotpMatchesRfc6238AndRejectsReplay()
  {
   const string secret="GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";

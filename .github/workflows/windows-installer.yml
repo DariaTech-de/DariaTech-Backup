@@ -1,5 +1,6 @@
 name: Windows installer
 on:
+  workflow_call:
   workflow_dispatch:
     inputs:
       publish_release:
@@ -19,7 +20,7 @@ on:
       - 'branding/**'
       - '.github/workflows/windows-installer.yml'
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  group: windows-installer-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 permissions:
   contents: read

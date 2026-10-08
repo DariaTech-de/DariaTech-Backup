@@ -39,20 +39,45 @@
  </article>
  @if(Model.CanManage){
  <article class="card" id="enroll">
-  <div class="card-head"><div><h2>Gerät hinzufügen</h2><span class="sub">Einmaliger Registrierungstoken für den Windows-Installer.</span></div></div>
+  <div class="card-head"><div><h2>Gerät hinzufügen</h2><span class="sub">Plattform wählen, Token erzeugen und den Agenten mit einem Befehl installieren.</span></div></div>
   @if(Model.Sites.Count==0){<p class="card-empty">@Ui.Icon("info")Legen Sie zuerst einen Standort an.</p>}
   else{
-  <form method="post" asp-page-handler="Enroll" class="inline-form">
+  <form method="post" asp-page-handler="Enroll" class="enroll-form">
    <input type="hidden" name="id" value="@c.Id">
-   <div class="field"><label for="siteId">Standort</label><select id="siteId" name="siteId">@foreach(var site in Model.Sites){<option value="@site.Id">@site.Name</option>}</select></div>
-   <div class="field"><label for="validMinutes">Gültigkeit in Minuten</label><input id="validMinutes" type="number" name="validMinutes" min="5" max="1440" value="60"></div>
-   <button class="button">@Ui.Icon("key")Registrierungstoken erzeugen</button>
+   <fieldset class="platforms"><legend>Betriebssystem des Geräts</legend>
+    @foreach(var p in DariaTech.Console.Services.AgentReleases.Platforms){
+    <label class="platform"><input type="radio" name="platform" value="@p" checked="@(p==Model.Platform?"checked":null)" />
+     <span><strong>@DariaTech.Console.Services.AgentReleases.PlatformLabel(p)</strong><span class="sub">@(p=="win-x64"?"Installer (.exe) als Windows-Dienst":p.StartsWith("osx")?"Paket (.tar.gz) als launchd-Dienst":"Paket (.tar.gz) als systemd-Dienst")</span></span></label>}
+   </fieldset>
+   <div class="inline-form">
+    <div class="field"><label for="siteId">Standort</label><select id="siteId" name="siteId">@foreach(var site in Model.Sites){<option value="@site.Id">@site.Name</option>}</select></div>
+    <div class="field"><label for="validMinutes">Gültigkeit in Minuten</label><input id="validMinutes" type="number" name="validMinutes" min="5" max="1440" value="60"></div>
+    <button class="button">@Ui.Icon("key")Token und Installationsbefehl erzeugen</button>
+   </div>
   </form>}
   @if(Model.Token is not null){
   <div class="token-box" role="status">
    <span class="token-head">@Ui.Icon("key")Token wird nur einmal angezeigt</span>
    <code class="token">@Model.Token</code>
-   <span class="sub">Sicher an den Techniker übergeben. Im Installer eingeben oder per <span class="code">/tokenfile=&lt;geschützte Datei&gt;</span> übergeben.</span>
+   <span class="sub">Sicher an den Techniker übergeben. Gilt für ein Gerät; nach der Registrierung ist er verbraucht.</span>
+  </div>
+  <div class="install-box">
+   <div class="install-head"><strong>@DariaTech.Console.Services.AgentReleases.PlatformLabel(Model.Platform)</strong>
+    @if(Model.Release is {} r){<span class="tag">Agent @r.Version@(r.Prerelease?" · Pilot":"")</span>}</div>
+   @if(Model.Asset is {} a){
+   <ol class="install-steps">
+    <li>@(Model.Platform=="win-x64"?"PowerShell als Administrator öffnen.":"Terminal öffnen (Benutzer mit sudo-Rechten).")</li>
+    <li>Befehl kopieren und einfügen. Er lädt das Paket, prüft die Prüfsumme und registriert das Gerät mit diesem Token.@(Model.Platform=="win-x64"?" Im Installer nur noch das Passwort für die lokale Oberfläche (mind. 14 Zeichen) vergeben.":"")</li>
+    <li>Das Gerät erscheint danach unter diesem Kunden; Backup-Jobs legen Sie dann in der Konsole an.</li>
+   </ol>
+   <div class="command"><pre><code data-copy-source>@Model.Command</code></pre><button type="button" class="button secondary" data-copy>Befehl kopieren</button></div>
+   <p class="sub">Alternativ manuell: <a href="@a.Url" rel="noopener">@Ui.Icon("download")@a.File</a> (@((a.Size/1048576.0).ToString("0.0")) MB) · SHA-256 <span class="code hash">@a.Sha256</span>
+    @if(Model.Platform=="win-x64"){<text>· Im Installer Konsolen-Adresse und Token eingeben.</text>}else{<text>· Danach <span class="code">sudo ./install.sh --console-url … --enrollment-token-file …</span></text>}</p>
+   @if(Model.Platform!="win-x64"&&Model.Platform.StartsWith("osx")){<p class="sub">@Ui.Icon("info")Die macOS-Binärdateien sind noch nicht notarisiert; der Befehl oben funktioniert trotzdem, da er ohne Finder/Gatekeeper-Download auskommt.</p>}
+   @if(Model.Platform=="win-x64"){<p class="sub">@Ui.Icon("info")Der Installer ist noch nicht code-signiert; Windows SmartScreen kann beim manuellen Start warnen.</p>}
+   }else{
+   <p class="card-empty">@Ui.Icon("info")Kein veröffentlichtes Agent-Paket gefunden. Paket von <a href="@Model.ReleasesPage" rel="noopener">GitHub Releases</a> laden und im Installer bzw. mit <span class="code">install.sh --enrollment-token-file</span> diesen Token verwenden.</p>
+   }
   </div>}
  </article>}
 </section>
