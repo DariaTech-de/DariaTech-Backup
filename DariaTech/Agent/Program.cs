@@ -36,16 +36,31 @@ if(args.Length==2&&args[0]=="--service-health")
  try
  {
   var serviceOptions=SourceChecks.ReadOptions(args[1]);var serviceState=new ProtectedState(serviceOptions);
-  using var deadline=new CancellationTokenSource(TimeSpan.FromSeconds(90));
-  while(serviceState.Read<AgentIdentity>("identity.bin") is null)await Task.Delay(500,deadline.Token);
+  // The first start of freshly unpacked, not yet notarized binaries can take minutes on macOS (Gatekeeper/XProtect scan).
+  using var deadline=new CancellationTokenSource(TimeSpan.FromSeconds(180));
+  var started=DateTimeOffset.UtcNow;
+  try
+  {
+   while(serviceState.Read<AgentIdentity>("identity.bin") is null)await Task.Delay(500,deadline.Token);
+  }
+  catch(OperationCanceledException){throw new HealthPhaseException("enrollment",null,started);}
+  var enrolled=DateTimeOffset.UtcNow;
   using var adapter=new DuplicatiAdapter(serviceOptions,serviceState);
+  string? lastEngineError=null;
   while(true)
   {
    try{await adapter.ReadJobs(deadline.Token);break;}
-   catch(Exception error)when(error is HttpRequestException or InvalidOperationException){await Task.Delay(500,deadline.Token);}
+   // A single slow engine request (per-request timeout while the engine is still starting) is retried like a refused connection.
+   catch(Exception error)when(error is HttpRequestException or InvalidOperationException||error is OperationCanceledException&&!deadline.IsCancellationRequested)
+   {
+    lastEngineError=error is OperationCanceledException?"RequestTimeout":error.GetType().Name;
+    try{await Task.Delay(500,deadline.Token);}catch(OperationCanceledException){throw new HealthPhaseException("engine",lastEngineError,enrolled);}
+   }
+   catch(OperationCanceledException){throw new HealthPhaseException("engine",lastEngineError??"Timeout",enrolled);}
   }
-  System.Console.WriteLine("Enrolled native agent and authenticated local engine are healthy.");
+  System.Console.WriteLine($"Enrolled native agent and authenticated local engine are healthy (enrollment {(enrolled-started).TotalSeconds:0}s, engine {(DateTimeOffset.UtcNow-enrolled).TotalSeconds:0}s).");
  }
+ catch(HealthPhaseException error){System.Console.Error.WriteLine($"Agent startup not verified (phase {error.Phase}, last error {error.LastError??"none"}, waited {error.Waited.TotalSeconds:0}s); retained service/state can retry when connectivity and enrollment are corrected.");Environment.ExitCode=2;}
  catch(Exception error){System.Console.Error.WriteLine($"Agent startup not verified ({error.GetType().Name}); retained service/state can retry when connectivity and enrollment are corrected.");Environment.ExitCode=2;}
  return;
 }

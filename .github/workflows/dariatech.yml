@@ -16,6 +16,7 @@ jobs:
           global-json-file: global.json
       - run: scripts/build-duplicati.sh
       - run: python3 scripts/generate-branding.py --check
+      - run: scripts/generate-destinations.sh --check
 
   management-security:
     runs-on: ubuntu-latest

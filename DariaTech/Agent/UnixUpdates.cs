@@ -105,8 +105,9 @@ public static class UnixUpdates
  private static Task Start(CancellationToken ct)=>UnixServices.Start(ct);
  private static async Task WaitForEngine(AgentOptions options,ProtectedState state,CancellationToken ct)
  {
-  using var timeout=CancellationTokenSource.CreateLinkedTokenSource(ct);timeout.CancelAfter(TimeSpan.FromSeconds(90));using var adapter=new DuplicatiAdapter(options,state);
-  for(var i=0;i<180;i++){try{await adapter.ReadJobs(timeout.Token);return;}catch(Exception error)when(error is HttpRequestException or InvalidOperationException){await Task.Delay(500,timeout.Token);}}
+  // Cold start of a freshly unpacked engine can be slow (macOS first-launch scan); a single slow request is retried.
+  using var timeout=CancellationTokenSource.CreateLinkedTokenSource(ct);timeout.CancelAfter(TimeSpan.FromSeconds(180));using var adapter=new DuplicatiAdapter(options,state);
+  for(var i=0;i<360;i++){try{await adapter.ReadJobs(timeout.Token);return;}catch(Exception error)when(error is HttpRequestException or InvalidOperationException||error is OperationCanceledException&&!timeout.IsCancellationRequested){await Task.Delay(500,timeout.Token);}}
   throw new InvalidOperationException("Updated engine failed startup");
  }
  private static async Task Run(string executable,string[] args,CancellationToken ct)
