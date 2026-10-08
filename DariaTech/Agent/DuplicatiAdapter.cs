@@ -49,7 +49,7 @@ public sealed partial class DuplicatiAdapter : IDisposable
    if(error is not null&&(run is null||error>run.Completed))run=new RunReport($"engine-error:{error.Value.ToUnixTimeSeconds()}",error.Value,null,RunStatus.Failed,null,null,null,null,"EngineOperationFailed");
    DateTimeOffset? next=null;var proposed=Get(schedule.RootElement,"ProposedSchedule");
    if(proposed.ValueKind==JsonValueKind.Array)foreach(var s in proposed.EnumerateArray())if(Get(s,"Item1").ToString()==id)next=Date(Get(s,"Item2"));
-   reports.Add(new JobReport(id,name,next,run));
+   reports.Add(new JobReport(id,name,next,CloudOutcome(id,run)));
   }
   return reports.ToArray();
  }
@@ -61,6 +61,8 @@ public sealed partial class DuplicatiAdapter : IDisposable
   var fraction=Get(root,"OverallProgress").TryGetDouble(out var f)&&double.IsFinite(f)?Math.Clamp(f,0,1):0;
   return new ProgressReport(id,Number(Get(root,"TaskID")),fraction,Number(Get(root,"ProcessedFileSize")),Number(Get(root,"ProcessedFileCount")));
  }
+ private RunReport? CloudOutcome(string localId,RunReport? run)=>run is {Status:RunStatus.Warning}&&(state.Read<Dictionary<string,SaasJobBinding>>("saas-bindings.bin")??[]).ContainsKey(localId)
+  ?run with{Status=RunStatus.Failed,ErrorCode="BackupFailed"}:run;
  public static RunReport? ParseResult(JsonElement result,JsonElement metadata)
  {
   var operation=Get(result,"MainOperation").ToString();if(!operation.Equals("Backup",StringComparison.OrdinalIgnoreCase))return null;
