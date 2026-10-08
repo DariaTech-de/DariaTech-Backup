@@ -33,6 +33,14 @@ public sealed class UnixUpdateTests
    Assert.That(File.Exists(Path.Combine(root,"outside")),Is.False);
   }finally{Directory.Delete(root,true);}
  }
+ [Test]public void PrivateConfigurationRetainsAgentSectionAndWritableOptions()
+ {
+  var options=new AgentOptions{LinuxKeyFile="/var/lib/test/key",StateDirectory="/var/lib/test",ManageEngine=true};
+  using var config=System.Text.Json.JsonDocument.Parse(UnixProvisioning.Serialize(options));
+  var settings=config.RootElement.GetProperty("Agent");Assert.That(settings.GetProperty("LinuxKeyFile").GetString(),Is.EqualTo(options.LinuxKeyFile));
+  Assert.That(settings.GetProperty("ManageEngine").GetBoolean(),Is.True);
+  Assert.That(settings.TryGetProperty("Version",out _),Is.False);Assert.That(settings.TryGetProperty("Platform",out _),Is.False);
+ }
  [Test]public void UnixManagedTransportAndUnsupportedArchitecturesAreExplicit()
  {
   if(OperatingSystem.IsWindows()){Assert.Ignore("Unix loopback policy");return;}

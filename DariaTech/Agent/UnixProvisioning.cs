@@ -67,9 +67,10 @@ public static class UnixProvisioning
    if(!File.Exists(Path.Combine(options.StateDirectory,"enrollment-token.txt")))throw new InvalidOperationException("Protected enrollment token file required for first installation");
   }
   var parent=Path.GetDirectoryName(config)!;UnixPrivatePaths.Directory(parent,true);
-  WritePrivate(config,JsonSerializer.Serialize(new{Agent=options},new JsonSerializerOptions{WriteIndented=true,IgnoreReadOnlyProperties=true}));
+  WritePrivate(config,Serialize(options));
   return options;
  }
+ public static string Serialize(AgentOptions options)=>JsonSerializer.Serialize(new Dictionary<string,AgentOptions>{{"Agent",options}},new JsonSerializerOptions{WriteIndented=true,IgnoreReadOnlyProperties=true});
  private static string PinKey(string source,string? existing,string state,string leaf)
  {
   UnixPrivatePaths.TrustedFile(source);var text=File.ReadAllText(source);

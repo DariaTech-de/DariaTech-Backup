@@ -25,6 +25,9 @@ public static class UnixServices
   string content;
   if(OperatingSystem.IsMacOS())
   {
+   using var config=JsonDocument.Parse(File.ReadAllText(configuration));var state=config.RootElement.GetProperty("Agent").GetProperty("StateDirectory").GetString()!;
+   UnixPrivatePaths.Directory(state,false);var log=Path.Combine(state,"agent-service.log");
+   if(!File.Exists(log))UnixProvisioning.WritePrivate(log,"");
    var dictionary=new XElement("dict",
     new XElement("key","Label"),new XElement("string",MacLabel),
     new XElement("key","ProgramArguments"),new XElement("array",new XElement("string",executable),new XElement("string","--agent-config"),new XElement("string",configuration)),
@@ -35,8 +38,8 @@ public static class UnixServices
     new XElement("key","AbandonProcessGroup"),new XElement("false"),
     new XElement("key","ExitTimeOut"),new XElement("integer","45"),
     new XElement("key","ThrottleInterval"),new XElement("integer","10"),
-    new XElement("key","StandardOutPath"),new XElement("string","/Library/Application Support/DariaTechBackup/state/agent-service.log"),
-    new XElement("key","StandardErrorPath"),new XElement("string","/Library/Application Support/DariaTechBackup/state/agent-service.log"));
+    new XElement("key","StandardOutPath"),new XElement("string",log),
+    new XElement("key","StandardErrorPath"),new XElement("string",log));
    content=new XDocument(new XDeclaration("1.0","UTF-8",null),new XDocumentType("plist","-//Apple//DTD PLIST 1.0//EN","http://www.apple.com/DTDs/PropertyList-1.0.dtd",null),new XElement("plist",new XAttribute("version","1.0"),dictionary)).ToString();
   }
   else

@@ -55,8 +55,8 @@ for attempt in {1..90}; do
  sleep 1
 done
 if ! python3 -c 'import json,sys;v=json.load(open(sys.argv[1]));assert v["enrolled"] and v["heartbeats"]>0' "$work/result.json"; then
- if [ "$(uname -s)" = Linux ]; then journalctl -u DariaTechBackupAgent.service -n 70 --no-pager; else launchctl print system/de.dariatech.dariatechbackupagent; fi
- printf '%s\\n' 'FAIL: service did not enroll and authenticate the native engine' >&2
+ if [ "$(uname -s)" = Linux ]; then journalctl -u DariaTechBackupAgent.service -n 70 --no-pager; else launchctl print system/de.dariatech.dariatechbackupagent; tail -n 70 "$state/agent-service.log"; fi
+ printf '%s\n' 'FAIL: service did not enroll and authenticate the native engine' >&2
  exit 1
 fi
 test -s "$state/identity.bin"

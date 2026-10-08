@@ -30,7 +30,7 @@ jobs:
           - {runner: macos-15-intel, rid: osx-x64}
           - {runner: macos-15, rid: osx-arm64}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
       DO_NOT_TRACK: '1'
@@ -52,6 +52,16 @@ jobs:
         run: dotnet test DariaTech/Tests/DariaTech.Tests.csproj -c Release --no-build --filter "FullyQualifiedName~UnixSecurityTests|Category=UnixNative"
       - name: Check package and real service installation
         run: sudo --preserve-env=PATH bash deploy/unix/tests/Smoke.sh "${{ matrix.rid }}"
+      - name: Build distinct candidate version for signed update
+        run: |
+          mkdir -p "artifacts/update/${{ matrix.rid }}"
+          mv "artifacts/unix/${{ matrix.rid }}" "artifacts/unix/${{ matrix.rid }}-original"
+          python3 scripts/build-unix-agent.py --rid "${{ matrix.rid }}" --version 0.3.0
+          mv artifacts/unix/${{ matrix.rid }}/*.tar.gz "artifacts/update/${{ matrix.rid }}/"
+          rm -rf "artifacts/unix/${{ matrix.rid }}"
+          mv "artifacts/unix/${{ matrix.rid }}-original" "artifacts/unix/${{ matrix.rid }}"
+      - name: Test actual signed update with independent native supervisor
+        run: sudo --preserve-env=PATH bash deploy/unix/tests/ApprovedUpdate.sh "${{ matrix.rid }}"
       - uses: actions/upload-artifact@v4
         with:
           name: DariaTechBackupAgent-${{ matrix.rid }}-pilot
