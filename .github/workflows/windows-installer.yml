@@ -62,7 +62,7 @@ jobs:
 
           Automated Windows checks cover LocalSystem service installation, DPAPI/ACL protection, HTTPS enrollment against a test-only fixture, real engine authentication, heartbeat, upgrade, restart and uninstall. Management tests separately exercise the real PostgreSQL Console and encrypted backup/restore.
 
-          This EXE is unsigned. Authenticode signing, VSS and customer-specific/reboot validation remain release gates. Remote commands, notifications and automatic signed updates are not implemented. See docs/AGENT.md for installation, protected enrollment input files and retained uninstall data.
+          This EXE is unsigned. Authenticode signing, VSS and customer-specific/reboot validation remain release gates. Managed configuration, signed remote operations and approved signed update code are opt-in. End-to-end remote update across distinct versions remains a production gate. See docs/AGENT.md for installation, protected enrollment input files and retained uninstall data.
           '@ | Set-Content artifacts/installer/RELEASE_NOTES.md
-          gh release create $env:RELEASE_TAG artifacts/installer/*.exe artifacts/installer/*.sha256 --target $env:GITHUB_SHA --prerelease --title 'DariaTech Backup Agent 0.1.0 — Windows pilot' --notes-file artifacts/installer/RELEASE_NOTES.md
+          gh release create $env:RELEASE_TAG artifacts/installer/*.exe artifacts/installer/*.sha256 --target $env:GITHUB_SHA --prerelease --title "DariaTech Backup Agent $((Get-Content artifacts/installer/agent-version.txt).Trim()) — Windows pilot" --notes-file artifacts/installer/RELEASE_NOTES.md
           if ($LASTEXITCODE) { throw 'Release publication failed' }

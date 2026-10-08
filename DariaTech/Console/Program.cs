@@ -112,5 +112,5 @@ app.Use(async(c,next)=>
  await next();
 });
 app.MapHealthChecks("/health/ready");app.MapGet("/health/live",()=>Results.Ok(new{status="live"}));
-app.MapNotificationApi();app.MapCommandApi();app.MapConfigurationApi();app.MapManagementApi();app.MapAgentApi();app.MapRazorPages();await app.RunAsync();return 0;
+app.MapUpdateApi();app.MapNotificationApi();app.MapCommandApi();app.MapConfigurationApi();app.MapManagementApi();app.MapAgentApi();app.MapRazorPages();await app.RunAsync();return 0;
 public partial class Program { }

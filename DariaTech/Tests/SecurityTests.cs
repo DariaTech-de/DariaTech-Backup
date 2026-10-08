@@ -84,6 +84,19 @@ public sealed class SecurityTests
   Assert.That(CommandProtocol.Valid(command with{LocalJobId="1/run-script"},device,now),Is.False);
   Assert.Throws<InvalidOperationException>(()=>DuplicatiAdapter.RestoreDestination(null,"restore-1"));
  }
+ [Test]public async Task UpdatesRequireIndependentSignatureHashesExpiryAndMonotonicVersions()
+ {
+  using var key=ECDsa.Create(ECCurve.NamedCurves.nistP256);using var other=ECDsa.Create(ECCurve.NamedCurves.nistP256);var now=DateTimeOffset.UtcNow;
+  var bytes=RandomNumberGenerator.GetBytes(2048);var m=new AgentUpdateManifest(Guid.NewGuid(),12,"DariaTechBackupAgent","win-x64","0.3.0.0","https://github.com/DariaTech-de/DariaTech-Backup/releases/download/test/Setup.exe",Convert.ToHexString(SHA256.HashData(bytes)),bytes.Length,now,now.AddDays(7));
+  var signed=UpdateProtocol.Sign(m,key);Assert.That(UpdateProtocol.Verify(signed,key,now),Is.EqualTo(m));
+  Assert.Throws<CryptographicException>(()=>UpdateProtocol.Verify(signed,other,now));
+  Assert.Throws<CryptographicException>(()=>UpdateProtocol.Verify(signed,key,now.AddDays(8)));
+  Assert.That(UpdateProtocol.Newer(m,"0.2.0.0",11),Is.True);Assert.That(UpdateProtocol.Newer(m,"0.2.0.0",12),Is.False);Assert.That(UpdateProtocol.Newer(m,"0.4.0.0",11),Is.False);
+  Assert.That(AgentUpdates.AllowedDownload(new Uri("http://github.com/setup"),["github.com"]),Is.False);
+  Assert.That(AgentUpdates.AllowedDownload(new Uri("https://github.com.attacker.invalid/setup"),["github.com"]),Is.False);
+  Assert.That(AgentUpdates.AllowedDownload(new Uri("https://127.0.0.1/setup"),["127.0.0.1"]),Is.False);
+  var file=Path.GetTempFileName();try{await File.WriteAllBytesAsync(file,bytes);await AgentUpdates.VerifyArtifact(file,m,CancellationToken.None);bytes[0]^=1;await File.WriteAllBytesAsync(file,bytes);Assert.ThrowsAsync<CryptographicException>(async()=>await AgentUpdates.VerifyArtifact(file,m,CancellationToken.None));}finally{File.Delete(file);}
+ }
  [Test]public void AgentRejectsRemoteEngineAndInsecureConsole()
  {
   Assert.Throws<InvalidOperationException>(()=>new AgentOptions{EngineUrl="https://attacker.example"}.Validate());

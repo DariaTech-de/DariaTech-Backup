@@ -34,3 +34,5 @@ if (!(Test-Path $Compiler)) { throw 'Install Inno Setup 6 or supply -Compiler' }
 if ($LASTEXITCODE) { throw 'Installer compilation failed' }
 $file="artifacts/installer/$($brand.installerName).exe"
 (Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant() | Set-Content "$file.sha256" -Encoding ASCII
+
+"$version.0" | Set-Content artifacts/installer/agent-version.txt -Encoding ASCII

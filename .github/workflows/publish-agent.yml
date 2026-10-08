@@ -47,6 +47,6 @@ jobs:
 
           Automated Windows checks cover LocalSystem service installation, DPAPI/ACL protection, HTTPS enrollment against a test-only fixture, real engine authentication, heartbeat, upgrade, restart and uninstall. Management tests separately cover the real PostgreSQL Console and encrypted backup/restore.
 
-          This EXE is unsigned. Authenticode signing, VSS, reboot and customer-specific validation remain release gates. Remote commands, notifications and automatic signed updates are not implemented. See docs/AGENT.md for installation and protected enrollment files. Uninstall retains local state/databases.
+          This EXE is unsigned. Authenticode signing, VSS, reboot and customer-specific validation remain release gates. Managed configuration, signed remote operations and approved signed update code are opt-in. End-to-end remote update across distinct versions remains a production gate. See docs/AGENT.md for installation and protected enrollment files. Uninstall retains local state/databases.
           EOF
-          gh release create "$RELEASE_TAG" installer/DariaTechBackupSetup.exe installer/DariaTechBackupSetup.exe.sha256 --target "$TESTED_SHA" --prerelease --title 'DariaTech Backup Agent 0.1.0 — Windows pilot' --notes-file release-notes.md
+          gh release create "$RELEASE_TAG" installer/DariaTechBackupSetup.exe installer/DariaTechBackupSetup.exe.sha256 --target "$TESTED_SHA" --prerelease --title "DariaTech Backup Agent $(cat installer/agent-version.txt) — Windows pilot" --notes-file release-notes.md

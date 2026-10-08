@@ -78,7 +78,15 @@ try {
  if(!$result -or !$result.enrolled -or $result.heartbeats -lt 1){throw 'No authenticated engine-reachable heartbeat received'}
  $identityHash=(Get-FileHash (Join-Path $state 'identity.bin')).Hash
  $credentialHash=(Get-FileHash (Join-Path $state 'engine-credential.bin')).Hash
+ $configFile=Join-Path (Join-Path ${env:ProgramFiles} 'DariaTech Backup') 'appsettings.json'
+ $configuration=Get-Content $configFile -Raw|ConvertFrom-Json
+ $configuration.Agent | Add-Member AllowManagedConfiguration $true -Force
+ $configuration.Agent | Add-Member CommandPublicKeyFile (Join-Path $state 'commands-public.pem') -Force
+ $configuration.Agent | Add-Member RestoreRoot (Join-Path $state 'Restores') -Force
+ $configuration | ConvertTo-Json -Depth 5 | Set-Content $configFile -Encoding UTF8
  Invoke-Setup @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/console=https://localhost:18443')
+ $preserved=Get-Content $configFile -Raw|ConvertFrom-Json
+ if(!$preserved.Agent.AllowManagedConfiguration -or $preserved.Agent.CommandPublicKeyFile -ne $configuration.Agent.CommandPublicKeyFile -or $preserved.Agent.RestoreRoot -ne $configuration.Agent.RestoreRoot){throw 'Upgrade discarded local management opt-in or trust settings'}
  if((Get-FileHash (Join-Path $state 'identity.bin')).Hash -ne $identityHash -or (Get-FileHash (Join-Path $state 'engine-credential.bin')).Hash -ne $credentialHash){throw 'Upgrade changed enrolled identity or engine credential'}
  Stop-Service DariaTechBackupAgent
  Start-Sleep 3

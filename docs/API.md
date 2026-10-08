@@ -58,3 +58,9 @@ Agents use `GET /api/v1/agent/commands` and `POST /api/v1/agent/commands/{id}/re
 ## Notification rules and delivery state
 
 Admin/CSRF: `POST /api/v1/management/notification-rules` and `PUT /notification-rules/{id}` accept `{tenantId,recipient,repeatMinutes,enabled}`. Email only initially; repeat interval 60–43200 minutes. Recipient must be a plain valid email address without header/display-name injection. `GET /notification-rules` and `/notification-deliveries` are tenant scoped. Disabling a rule cancels pending deliveries. Transport is behind `INotificationTransport` for later Teams/Slack/Webhook/SMS implementations; unimplemented transports are not selectable or advertised as delivered.
+
+## Approved agent updates
+
+SuperAdmin/CSRF: `POST /agent-releases` accepts `{payload,signature}` created by the offline signing tool. Console independently verifies the pinned update key, manifest expiry and monotonic release sequence. `GET /agent-releases` returns public version/approval metadata. Admin/CSRF: `POST /update-deployments` with `{deviceId,releaseId}` approves a specific active device; `GET /update-deployments` is tenant scoped. An unconfigured update trust key returns 503.
+
+Device Bearer/X-Device-Id: `GET /api/v1/agent/update` returns its highest pending approved assignment or 204. `POST /api/v1/agent/updates/{deploymentId}/receipt` reports Downloaded/Applying/Installed/Rejected/Failed; terminal states are immutable and receipts cannot target a foreign device. See UPDATES.md for independent key pinning, download restrictions and operational recovery gates.

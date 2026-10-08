@@ -53,7 +53,13 @@ if ($Action -eq 'Prepare') {
  Set-Acl -Path $state -AclObject $acl
  # Fail closed rather than claiming the bundled engine is running on a port owned by another process.
  if (Get-NetTCPConnection -LocalPort 8210 -State Listen -ErrorAction SilentlyContinue) { throw 'Port 8210 is in use; stop the conflicting application before installation' }
- @{Agent=@{ConsoleUrl=$uri.AbsoluteUri.TrimEnd('/');EngineUrl='http://127.0.0.1:8210';StateDirectory=$state;HeartbeatSeconds=60;ManageEngine=$true};Logging=@{LogLevel=@{Default='Information'}}} |
+ $agentConfiguration=@{ConsoleUrl=$uri.AbsoluteUri.TrimEnd('/');EngineUrl='http://127.0.0.1:8210';StateDirectory=$state;HeartbeatSeconds=60;ManageEngine=$true}
+ if ($old -and $old.Agent) {
+  foreach($property in 'AllowManagedConfiguration','AllowRemoteCommands','CommandPublicKeyFile','RestoreRoot','AllowAgentUpdates','UpdatePublicKeyFile','UpdateDownloadHosts') {
+   if ($old.Agent.PSObject.Properties.Name -contains $property) { $agentConfiguration[$property]=$old.Agent.$property }
+  }
+ }
+ @{Agent=$agentConfiguration;Logging=@{LogLevel=@{Default='Information'}}} |
   ConvertTo-Json -Depth 5 | Set-Content (Join-Path $InstallDirectory 'appsettings.json') -Encoding UTF8
  exit 0
 }

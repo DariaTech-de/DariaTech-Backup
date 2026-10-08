@@ -22,6 +22,7 @@ public sealed class Monitoring(IServiceScopeFactory scopes,Microsoft.Extensions.
  }
  public static async Task Evaluate(ManagementDb db,MonitoringOptions o,DateTimeOffset now,CancellationToken ct=default)
  {
+  var approvedVersion=await db.AgentReleases.Where(x=>x.Expires>now).OrderByDescending(x=>x.Sequence).Select(x=>x.Version).FirstOrDefaultAsync(ct)??o.LatestApprovedVersion;
   var devices=await db.Devices.Where(x=>x.Active).ToListAsync(ct);var jobs=await db.Jobs.Where(x=>x.Active).ToListAsync(ct);
   var agents=await db.Agents.ToListAsync(ct);var alerts=await db.Alerts.ToListAsync(ct);
   foreach(var d in devices)
@@ -40,7 +41,7 @@ public sealed class Monitoring(IServiceScopeFactory scopes,Microsoft.Extensions.
     if(last?.Status is RunStatus.Cancelled or RunStatus.Unknown)problems[$"incomplete:{j.Id}"]=("Warning","BackupNotSuccessful");
    }
    var a=agents.FirstOrDefault(x=>x.DeviceId==d.Id);
-   if(Version.TryParse(o.LatestApprovedVersion,out var approved)&&Version.TryParse(a?.Version,out var installed)&&installed<approved)problems["outdated"]=("Warning","AgentOutdated");
+   if(Version.TryParse(approvedVersion,out var approved)&&Version.TryParse(a?.Version,out var installed)&&installed<approved)problems["outdated"]=("Warning","AgentOutdated");
    foreach(var (key,value) in problems)
    {
     var alert=alerts.SingleOrDefault(x=>x.DeviceId==d.Id&&x.Key==key);

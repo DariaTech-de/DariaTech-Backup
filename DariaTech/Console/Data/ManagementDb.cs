@@ -16,6 +16,8 @@ public sealed class ManagementDb(DbContextOptions<ManagementDb> options, TenantS
  public DbSet<ConfigurationRevision> ConfigurationRevisions => Set<ConfigurationRevision>();
  public DbSet<RemoteCommand> Commands => Set<RemoteCommand>();
  public DbSet<NotificationDelivery> Deliveries => Set<NotificationDelivery>();
+ public DbSet<ApprovedAgentRelease> AgentReleases=>Set<ApprovedAgentRelease>();
+ public DbSet<UpdateDeployment> UpdateDeployments=>Set<UpdateDeployment>();
  protected override void OnModelCreating(ModelBuilder b)
  {
   b.Entity<Tenant>().HasQueryFilter(x => scope.Global || x.Id == scope.TenantId);
@@ -55,6 +57,11 @@ public sealed class ManagementDb(DbContextOptions<ManagementDb> options, TenantS
   b.Entity<NotificationDelivery>().HasOne<Alert>().WithMany().HasForeignKey(x=>new{x.TenantId,x.AlertId}).HasPrincipalKey(x=>new{x.TenantId,x.Id}).OnDelete(DeleteBehavior.Restrict);
   b.Entity<NotificationDelivery>().HasIndex(x=>new{x.RuleId,x.AlertId,x.Occurrence,x.Kind,x.Sequence}).IsUnique();
   b.Entity<NotificationDelivery>().HasIndex(x=>new{x.Status,x.Due});
+  b.Entity<ApprovedAgentRelease>().HasIndex(x=>x.Sequence).IsUnique();
+  b.Entity<ApprovedAgentRelease>().Property(x=>x.Payload).HasMaxLength(16000);
+  b.Entity<UpdateDeployment>().HasOne<Device>().WithMany().HasForeignKey(x=>new{x.TenantId,x.DeviceId}).HasPrincipalKey(x=>new{x.TenantId,x.Id}).OnDelete(DeleteBehavior.Restrict);
+  b.Entity<UpdateDeployment>().HasOne<ApprovedAgentRelease>().WithMany().HasForeignKey(x=>x.ReleaseId).OnDelete(DeleteBehavior.Restrict);
+  b.Entity<UpdateDeployment>().HasIndex(x=>new{x.DeviceId,x.ReleaseId}).IsUnique();
   b.Entity<Role>().HasData(Enum.GetValues<UserRole>().Select(x=>new Role{Id=x,Name=x.ToString()}));
   b.Entity<User>().HasIndex(x=>x.Email).IsUnique();
   b.Entity<User>().Property(x=>x.LastTotpStep).IsConcurrencyToken();
@@ -67,7 +74,7 @@ public sealed class ManagementDb(DbContextOptions<ManagementDb> options, TenantS
    """));
   b.Entity<AuditEvent>().HasQueryFilter(x=>scope.Global || (scope.TenantId != null && x.TenantId == scope.TenantId));
   foreach(var entity in b.Model.GetEntityTypes())
-   foreach(var property in entity.GetProperties().Where(p=>p.ClrType==typeof(string))) property.SetMaxLength(property.Name is "EncryptedConfiguration" or "EncryptedPayload" ? 120000 : property.Name.Contains("Secret") || property.Name.Contains("Credential") ? 4096 : 1000);
+   foreach(var property in entity.GetProperties().Where(p=>p.ClrType==typeof(string))) property.SetMaxLength(property.Name is "EncryptedConfiguration" or "EncryptedPayload" or "Payload" ? 120000 : property.Name.Contains("Secret") || property.Name.Contains("Credential") ? 4096 : 1000);
  }
  public override int SaveChanges(bool acceptAllChangesOnSuccess) {ValidateScope();return base.SaveChanges(acceptAllChangesOnSuccess);}
  public override Task<int> SaveChangesAsync(CancellationToken ct=default)

@@ -119,3 +119,16 @@ public sealed class NotificationDelivery : TenantEntity
  public DateTimeOffset? LeaseUntil {get;set;} public DateTimeOffset? Sent {get;set;}
  public int Attempts {get;set;} public string? ErrorCode {get;set;}
 }
+
+public sealed class ApprovedAgentRelease
+{
+ public Guid Id {get;set;} public long Sequence {get;set;} public string Version {get;set;}="";
+ public string Payload {get;set;}=""; public string Signature {get;set;}="";
+ public DateTimeOffset Expires {get;set;}
+}
+public sealed class UpdateDeployment : TenantEntity
+{
+ public Guid DeviceId {get;set;} public Guid ReleaseId {get;set;}
+ public string Status {get;set;}="Approved"; public string? ErrorCode {get;set;}
+ public DateTimeOffset Approved {get;set;}=DateTimeOffset.UtcNow;
+}
