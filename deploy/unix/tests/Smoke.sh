@@ -28,6 +28,9 @@ openssl pkcs12 -export -out "$work/server.pfx" -inkey "$work/server.key" -in "$w
 if [ "$(uname -s)" = Linux ]; then
  install -m 644 "$work/ca.pem" /usr/local/share/ca-certificates/dariatech-ci.crt
  update-ca-certificates >/dev/null
+ # Hosted runners allow their tool user to write /opt; establish the production trust boundary in this isolated CI machine.
+ chown 0:0 /opt
+ chmod 755 /opt
  prefix=/opt/dariatech-backup-agent
  config=/etc/dariatech-backup/agent.json
  state=/var/lib/dariatech-backup

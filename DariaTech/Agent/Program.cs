@@ -4,6 +4,12 @@ using System.Text.Json;
 using DariaTech.Agent;
 using DariaTech.Contracts;
 
+if(args.Length==3&&args[0]=="--apply-unix-update")
+{
+ try{using var deadline=new CancellationTokenSource(TimeSpan.FromMinutes(20));await UnixUpdates.Apply(args[1],args[2],deadline.Token);}
+ catch(Exception error){System.Console.Error.WriteLine($"Verified Unix update failed ({error.GetType().Name}); retained state and previous binaries are available.");Environment.ExitCode=2;}
+ return;
+}
 if(args.Length==1&&args[0]=="--service-name"){System.Console.WriteLine(UnixServices.ServiceName);return;}
 if(args.Length==1&&args[0]=="--service-label"){System.Console.WriteLine(UnixServices.MacLabel);return;}
 if(args.Length==2&&args[0]=="--write-service-file"){UnixServices.Write(args[1]);return;}
@@ -31,7 +37,7 @@ if(args.Length==4&&args[0]=="--check-engine-port")
 if(args.Length==2&&args[0]=="--check-engine-installation")
 {
  try{EngineInstallation.ValidateExternal(args[1]);System.Console.WriteLine("External engine installation permissions verified");}
- catch(Exception error){System.Console.Error.WriteLine($"Engine installation check rejected ({error.GetType().Name})");Environment.ExitCode=2;}
+ catch(Exception error){System.Console.Error.WriteLine($"Engine installation check rejected ({error.GetType().Name})"+(error is InvalidOperationException?": "+error.Message:""));Environment.ExitCode=2;}
  return;
 }
 
@@ -50,7 +56,7 @@ if(configIndex>=0)
  if(!OperatingSystem.IsWindows())UnixPrivatePaths.File(args[configIndex+1]);
  builder.Configuration.AddJsonFile(args[configIndex+1],optional:false,reloadOnChange:false);
 }
-var options=builder.Configuration.GetSection("Agent").Get<AgentOptions>()??new();options.Validate();var state=new ProtectedState(options);
+var options=builder.Configuration.GetSection("Agent").Get<AgentOptions>()??new();if(configIndex>=0)options.ConfigurationFile=args[configIndex+1];options.Validate();var state=new ProtectedState(options);
 if(args.Contains("enroll"))
 {
  if(state.Read<AgentIdentity>("identity.bin") is not null)throw new InvalidOperationException("Agent is already enrolled");

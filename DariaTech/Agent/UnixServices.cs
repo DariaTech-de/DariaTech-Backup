@@ -42,7 +42,12 @@ public static class UnixServices
    var command=Quote(executable)+" --agent-config "+Quote(configuration);
    content="[Unit]\nDescription=DariaTech Backup Agent\nAfter=network-online.target\nWants=network-online.target\n[Service]\nType=simple\nExecStart="+command+"\nUser=root\nUMask=0077\nRestart=on-failure\nRestartSec=10\nTimeoutStopSec=45\nKillMode=control-group\nNoNewPrivileges=true\nProtectKernelTunables=true\nProtectKernelModules=true\nProtectControlGroups=true\nRestrictSUIDSGID=true\n[Install]\nWantedBy=multi-user.target\n";
   }
-  UnixPrivatePaths.TrustedFile(executable);
+  UnixPrivatePaths.TrustedFile(executable);WriteDefinition(path,content);
+ }
+ public static void WriteDefinition(string path,string content)
+ {
+  if(OperatingSystem.IsWindows()||UnixPrivatePaths.EffectiveUserId!=0)throw new InvalidOperationException("Service definition requires root");
+  UnixPrivatePaths.TrustedDirectory(Path.GetDirectoryName(path)!);
   if(File.Exists(path))UnixPrivatePaths.TrustedFile(path);
   var temporary=path+"."+Guid.NewGuid().ToString("N")+".tmp";
   try

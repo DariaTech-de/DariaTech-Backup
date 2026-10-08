@@ -4,6 +4,7 @@ public sealed class AgentOptions
  public string ConsoleUrl {get;set;}="https://backup.dariatech.de";
  public string EngineUrl {get;set;}=OperatingSystem.IsWindows()?"http://127.0.0.1:8200":"https://127.0.0.1:8210";
  public string StateDirectory {get;set;}=OperatingSystem.IsWindows()?Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),"DariaTechBackup"):OperatingSystem.IsMacOS()?"/Library/Application Support/DariaTechBackup/state":"/var/lib/dariatech-backup";
+ public string? ConfigurationFile {get;set;}
  public string? LinuxKeyFile {get;set;}
  public int HeartbeatSeconds {get;set;}=60;
  public bool AllowAgentUpdates {get;set;}
@@ -30,6 +31,7 @@ public sealed class AgentOptions
   if(AllowUnlicensedSaasDevelopment&&!SaasWorkloads.DevelopmentTestingAllowed)throw new InvalidOperationException("Unlicensed SaaS testing requires the isolated development environment");
   if(AllowRemoteCommands&&!ManageEngine)throw new InvalidOperationException("Remote commands require an installer-managed engine instance");
   if(AllowRemoteCommands&&(string.IsNullOrWhiteSpace(CommandPublicKeyFile)||!File.Exists(CommandPublicKeyFile)))throw new InvalidOperationException("Pinned command public key required");
+  if(AllowAgentUpdates&&!OperatingSystem.IsWindows()&&(ConfigurationFile is null||!Path.IsPathFullyQualified(ConfigurationFile)))throw new InvalidOperationException("Unix update service configuration required");
   if(AllowAgentUpdates&&(!ManageEngine||string.IsNullOrWhiteSpace(UpdatePublicKeyFile)||!File.Exists(UpdatePublicKeyFile)||UpdateDownloadHosts.Length==0))throw new InvalidOperationException("Managed engine and pinned update key required");
   var remote=new Uri(ConsoleUrl);if(remote.Scheme!="https"||!string.IsNullOrEmpty(remote.UserInfo)||remote.AbsolutePath!="/"||!string.IsNullOrEmpty(remote.Query)||!string.IsNullOrEmpty(remote.Fragment))throw new InvalidOperationException("ConsoleUrl must be an HTTPS origin");
   var local=new Uri(EngineUrl);if(!local.IsLoopback||!string.IsNullOrEmpty(local.UserInfo)||local.AbsolutePath!="/"||local.Scheme is not ("http" or "https")||local.Query!=""||local.Fragment!="")throw new InvalidOperationException("EngineUrl must be a loopback origin");

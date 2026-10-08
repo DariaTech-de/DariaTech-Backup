@@ -54,7 +54,7 @@ public static class UnixProvisioning
   options.AllowAgentUpdates|=flags.Contains("--allow-agent-updates");
   options.AllowSaasWorkloads|=flags.Contains("--allow-saas");
   options.AllowSaasRestore|=flags.Contains("--allow-saas-restore");
-  options.Validate();EngineInstallation.Resolve(options);
+  options.ConfigurationFile=config;options.Validate();EngineInstallation.Resolve(options);
   var state=new ProtectedState(options);
   if(state.Read<AgentIdentity>("identity.bin") is null)
   {
