@@ -15,7 +15,7 @@ public sealed class HistoryTests
   try
   {
    var key=Path.Combine(dir,"key");File.WriteAllText(key,Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
-   File.SetUnixFileMode(key,UnixFileMode.UserRead|UnixFileMode.UserWrite);
+   if(!OperatingSystem.IsWindows())File.SetUnixFileMode(key,UnixFileMode.UserRead|UnixFileMode.UserWrite);
    var options=new AgentOptions{LinuxKeyFile=key,StateDirectory=Path.Combine(dir,"state")};var state=new ProtectedState(options);
    using var receiver=new HistoryReceiver();using var console=new HttpClient(receiver){BaseAddress=new Uri("https://test-only.invalid")};
    for(var cycle=0;cycle<5;cycle++)

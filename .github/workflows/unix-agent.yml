@@ -1,0 +1,56 @@
+name: Unix agent integration
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'DariaTech/Agent/**'
+      - 'DariaTech/Contracts/**'
+      - 'DariaTech/Tests/**'
+      - 'deploy/unix/**'
+      - 'scripts/build-unix-agent.py'
+      - '.github/workflows/unix-agent.yml'
+  pull_request:
+    paths:
+      - 'DariaTech/**'
+      - 'deploy/unix/**'
+      - 'scripts/build-unix-agent.py'
+permissions:
+  contents: read
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: ubuntu-24.04, rid: linux-x64}
+          - {runner: ubuntu-24.04-arm, rid: linux-arm64}
+          - {runner: macos-15-intel, rid: osx-x64}
+          - {runner: macos-15, rid: osx-arm64}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DO_NOT_TRACK: '1'
+      AUTOUPDATER_Duplicati_SKIP_UPDATE: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - name: Build self-contained OSS package
+        run: python3 scripts/build-unix-agent.py --rid "${{ matrix.rid }}"
+      - name: Build integration tests
+        run: |
+          dotnet restore DariaTech.slnx --locked-mode
+          dotnet build DariaTech.slnx -c Release --no-restore
+      - name: Check Unix security and actual managed native backup/restore
+        env:
+          DARIATECH_ENGINE_NATIVE: ${{ github.workspace }}/artifacts/unix/${{ matrix.rid }}/payload/agent/engine/Duplicati.Server
+        run: dotnet test DariaTech/Tests/DariaTech.Tests.csproj -c Release --no-build --filter "FullyQualifiedName~UnixSecurityTests|Category=UnixNative"
+      - name: Check package and real service installation
+        run: sudo --preserve-env=PATH bash deploy/unix/tests/Smoke.sh "${{ matrix.rid }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DariaTechBackupAgent-${{ matrix.rid }}-pilot
+          path: artifacts/unix/${{ matrix.rid }}/*.tar.gz*
+          if-no-files-found: error

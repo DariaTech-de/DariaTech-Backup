@@ -4,6 +4,10 @@ using System.Text.Json;
 using DariaTech.Agent;
 using DariaTech.Contracts;
 
+if(args.Length==1&&args[0]=="--service-name"){System.Console.WriteLine(UnixServices.ServiceName);return;}
+if(args.Length==1&&args[0]=="--service-label"){System.Console.WriteLine(UnixServices.MacLabel);return;}
+if(args.Length==2&&args[0]=="--write-service-file"){UnixServices.Write(args[1]);return;}
+
 if(args.Length>0&&args[0]=="--initialize")
 {
  try{var provisioned=UnixProvisioning.Initialize(args);System.Console.WriteLine("Agent service configuration initialized; enrollment completes on service startup.");}
