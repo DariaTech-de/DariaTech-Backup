@@ -14,7 +14,7 @@ cd /opt/dariatech-backup
 git rev-parse HEAD
 ```
 
-Record the commit used for deployment. The following instructions build images locally from that checked-out source; a registry or GitHub Release binary is not required. This is the first management slice, not a completed production release; see IMPLEMENTATION_PLAN.md for outstanding features and release gates.
+Record the commit used for deployment. The following instructions build images locally from that checked-out source; a registry or GitHub Release binary is not required. See IMPLEMENTATION_PLAN.md and PRODUCTION_ROADMAP.md for implemented capabilities and remaining production release gates.
 
 ## Initial deployment
 
@@ -84,8 +84,8 @@ Caddy listens on 80/443. Point DNS at the host and allow certificate issuance. C
 
 - `/health/live` is process liveness; `/health/ready` checks PostgreSQL access. Health endpoints contain no tenant data. Console container runs as a non-root user with a read-only root filesystem, dropped capabilities and a writable dedicated key volume.
 - Persist postgres-data, console-keys and Caddy certificate/config volumes. Back up PostgreSQL AND the encryption master key using separate protected storage. Verify restoration in an isolated environment; losing the master key makes encrypted secrets unreadable.
-- Monitoring configuration: OfflineMinutes (default 30), BackupAgeHours (24), PollSeconds (60), LatestApprovedVersion (unset by default). A version entry only drives monitoring; it does not enable an updater.
-- SMTP/notifications and automatic configuration/update distribution are not implemented. Do not assume alerts send email.
+- Monitoring configuration: OfflineMinutes (30), BackupAgeHours (24), PollSeconds (60), RepeatedFailureCount (3), QuotaCriticalPercent (5), QuotaWarningPercent (10). Warning must exceed critical; invalid thresholds prevent startup. LatestApprovedVersion is a fallback; valid approved release records take precedence. Monitoring alone never enables an updater.
+- Notifications require the explicit SMTP overlay and real STARTTLS credentials. Managed configuration, signed operations and approved updates each require local agent opt-in and the documented trust keys; default deployments do not enable remote execution.
 - For updates: back up DB/key volumes, review migration SQL, run explicit migrate, deploy image, verify readiness and rollback plan. Never start an older binary against an incompatible migrated schema.
 - Build environment proxy CAs can be mounted with `docker build --secret id=proxy_bundle,src=/etc/ssl/certs/ca-certificates.crt -f DariaTech/Console/Dockerfile .`; retain TLS verification. The CA mount is not persisted in image layers.
 
