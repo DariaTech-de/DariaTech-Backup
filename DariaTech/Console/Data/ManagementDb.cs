@@ -74,7 +74,7 @@ public sealed class ManagementDb(DbContextOptions<ManagementDb> options, TenantS
    """));
   b.Entity<AuditEvent>().HasQueryFilter(x=>scope.Global || (scope.TenantId != null && x.TenantId == scope.TenantId));
   foreach(var entity in b.Model.GetEntityTypes())
-   foreach(var property in entity.GetProperties().Where(p=>p.ClrType==typeof(string))) property.SetMaxLength(property.Name is "EncryptedConfiguration" or "EncryptedPayload" or "Payload" ? 120000 : property.Name.Contains("Secret") || property.Name.Contains("Credential") ? 4096 : 1000);
+   foreach(var property in entity.GetProperties().Where(p=>p.ClrType==typeof(string))) property.SetMaxLength(property.Name is "EncryptedConfiguration" or "EncryptedPayload" or "Payload" or "EncryptedCatalog" ? 120000 : property.Name.Contains("Secret") || property.Name.Contains("Credential") ? 4096 : 1000);
  }
  public override int SaveChanges(bool acceptAllChangesOnSuccess) {ValidateScope();return base.SaveChanges(acceptAllChangesOnSuccess);}
  public override Task<int> SaveChangesAsync(CancellationToken ct=default)

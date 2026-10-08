@@ -103,7 +103,7 @@ public sealed class RemoteCommand : TenantEntity
 {
  public Guid DeviceId { get; set; } public Guid JobId { get; set; }
  public string RequestedBy { get; set; } = ""; public string? ApprovedBy { get; set; }
- public string EncryptedPayload { get; set; } = ""; public string Signature { get; set; } = "";
+ public string EncryptedPayload { get; set; } = ""; public string Signature { get; set; } = ""; public string? EncryptedCatalog {get;set;}
  public RemoteAction Action { get; set; } public DateTimeOffset Expires { get; set; }
  public string Status { get; set; } = "Pending"; public long? TaskId { get; set; }
  public string? ErrorCode { get; set; }

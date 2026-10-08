@@ -68,6 +68,8 @@ public sealed class EngineIntegrationTests
    using var historyReceiver=new HistoryFixtureHandler();using var historyConsole=new HttpClient(historyReceiver){BaseAddress=new Uri("https://test-only.invalid")};
    await adapter.CaptureHistory(historyConsole,await adapter.ReadJobs(ct.Token),ct.Token);Assert.That(historyReceiver.Runs.Count(x=>x.LocalJobId==id),Is.GreaterThanOrEqualTo(2));
    var captured=historyReceiver.Runs.Count;await adapter.CaptureHistory(historyConsole,await adapter.ReadJobs(ct.Token),ct.Token);Assert.That(historyReceiver.Runs.Count,Is.EqualTo(captured));
+   var points=await adapter.ReadCatalog(command with{Action=RemoteAction.ListRestorePoints},ct.Token);Assert.That(points.Points,Is.Not.Empty);
+   var catalog=await adapter.ReadCatalog(command with{Action=RemoteAction.ListRestoreFiles,Catalog=new(points.Points[0].Time,null)},ct.Token);Assert.That(catalog.Files,Is.Not.Empty);
    File.Delete(Path.Combine(source,"restore-check.bin"));
    using var restored=await client.PostAsJsonAsync($"/api/v1/backup/{id}/restore",new{paths=new[]{Path.Combine(source,"restore-check.bin")},time="now",restore_path=restore,overwrite=true,permissions=false,skip_metadata=true},ct.Token);restored.EnsureSuccessStatusCode();using var restoreTask=JsonDocument.Parse(await restored.Content.ReadAsStringAsync(ct.Token));await WaitTask(client,DuplicatiAdapter.Get(restoreTask.RootElement,"ID").ToString(),ct.Token,password,passphrase);
    var file=Directory.GetFiles(restore,"restore-check.bin",SearchOption.AllDirectories).Single();Assert.That(await File.ReadAllBytesAsync(file,ct.Token),Is.EqualTo(bytes));

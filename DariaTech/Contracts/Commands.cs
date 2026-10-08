@@ -2,18 +2,21 @@ using System.Security.Cryptography;
 using System.Text.Json;
 namespace DariaTech.Contracts;
 
-public enum RemoteAction { RunBackup, StopBackup, VerifyBackup, Restore }
+public enum RemoteAction { RunBackup, StopBackup, VerifyBackup, Restore, ListRestorePoints, ListRestoreFiles }
 public sealed record RestoreSelection(DateTimeOffset Snapshot,string[] Paths,string DestinationFolder);
-public sealed record CommandInput(Guid JobId,RemoteAction Action,RestoreSelection? Restore,int ValidMinutes);
-public sealed record DeviceCommand(Guid Id,Guid TenantId,Guid DeviceId,string LocalJobId,RemoteAction Action,RestoreSelection? Restore,DateTimeOffset Issued,DateTimeOffset Expires);
+public sealed record CommandInput(Guid JobId,RemoteAction Action,RestoreSelection? Restore,int ValidMinutes,CatalogRequest? Catalog=null);
+public sealed record DeviceCommand(Guid Id,Guid TenantId,Guid DeviceId,string LocalJobId,RemoteAction Action,RestoreSelection? Restore,DateTimeOffset Issued,DateTimeOffset Expires,CatalogRequest? Catalog=null);
 public sealed record SignedCommand(string Payload,string Signature);
-public sealed record CommandReceipt(string Status,long? TaskId,string? ErrorCode);
+public sealed record CommandReceipt(string Status,long? TaskId,string? ErrorCode,RestoreCatalog? Catalog=null);
 public static class CommandProtocol
 {
  public static bool Valid(DeviceCommand c,Guid device,DateTimeOffset now)
  {
   if(c.Id==Guid.Empty||c.TenantId==Guid.Empty||c.DeviceId!=device||!long.TryParse(c.LocalJobId,out var id)||id<1||!Enum.IsDefined(c.Action)
    ||c.Expires<=now||c.Issued>now.AddSeconds(30)||c.Expires<=c.Issued||c.Expires-c.Issued>TimeSpan.FromMinutes(30))return false;
+  if(c.Action==RemoteAction.ListRestorePoints)return c.Restore is null&&c.Catalog is null;
+  if(c.Action==RemoteAction.ListRestoreFiles)return c.Restore is null&&c.Catalog?.Snapshot is {} snapshot&&snapshot.Year>=2000&&snapshot<=now.AddMinutes(5)&&(c.Catalog.Prefix is null||c.Catalog.Prefix.Length<=1000&&!c.Catalog.Prefix.Any(char.IsControl));
+  if(c.Catalog is not null)return false;
   if(c.Action!=RemoteAction.Restore)return c.Restore is null;
   var s=c.Restore;return s is not null&&s.Paths is not null&&s.Paths.Length is >0 and <=500&&s.Paths.All(p=>!string.IsNullOrWhiteSpace(p)&&p.Length<=1000&&!p.Any(char.IsControl))
    &&s.Snapshot.Year>=2000&&s.Snapshot<=now.AddMinutes(5)&&SafeFolder(s.DestinationFolder);
@@ -32,3 +35,8 @@ public static class CommandProtocol
   if(!Valid(command,device,now))throw new CryptographicException("Expired or invalid command");return command;
  }
 }
+
+public sealed record CatalogRequest(DateTimeOffset? Snapshot,string? Prefix);
+public sealed record RestorePoint(DateTimeOffset Time,long? Files,long? Bytes);
+public sealed record RestoreFile(string Path,long? Bytes,bool Directory);
+public sealed record RestoreCatalog(RestorePoint[] Points,RestoreFile[] Files,bool Truncated);

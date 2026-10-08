@@ -180,6 +180,12 @@ public sealed class PostgresTests
   using var complete=await agent.PostAsJsonAsync($"/api/v1/agent/commands/{id}/receipt",new CommandReceipt("Completed",19,null));Assert.That(complete.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
   using var replay=await agent.PostAsJsonAsync($"/api/v1/agent/commands/{id}/receipt",new CommandReceipt("Accepted",19,null));Assert.That(replay.StatusCode,Is.EqualTo(HttpStatusCode.Conflict));
   Assert.That(await db.Audit.CountAsync(x=>x.Resource==id.ToString()),Is.EqualTo(4));
+  using var catalogRequest=await admin.PostAsJsonAsync("/api/v1/management/commands",new CommandInput(job.Id,RemoteAction.ListRestoreFiles,null,15,new(DateTimeOffset.UtcNow.AddDays(-1),null)));using var catalogDoc=System.Text.Json.JsonDocument.Parse(await catalogRequest.Content.ReadAsStringAsync());var catalogId=catalogDoc.RootElement.GetProperty("id").GetGuid();
+  var catalog=new RestoreCatalog([],[new("C:\\Private\\patient.txt",10,false)],false);
+  using var catalogReceipt=await agent.PostAsJsonAsync($"/api/v1/agent/commands/{catalogId}/receipt",new CommandReceipt("Completed",null,null,catalog));Assert.That(catalogReceipt.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  var encrypted=await db.Commands.Where(x=>x.Id==catalogId).Select(x=>x.EncryptedCatalog).SingleAsync();Assert.That(encrypted,Does.Not.Contain("patient.txt"));
+  var viewed=await admin.GetStringAsync($"/api/v1/management/commands/{catalogId}/catalog");Assert.That(viewed,Does.Contain("patient.txt"));
+  using var readonlyUser=await Login(UserRole.ReadOnly);using var catalogDenied=await readonlyUser.GetAsync($"/api/v1/management/commands/{catalogId}/catalog");Assert.That(catalogDenied.StatusCode,Is.EqualTo(HttpStatusCode.Forbidden));
  }
 
  [Test]public async Task NotificationOutboxDeduplicatesRetriesRemindsAndSendsRecovery()
