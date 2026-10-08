@@ -44,6 +44,8 @@ public sealed class BackupRun : TenantEntity
  public RunStatus Status { get; set; } public long? Bytes { get; set; } public long? Files { get; set; }
  public long? StorageBytes { get; set; } public double? Progress { get; set; }
  public string? ErrorCode { get; set; }
+ public long? QuotaFreeBytes {get;set;} public long? QuotaTotalBytes {get;set;}
+ public bool? QuotaWarning {get;set;} public bool? QuotaError {get;set;} public bool? RetentionError {get;set;}
 }
 public sealed class EnrollmentToken : TenantEntity
 {

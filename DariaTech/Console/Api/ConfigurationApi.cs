@@ -44,7 +44,10 @@ public static class ConfigurationApi
   {
    var agent=await DeviceAuthentication.Authenticate(ctx,db,scope);if(agent is null)return Results.Unauthorized();
    if(receipt.Revision<1||receipt.Status is not ("Applied" or "Rejected" or "Failed")||receipt.Status=="Applied"&&(!long.TryParse(receipt.LocalJobId,out var local)||local<1))return Results.BadRequest();
-   await using var tx=await db.Database.BeginTransactionAsync();await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({BitConverter.ToInt64(id.ToByteArray())})");
+   await using var tx=await db.Database.BeginTransactionAsync();
+   // Serialize job adoption with heartbeat/history before taking the configuration lock.
+   await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({BitConverter.ToInt64(agent.DeviceId.ToByteArray())})");
+   await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({BitConverter.ToInt64(id.ToByteArray())})");
    var job=await db.ManagedJobs.SingleOrDefaultAsync(x=>x.Id==id&&x.DeviceId==agent.DeviceId);if(job is null)return Results.NotFound();
    if(receipt.Revision>job.LatestRevision||receipt.Revision<job.AppliedRevision)return Results.Conflict();
    if(job.LastReportedRevision==receipt.Revision&&job.Status==receipt.Status)return Results.NoContent();

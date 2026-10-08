@@ -18,7 +18,7 @@ public static class HistoryApi
    {
     var job=jobs.Single(x=>x.LocalId==item.LocalJobId);var run=item.Run;
     if(await db.Runs.AnyAsync(x=>x.JobId==job.Id&&x.LocalRunId==run.LocalRunId))continue;
-    db.Runs.Add(new BackupRun{TenantId=agent.TenantId,JobId=job.Id,LocalRunId=run.LocalRunId,Started=run.Started,Completed=run.Completed,Status=run.Status,Bytes=run.Bytes,Files=run.Files,StorageBytes=run.StorageBytes,Progress=run.Progress,ErrorCode=run.ErrorCode});
+    db.Runs.Add(new BackupRun{TenantId=agent.TenantId,JobId=job.Id,LocalRunId=run.LocalRunId,Started=run.Started,Completed=run.Completed,Status=run.Status,Bytes=run.Bytes,Files=run.Files,StorageBytes=run.StorageBytes,Progress=run.Progress,ErrorCode=run.ErrorCode,QuotaFreeBytes=run.QuotaFreeBytes,QuotaTotalBytes=run.QuotaTotalBytes,QuotaWarning=run.QuotaWarning,QuotaError=run.QuotaError,RetentionError=run.RetentionError});
    }
    await db.SaveChangesAsync();await tx.CommitAsync();return Results.NoContent();
   }).RequireRateLimiting("Agent");

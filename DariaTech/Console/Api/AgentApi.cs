@@ -53,7 +53,7 @@ public static class AgentApi
      if(stored is null){stored=new BackupRun{TenantId=d.TenantId,JobId=job.Id,LocalRunId=run.LocalRunId,Started=run.Started};db.Runs.Add(stored);}
      // Terminal runs are immutable; delayed heartbeat cannot turn a completed run back into Running.
      if(stored.Completed is not null||stored.Status is RunStatus.Success or RunStatus.Warning or RunStatus.Failed or RunStatus.Cancelled)continue;
-     stored.Status=run.Status;stored.Completed=run.Completed;stored.Bytes=run.Bytes;stored.Files=run.Files;stored.StorageBytes=run.StorageBytes;stored.Progress=run.Progress;stored.ErrorCode=run.ErrorCode;
+     stored.Status=run.Status;stored.Completed=run.Completed;stored.Bytes=run.Bytes;stored.Files=run.Files;stored.StorageBytes=run.StorageBytes;stored.Progress=run.Progress;stored.ErrorCode=run.ErrorCode;stored.QuotaFreeBytes=run.QuotaFreeBytes;stored.QuotaTotalBytes=run.QuotaTotalBytes;stored.QuotaWarning=run.QuotaWarning;stored.QuotaError=run.QuotaError;stored.RetentionError=run.RetentionError;
     }
    }
    await db.SaveChangesAsync();await tx.CommitAsync();return Results.NoContent();
@@ -67,11 +67,11 @@ public static class AgentApi
   {
    if(!ManagementApi.Text(j.LocalId,80)||!ManagementApi.Text(j.Name,200))return false;
    if(j.LastRun is not {} v)continue;
-   if(!ManagementApi.Text(v.LocalRunId,100)||!Enum.IsDefined(v.Status)||v.Bytes<0||v.Files<0||v.StorageBytes<0||v.Started>now.AddMinutes(5)||v.Started<now.AddYears(-20)||v.Completed<v.Started||v.Completed>now.AddMinutes(5))return false;
+   if(!ManagementApi.Text(v.LocalRunId,100)||!Enum.IsDefined(v.Status)||v.Bytes<0||v.Files<0||v.StorageBytes<0||v.QuotaFreeBytes<0||v.QuotaTotalBytes<0||v.QuotaFreeBytes>v.QuotaTotalBytes&&v.QuotaTotalBytes>0||v.Started>now.AddMinutes(5)||v.Started<now.AddYears(-20)||v.Completed<v.Started||v.Completed>now.AddMinutes(5))return false;
    if(v.Status is RunStatus.Success or RunStatus.Warning or RunStatus.Failed or RunStatus.Cancelled && v.Completed is null && v.ErrorCode!="EngineOperationFailed")return false;
    if(v.Status==RunStatus.Running&&v.Completed is not null)return false;
    if(v.Progress is {} p&&(!double.IsFinite(p)||p<0||p>1))return false;
-   if(v.ErrorCode=="EngineOperationFailed"&&(v.Status!=RunStatus.Failed||v.Bytes is not null||v.Files is not null||v.StorageBytes is not null||v.Completed is not null))return false;
+   if(v.ErrorCode=="EngineOperationFailed"&&(v.Status!=RunStatus.Failed||v.Bytes is not null||v.Files is not null||v.StorageBytes is not null||v.Completed is not null||v.QuotaFreeBytes is not null||v.QuotaTotalBytes is not null||v.QuotaWarning is not null||v.QuotaError is not null||v.RetentionError is not null))return false;
    if(v.ErrorCode is not null&&!new[]{"BackupFailed","BackupWarning","EngineUnavailable","Cancelled","EngineOperationFailed"}.Contains(v.ErrorCode))return false;
   }
   if(r.ActiveOperation is {} progress&&(!r.EngineReachable||!ManagementApi.Text(progress.LocalJobId,80)||progress.TaskId<0||!double.IsFinite(progress.Fraction)||progress.Fraction<0||progress.Fraction>1||progress.Bytes<0||progress.Files<0||r.Jobs.All(x=>x.LocalId!=progress.LocalJobId)))return false;

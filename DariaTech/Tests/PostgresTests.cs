@@ -286,6 +286,16 @@ public sealed class PostgresTests
   }
   finally{Npgsql.NpgsqlConnection.ClearAllPools();await using var ddl=new Npgsql.NpgsqlCommand($"DROP OWNED BY {quotedRole}; DROP ROLE {quotedRole};",(Npgsql.NpgsqlConnection)owner.Database.GetDbConnection());await ddl.ExecuteNonQueryAsync();}
  }
+
+ [Test]public async Task MonitoringUsesRealQuotaRetentionRepeatedFailureAndVerificationSignals()
+ {
+  var(t,site)=await Customer();await using var db=Db();var now=DateTimeOffset.UtcNow;var d=new Device{TenantId=t.Id,SiteId=site.Id,EngineReachable=true,LastHeartbeat=now};db.Devices.Add(d);db.Agents.Add(new DariaTech.Console.Data.Agent{TenantId=t.Id,DeviceId=d.Id,Version="0.2.0.0",CredentialHash=Tokens.Hash(Tokens.Create())});var job=new BackupJob{TenantId=t.Id,DeviceId=d.Id,LocalId="1",Name="Signals"};db.Jobs.Add(job);
+  for(var i=0;i<3;i++)db.Runs.Add(new BackupRun{TenantId=t.Id,JobId=job.Id,LocalRunId="failure-"+i,Started=now.AddMinutes(-10+i),Completed=now.AddMinutes(-9+i),Status=RunStatus.Failed,QuotaTotalBytes=100,QuotaFreeBytes=1,QuotaError=false,RetentionError=true});
+  db.Commands.Add(new RemoteCommand{TenantId=t.Id,DeviceId=d.Id,JobId=job.Id,Action=RemoteAction.VerifyBackup,Expires=now,Status="Failed"});await db.SaveChangesAsync();await Monitoring.Evaluate(db,new(),now);
+  var codes=await db.Alerts.Where(x=>x.DeviceId==d.Id&&x.Resolved==null).Select(x=>x.Code).ToListAsync();Assert.That(codes,Does.Contain("RepeatedBackupFailures").And.Contain("StorageCapacityCritical").And.Contain("RetentionFailed").And.Contain("BackupVerificationFailed"));
+  db.Runs.Add(new BackupRun{TenantId=t.Id,JobId=job.Id,LocalRunId="recovered",Started=now,Completed=now.AddMinutes(1),Status=RunStatus.Success,QuotaTotalBytes=100,QuotaFreeBytes=90,QuotaError=false,RetentionError=false});db.Commands.Add(new RemoteCommand{TenantId=t.Id,DeviceId=d.Id,JobId=job.Id,Action=RemoteAction.VerifyBackup,Expires=now.AddMinutes(1),Status="Completed"});await db.SaveChangesAsync();await Monitoring.Evaluate(db,new(),now.AddMinutes(2));
+  Assert.That(await db.Alerts.CountAsync(x=>x.DeviceId==d.Id&&x.Resolved==null),Is.EqualTo(0));
+ }
  private sealed class TestFactory(string cs,string dir):WebApplicationFactory<Program>
  {
   protected override void ConfigureWebHost(IWebHostBuilder b)

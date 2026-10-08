@@ -60,7 +60,9 @@ public sealed class SecurityTests
   using var meta=JsonDocument.Parse("""{"TargetFilesSize":"4096","LastErrorMessage":"secret"}""");
   var report=DuplicatiAdapter.ParseResult(result.RootElement,meta.RootElement);Assert.That(report!.Status,Is.EqualTo(RunStatus.Warning));
   var json=JsonSerializer.Serialize(report);Assert.That(json,Does.Not.Contain("DoNotSend").And.Not.Contain("patient-name").And.Not.Contain("LastErrorMessage"));
-  Assert.That(report.StorageBytes,Is.EqualTo(4096));
+  Assert.That(report.StorageBytes,Is.EqualTo(4096));Assert.That(report.RetentionError,Is.Null);
+  using var unhealthy=JsonDocument.Parse("""{"MainOperation":"Backup","BeginTime":"2026-10-01T12:00:00Z","EndTime":"2026-10-01T12:10:00Z","ParsedResult":"Error","BackendStatistics":{"FreeQuotaSpace":1,"TotalQuotaSpace":100,"ReportedQuotaError":true},"DeleteResults":{"ParsedResult":"Error"}}""");
+  var signal=DuplicatiAdapter.ParseResult(unhealthy.RootElement,default)!;Assert.That(signal.QuotaFreeBytes,Is.EqualTo(1));Assert.That(signal.QuotaError,Is.True);Assert.That(signal.RetentionError,Is.True);
  }
  [Test]public void ManagedConfigurationRejectsScriptsUnencryptedStorageAndHostKeyBypass()
  {
