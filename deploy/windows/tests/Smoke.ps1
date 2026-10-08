@@ -71,6 +71,14 @@ try {
  if($jobs.Count -ne 0){throw 'Installer created unsolicited backup jobs'}
  $engine=Get-CimInstance Win32_Process -Filter "Name='Duplicati.Server.exe'"
  if(!$engine -or $engine.CommandLine.Contains($password)){throw 'Engine missing or password exposed on command line'}
+ $agentExe=Join-Path (Join-Path ${env:ProgramFiles} 'DariaTech Backup') 'DariaTech.Agent.exe'
+ $engineProcess=Get-Process -Id $engine.ProcessId;$ticks=$engineProcess.StartTime.ToUniversalTime().Ticks
+ & $agentExe --check-engine-port $engine.ProcessId $ticks 8210
+ if($LASTEXITCODE){throw 'Owned engine TCP connection was rejected'}
+ $rejected=Start-Process $agentExe -ArgumentList @('--check-engine-port',$PID.ToString(),((Get-Process -Id $PID).StartTime.ToUniversalTime().Ticks).ToString(),'8210') -Wait -PassThru -NoNewWindow -RedirectStandardError (Join-Path $temporary 'ownership-rejected.txt')
+ if(!$rejected.ExitCode){throw 'Foreign process ownership was accepted for the engine port'}
+ Write-Host 'PASS: authenticated connection ownership; rejected a foreign owner before sending HTTP data.'
+
  for($i=0;$i -lt 80;$i++) {
   if(Test-Path $env:FIXTURE_RESULT){$result=Get-Content $env:FIXTURE_RESULT -Raw|ConvertFrom-Json;if($result.enrolled -and $result.heartbeats -gt 0){break}}
   Start-Sleep 1

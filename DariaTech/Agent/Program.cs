@@ -4,6 +4,19 @@ using System.Text.Json;
 using DariaTech.Agent;
 using DariaTech.Contracts;
 
+// Read-only local diagnostic: connect without sending HTTP data or secrets.
+if(args.Length==4&&args[0]=="--check-engine-port")
+{
+ try
+ {
+  using var timeout=new CancellationTokenSource(TimeSpan.FromSeconds(10));
+  using var probe=await OwnedEngineConnection.Connect(new(int.Parse(args[1]),long.Parse(args[2])),int.Parse(args[3]),timeout.Token);
+  System.Console.WriteLine("Engine connection owner verified");
+ }
+ catch(Exception error){System.Console.Error.WriteLine($"Engine ownership check rejected ({error.GetType().Name})");Environment.ExitCode=2;}
+ return;
+}
+
 var builder=Host.CreateApplicationBuilder(new HostApplicationBuilderSettings{Args=args,ContentRootPath=AppContext.BaseDirectory});var options=builder.Configuration.GetSection("Agent").Get<AgentOptions>()??new();options.Validate();var state=new ProtectedState(options);
 if(args.Contains("enroll"))
 {
