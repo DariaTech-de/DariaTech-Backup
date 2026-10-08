@@ -44,6 +44,7 @@ public static class EngineInstallation
  }
  private static void Check(FileSystemInfo entry,bool installation,HashSet<string> trusted)
  {
+  if(!OperatingSystem.IsWindows())throw new PlatformNotSupportedException("Windows installation ACL required");
   if((entry.Attributes&FileAttributes.ReparsePoint)!=0)throw new InvalidOperationException("Engine installation cannot contain links or junctions");
   FileSystemSecurity acl=entry is DirectoryInfo directory?directory.GetAccessControl():((FileInfo)entry).GetAccessControl();
   if(acl.GetOwner(typeof(SecurityIdentifier))?.Value is not {} owner||!trusted.Contains(owner))
