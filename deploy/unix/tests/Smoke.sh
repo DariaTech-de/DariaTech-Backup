@@ -35,6 +35,7 @@ if [ "$(uname -s)" = Linux ]; then
  config=/etc/dariatech-backup/agent.json
  state=/var/lib/dariatech-backup
 else
+ printf '%s\n' 'CI: trusting the isolated HTTPS fixture CA'
  security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "$work/ca.pem"
  prefix='/Library/Application Support/DariaTechBackup/agent'
  config='/Library/Application Support/DariaTechBackup/config/agent.json'
@@ -49,6 +50,7 @@ printf '%s' "$FIXTURE_ENGINE_PASSWORD" > "$state/engine-password.txt"
 node "$repo/deploy/unix/tests/console-fixture.cjs" >/dev/null 2>&1 &
 node_pid=$!
 for attempt in {1..40}; do if curl --silent --fail https://127.0.0.1:18443/health >/dev/null; then break; fi; sleep 0.25; done
+printf '%s\n' 'CI: installing the native service'
 bash "$repo/artifacts/unix/$rid/payload/install.sh" --console-url https://127.0.0.1:18443 --enrollment-token-file "$work/token"
 for attempt in {1..90}; do
  if [ -f "$work/result.json" ] && python3 -c 'import json,sys;assert json.load(open(sys.argv[1]))["heartbeats"]>0' "$work/result.json" 2>/dev/null; then break; fi
@@ -64,11 +66,14 @@ test ! -e "$state/enrollment-token.txt"
 test ! -e "$state/engine-password.txt"
 identity_hash="$(openssl dgst -sha256 "$state/identity.bin")"
 # Service restart and installer upgrade must preserve the protected enrollment identity.
+printf '%s\n' 'CI: restarting the enrolled native service'
 if [ "$(uname -s)" = Linux ]; then systemctl restart DariaTechBackupAgent.service; else launchctl kickstart -k system/de.dariatech.dariatechbackupagent; fi
+printf '%s\n' 'CI: reinstalling and retaining the enrolled identity'
 bash "$repo/artifacts/unix/$rid/payload/install.sh"
 test "$(openssl dgst -sha256 "$state/identity.bin")" = "$identity_hash"
 # The token has already been consumed; the fixture refuses any second enrollment.
 test "$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["enrollments"])' "$work/result.json")" = 1
+printf '%s\n' 'CI: uninstalling the native service while retaining protected state'
 bash "$repo/artifacts/unix/$rid/payload/uninstall.sh"
 test -s "$state/identity.bin"
 test -s "$state/agent.key"

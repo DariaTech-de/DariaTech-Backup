@@ -33,6 +33,17 @@ public sealed class SourceTests
   Assert.That(ProxmoxWorkloads.ArchiveGuest("vzdump-lxc-102-2026_10_08-08_00_00.tar.zst"),Is.EqualTo((102,"lxc")));
   Assert.That(ProxmoxWorkloads.ArchiveGuest("vzdump-qemu-101-2026_10_08-08_00_00.tar.zst"),Is.Null);
  }
+ [Test]public void ImageImportSelectionCannotEnableOverwriteOrInjectAStorageCommand()
+ {
+  var now=DateTimeOffset.UtcNow;var selection=new ProxmoxRestoreSelection(1,now.AddDays(-1),"/staging/latest/vzdump-qemu-101-2026_10_07-08_00_00.vma.zst",901,"customer-storage",true);
+  var command=new DeviceCommand(Guid.NewGuid(),Guid.NewGuid(),Guid.NewGuid(),"1",RemoteAction.RestoreProxmox,null,now,now.AddMinutes(10),ProxmoxRestore:selection);
+  Assert.That(CommandProtocol.Valid(command,command.DeviceId,now),Is.True);
+  Assert.That(CommandProtocol.Valid(command with{ProxmoxRestore=selection with{ConfirmImport=false}},command.DeviceId,now),Is.False);
+  Assert.That(CommandProtocol.Valid(command with{ProxmoxRestore=selection with{Storage="local; reboot"}},command.DeviceId,now),Is.False);
+  Assert.That(CommandProtocol.Valid(command with{Action=RemoteAction.RunBackup},command.DeviceId,now),Is.False);
+  var binding=new ManagedSourceBinding(Guid.NewGuid(),1,["/staging/latest/"],[],new([101]));
+  Assert.Throws<InvalidOperationException>(()=>ProxmoxRestore.Authorize(new AgentOptions(),binding,selection));
+ }
  [Test]public void ProxmoxHostFileJobsCannotCrossLocallyAssignedCustomerBoundary()
  {
   var options=new AgentOptions{AllowProxmoxSnapshots=true,AllowedFileSourceRoots=["/customer/one"]};

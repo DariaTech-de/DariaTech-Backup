@@ -12,6 +12,7 @@ else{
  <option value="RunBackup">Backup starten</option><option value="StopBackup">Lauf stoppen</option><option value="VerifyBackup">Backup prüfen</option>
  <option value="ListRestorePoints">Restore-Zeitpunkte laden</option><option value="ListRestoreFiles">Dateien / Objekte laden</option>
  @if(Model.Administrator){<option value="Restore">Dateien in neues lokales Restore-Verzeichnis wiederherstellen</option>}
+ @if(Model.Administrator&&Model.Proxmox){<option value="RestoreProxmox">Proxmox-Gast aus ausgewähltem Archiv wiederherstellen</option>}
  @if(Model.Administrator&&Model.Provider is not null){<option value="RestoreSaas">Objekte im SaaS-Tenant wiederherstellen</option>}
  </select>
  <label asp-for="Snapshot">Sicherungszeitpunkt · UTC</label><input asp-for="Snapshot" type="datetime-local" asp-format="{0:yyyy-MM-ddTHH:mm}" />
@@ -21,6 +22,11 @@ else{
  @if(Model.Provider is not null){
  <label asp-for="ProviderTarget">SaaS-Restore · relativer Zielpfad im selben Tenant</label><input asp-for="ProviderTarget" />
  <label><input asp-for="ConfirmProviderWrites" /> Ich bestätige Schreibzugriffe durch den SaaS-Restore auf diesen Tenant.</label>
+ }
+ @if(Model.Proxmox){
+ <label asp-for="TargetGuestId">Neue Proxmox-Gast-ID</label><input asp-for="TargetGuestId" type="number" min="100" max="999999999" />
+ <label asp-for="ProxmoxStorage">Lokal freigegebener Proxmox-Storage</label><input asp-for="ProxmoxStorage" />
+ <label><input asp-for="ConfirmGuestImport" /> Ich bestätige den Import genau eines ausgewählten VM-/LXC-Archivs. Der Gast bleibt ausgeschaltet und bestehende Gast-IDs werden abgelehnt.</label>
  }
  <p>Restore benötigt die Freigabe eines zweiten Administrators. Befehle sind signiert, gerätegebunden und laufen nach 15 Minuten ab. Der Agent benötigt seine lokale Freigabe für die jeweilige Aktion.</p>
  <button type="submit">Aktion anfordern</button>

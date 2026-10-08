@@ -92,13 +92,25 @@ public static class SourceChecks
    if(options.AllowProxmoxSnapshots||requirements.Length>0)RejectLinks(source);
   }
  }
+ public static void RejectFileLinks(string path)
+ {
+  var entry=File.Exists(path)?(FileSystemInfo)new FileInfo(path):new DirectoryInfo(path);
+  if((entry.Attributes&FileAttributes.ReparsePoint)!=0)throw new InvalidOperationException("Image archive tree contains a link");
+  RejectLinks(Path.GetDirectoryName(path)!);
+ }
+ public static string Executable(AgentOptions options)
+ {
+  var executable=options.SourceCheckExecutable??Path.Combine(AppContext.BaseDirectory,OperatingSystem.IsWindows()?"DariaTech.Agent.exe":"DariaTech.Agent");
+  if(Path.GetFileName(executable)!=(OperatingSystem.IsWindows()?"DariaTech.Agent.exe":"DariaTech.Agent"))throw new InvalidOperationException("Source check must use the installed native agent");
+  if(OperatingSystem.IsWindows())throw new PlatformNotSupportedException("Source preflight requires a native Unix agent");
+  UnixPrivatePaths.AgentInstallation(executable);return executable;
+ }
  public static string Hook(AgentOptions options,Guid job,long revision)
  {
   if(options.ConfigurationFile is null||!Path.IsPathFullyQualified(options.ConfigurationFile))throw new InvalidOperationException("Source preflight requires a protected service configuration");
   if(OperatingSystem.IsWindows())RestoreRootSecurity.Validate(Path.GetDirectoryName(options.ConfigurationFile)!);else UnixPrivatePaths.File(options.ConfigurationFile);
-  var executable=options.SourceCheckExecutable??Path.Combine(AppContext.BaseDirectory,OperatingSystem.IsWindows()?"DariaTech.Agent.exe":"DariaTech.Agent");
-  if(Path.GetFileName(executable)!=(OperatingSystem.IsWindows()?"DariaTech.Agent.exe":"DariaTech.Agent"))throw new InvalidOperationException("Source check must use the installed native agent");
-  EngineInstallation.ValidateExternal(executable);
+  if(OperatingSystem.IsWindows())throw new InvalidOperationException("Unix mount guards require Unix; Windows uses absolute UNC sources");
+  var executable=Executable(options);
   static string Quote(string input)
   {
    if(input.Any(c=>char.IsControl(c)||c=='"'))throw new InvalidOperationException("Unsafe preflight path");

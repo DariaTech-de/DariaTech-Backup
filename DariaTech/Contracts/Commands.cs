@@ -2,10 +2,11 @@ using System.Security.Cryptography;
 using System.Text.Json;
 namespace DariaTech.Contracts;
 
-public enum RemoteAction { RunBackup, StopBackup, VerifyBackup, Restore, ListRestorePoints, ListRestoreFiles, RestoreSaas }
+public enum RemoteAction { RunBackup, StopBackup, VerifyBackup, Restore, ListRestorePoints, ListRestoreFiles, RestoreSaas, RestoreProxmox }
 public sealed record RestoreSelection(DateTimeOffset Snapshot,string[] Paths,string DestinationFolder);
 public sealed record CommandInput(Guid JobId,RemoteAction Action,RestoreSelection? Restore,int ValidMinutes,CatalogRequest? Catalog=null,
- [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] SaasRestoreSelection? SaasRestore=null);
+ [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] SaasRestoreSelection? SaasRestore=null,
+ [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] ProxmoxRestoreSelection? ProxmoxRestore=null);
 public sealed record DeviceCommand(Guid Id,Guid TenantId,Guid DeviceId,string LocalJobId,RemoteAction Action,RestoreSelection? Restore,DateTimeOffset Issued,DateTimeOffset Expires,CatalogRequest? Catalog=null,
  [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] SaasRestoreSelection? SaasRestore=null);
 public sealed record SignedCommand(string Payload,string Signature);
@@ -16,6 +17,8 @@ public static class CommandProtocol
  {
   if(c.Id==Guid.Empty||c.TenantId==Guid.Empty||c.DeviceId!=device||!long.TryParse(c.LocalJobId,out var id)||id<1||!Enum.IsDefined(c.Action)
    ||c.Expires<=now||c.Issued>now.AddSeconds(30)||c.Expires<=c.Issued||c.Expires-c.Issued>TimeSpan.FromMinutes(30))return false;
+  if(c.Action==RemoteAction.RestoreProxmox)return c.Restore is null&&c.Catalog is null&&c.SaasRestore is null&&ProxmoxPolicy.ValidRestore(c.ProxmoxRestore,now);
+  if(c.ProxmoxRestore is not null)return false;
   if(c.Action==RemoteAction.RestoreSaas)return c.Restore is null&&c.Catalog is null&&SaasPolicy.ValidRestore(c.SaasRestore,now);
   if(c.SaasRestore is not null)return false;
   if(c.Action==RemoteAction.ListRestorePoints)return c.Restore is null&&c.Catalog is null;

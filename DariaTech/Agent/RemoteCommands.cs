@@ -11,6 +11,7 @@ public sealed partial class DuplicatiAdapter
   var jobs=await ReadJobs(ct);if(jobs.All(x=>x.LocalId!=command.LocalJobId))throw new InvalidOperationException("Backup job no longer exists");
   var cloudBindings=state.Read<Dictionary<string,SaasJobBinding>>("saas-bindings.bin")??[];
   if(command.Action==RemoteAction.RunBackup&&cloudBindings.TryGetValue(command.LocalJobId,out var cloud))await RequireSaasProvider(cloud.Source,false,ct);
+  if(command.Action==RemoteAction.RestoreProxmox)return await RestoreProxmox(command,ct);
   if(command.Action==RemoteAction.RestoreSaas)return await RestoreSaas(command,ct);
   HttpResponseMessage response;
   if(command.Action==RemoteAction.StopBackup)
@@ -96,9 +97,10 @@ public static class RemoteCommands
    var receipt=entry.Receipt??new CommandReceipt("Indeterminate",null,"DispatchIndeterminate");
    if(receipt.Status=="Accepted"&&receipt.TaskId is {} task)
    {
-    if(state.Read<Guid>("engine-instance.bin")!=entry.EngineInstance)receipt=new("Indeterminate",task,"DispatchIndeterminate");
+    if(entry.Command.Action==RemoteAction.RestoreProxmox&&ProxmoxRestore.IndependentReceipt(state,id) is {} independent)receipt=independent;
+    else if(state.Read<Guid>("engine-instance.bin")!=entry.EngineInstance)receipt=new("Indeterminate",task,"DispatchIndeterminate");
     else
-    try{receipt=await adapter.TaskReceipt(task,ct);if(state.Read<Guid>("engine-instance.bin")!=entry.EngineInstance)receipt=new("Indeterminate",task,"DispatchIndeterminate");}
+    try{receipt=entry.Command.Action==RemoteAction.RestoreProxmox?await adapter.ProxmoxReceipt(id,task,ct):await adapter.TaskReceipt(task,ct);if(state.Read<Guid>("engine-instance.bin")!=entry.EngineInstance)receipt=new("Indeterminate",task,"DispatchIndeterminate");}
     catch(HttpRequestException){continue;} // Preserve accepted task; do not mistake missing history for success.
    }
    journal[id]=entry with{Receipt=receipt};state.Write("commands.bin",journal);

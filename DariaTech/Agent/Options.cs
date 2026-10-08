@@ -18,6 +18,9 @@ public sealed class AgentOptions
  public string? SourceCheckExecutable {get;set;}
  public DariaTech.Contracts.SourceMountRequirement[] RequiredSourceMounts {get;set;}=[];
  public bool AllowProxmoxSnapshots {get;set;}
+ public bool AllowProxmoxRestore {get;set;}
+ public int[] AllowedProxmoxRestoreGuestIds {get;set;}=[];
+ public string[] AllowedProxmoxRestoreStorages {get;set;}=[];
  public int[] AllowedProxmoxGuestIds {get;set;}=[];
  public string? ProxmoxDumpRoot {get;set;}
  public long ProxmoxMinimumFreeBytes {get;set;}=10737418240;
@@ -35,6 +38,7 @@ public sealed class AgentOptions
   if(!string.IsNullOrWhiteSpace(ExternalEngineExecutable)&&(!ManageEngine||AllowAgentUpdates))throw new InvalidOperationException("External engine requires managed operation and separate manual engine/agent updates");
   if(RequiredSourceMounts.Length>100||RequiredSourceMounts.Any(x=>!DariaTech.Contracts.SourcePolicy.ValidMount(x)))throw new InvalidOperationException("Invalid local mount identities");
   if(AllowProxmoxSnapshots&&(!OperatingSystem.IsLinux()||!ManageEngine||ProxmoxDumpRoot is null||!Path.IsPathFullyQualified(ProxmoxDumpRoot)||AllowedProxmoxGuestIds is not {Length:>0 and <=100}||AllowedProxmoxGuestIds.Any(x=>x is <100 or >999999999)||AllowedFileSourceRoots.Length==0||AllowedFileSourceRoots.Any(x=>!Path.IsPathFullyQualified(x))||ProxmoxMinimumFreeBytes<1073741824))throw new InvalidOperationException("Proxmox needs Linux, private staging, explicit guest and file-source allowlists and reserved free space");
+  if(AllowProxmoxRestore&&(!AllowProxmoxSnapshots||!AllowRemoteCommands||RestoreRoot is null||AllowedProxmoxRestoreGuestIds.Length is <1 or >100||AllowedProxmoxRestoreGuestIds.Any(x=>x is <100 or >999999999)||AllowedProxmoxRestoreStorages.Length is <1 or >100||AllowedProxmoxRestoreStorages.Any(x=>!DariaTech.Contracts.ProxmoxPolicy.ValidRestore(new(1,DateTimeOffset.UtcNow,"/check",100,x,true),DateTimeOffset.UtcNow))))throw new InvalidOperationException("Proxmox restore requires local guest-ID, storage, signed-command and protected restore-root authorization");
   if(AllowSaasWorkloads&&(!ManageEngine||AllowedSaasTenants is not {Length:>0 and <=100}||AllowedSaasTenants.Any(string.IsNullOrWhiteSpace)))throw new InvalidOperationException("SaaS requires a managed engine and local cloud-tenant allowlist");
   if(AllowSaasRestore&&(!AllowSaasWorkloads||!AllowRemoteCommands))throw new InvalidOperationException("SaaS restore requires local SaaS and signed-command opt-ins");
   if(AllowUnlicensedSaasDevelopment&&!SaasWorkloads.DevelopmentTestingAllowed)throw new InvalidOperationException("Unlicensed SaaS testing requires the isolated development environment");

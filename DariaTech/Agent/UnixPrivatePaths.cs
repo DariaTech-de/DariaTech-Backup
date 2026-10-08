@@ -40,10 +40,12 @@ public static class UnixPrivatePaths
   var file=new FileInfo(Path.GetFullPath(path));if(!file.Exists)throw new InvalidOperationException("Trusted file missing");
   Ancestors(file.Directory!);Check(file,false,true);
  }
- public static void Installation(string executable)
+ public static void Installation(string executable)=>ValidateInstallation(executable,["Duplicati.Server","duplicati-server"]);
+ public static void AgentInstallation(string executable)=>ValidateInstallation(executable,["DariaTech.Agent"]);
+ private static void ValidateInstallation(string executable,string[] names)
  {
   if(OperatingSystem.IsWindows())throw new PlatformNotSupportedException();
-  if(!Path.IsPathFullyQualified(executable)||!System.IO.File.Exists(executable)||Path.GetFileName(executable) is not ("Duplicati.Server" or "duplicati-server"))throw new InvalidOperationException("Absolute native engine executable required");
+  if(!Path.IsPathFullyQualified(executable)||!System.IO.File.Exists(executable)||!names.Contains(Path.GetFileName(executable),StringComparer.Ordinal))throw new InvalidOperationException("Absolute native engine executable required");
   var root=new DirectoryInfo(Path.GetDirectoryName(executable)!);Ancestors(root);
   var directories=new Stack<DirectoryInfo>();directories.Push(root);var count=0;var ownership=new List<string>();
   while(directories.TryPop(out var directory))

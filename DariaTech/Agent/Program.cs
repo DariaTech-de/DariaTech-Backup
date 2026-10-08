@@ -4,6 +4,12 @@ using System.Text.Json;
 using DariaTech.Agent;
 using DariaTech.Contracts;
 
+if(args.Length==3&&args[0]=="--import-proxmox")
+{
+ try{using var deadline=new CancellationTokenSource(TimeSpan.FromHours(6));await ProxmoxRestore.Apply(args[1],Guid.Parse(args[2]),deadline.Token);}
+ catch(Exception error){System.Console.Error.WriteLine($"Native guest import failed ({error.GetType().Name}); inspect the local Proxmox task and retained journal before retrying.");Environment.ExitCode=2;}
+ return;
+}
 if(args.Length==4&&args[0]=="--check-managed-source")
 {
  if(!string.Equals(Environment.GetEnvironmentVariable("DUPLICATI__OPERATIONNAME"),"Backup",StringComparison.OrdinalIgnoreCase))return;

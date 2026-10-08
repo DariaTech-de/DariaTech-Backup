@@ -18,3 +18,12 @@ public static class SourcePolicy
   !string.IsNullOrWhiteSpace(mount.RemoteSource)&&mount.RemoteSource.Length<=1000&&!mount.RemoteSource.Any(char.IsControl)&&
   (!mount.RemoteSource.Contains('@')||mount.RemoteSource.StartsWith("//",StringComparison.Ordinal)&&!mount.RemoteSource[2..mount.RemoteSource.IndexOf('@')].Contains(':')); // A macOS SMB username is allowed; passwords in user-info are rejected.
 }
+
+public sealed record ProxmoxRestoreSelection(long ConfigurationRevision,DateTimeOffset Snapshot,string ArchivePath,int TargetGuestId,string Storage,bool ConfirmImport);
+public static class ProxmoxPolicy
+{
+ public static bool ValidRestore(ProxmoxRestoreSelection? s,DateTimeOffset now)=>s is not null&&s.ConfigurationRevision>0&&s.ConfirmImport&&
+  s.Snapshot.Year>=2000&&s.Snapshot<=now.AddMinutes(5)&&s.TargetGuestId is >=100 and <=999999999&&
+  !string.IsNullOrWhiteSpace(s.ArchivePath)&&s.ArchivePath.Length<=1000&&!s.ArchivePath.Any(char.IsControl)&&
+  !string.IsNullOrWhiteSpace(s.Storage)&&s.Storage.Length<=100&&s.Storage.All(c=>char.IsAsciiLetterOrDigit(c)||c is '-' or '_');
+}

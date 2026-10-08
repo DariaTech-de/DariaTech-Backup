@@ -10,7 +10,7 @@ public static class AgentUpdates
 {
  public static async Task Synchronize(HttpClient console,DuplicatiAdapter adapter,AgentOptions options,ProtectedState state,CancellationToken ct)
  {
-  if(!options.AllowAgentUpdates)return;
+  if(!options.AllowAgentUpdates||ProxmoxRestore.Active(state,options.StateDirectory))return;
   var journal=state.Read<UpdateJournal>("update.bin");
   if(journal is {Status:"ApplyFailed"})
   {await Report(console,journal.DeploymentId,new("Failed","InstallationIndeterminate"),ct);state.Write("update.bin",journal with{Status="Failed"});return;}

@@ -8,8 +8,8 @@ public static class UnixProvisioning
  {
   if(OperatingSystem.IsWindows()||UnixPrivatePaths.EffectiveUserId!=0)throw new InvalidOperationException("Unix service provisioning requires root");
   var values=new Dictionary<string,string>(StringComparer.Ordinal);var flags=new HashSet<string>(StringComparer.Ordinal);
-  var allowed=new HashSet<string>(["--agent-config","--console-url","--state-directory","--engine-port","--enrollment-token-file","--command-key-file","--update-key-file","--restore-root","--external-engine","--saas-tenants","--proxmox-guest-ids","--proxmox-dump-root","--file-source-roots","--required-mounts-file"],StringComparer.Ordinal);
-  var switches=new HashSet<string>(["--allow-remote-commands","--allow-managed-configuration","--allow-agent-updates","--allow-saas","--allow-saas-restore","--allow-proxmox-snapshots"],StringComparer.Ordinal);
+  var allowed=new HashSet<string>(["--agent-config","--console-url","--state-directory","--engine-port","--enrollment-token-file","--command-key-file","--update-key-file","--restore-root","--external-engine","--saas-tenants","--proxmox-guest-ids","--proxmox-dump-root","--file-source-roots","--required-mounts-file","--proxmox-restore-guest-ids","--proxmox-restore-storages"],StringComparer.Ordinal);
+  var switches=new HashSet<string>(["--allow-remote-commands","--allow-managed-configuration","--allow-agent-updates","--allow-saas","--allow-saas-restore","--allow-proxmox-snapshots","--allow-proxmox-restore"],StringComparer.Ordinal);
   for(var i=1;i<args.Length;i++)
   {
    if(switches.Contains(args[i])){if(!flags.Add(args[i]))throw new InvalidOperationException("Duplicate provisioning option");continue;}
@@ -53,6 +53,9 @@ public static class UnixProvisioning
   if(values.TryGetValue("--proxmox-dump-root",out var dump)){UnixPrivatePaths.Directory(dump,true);options.ProxmoxDumpRoot=Path.GetFullPath(dump);}
   if(values.TryGetValue("--file-source-roots",out var fileRoots))options.AllowedFileSourceRoots=fileRoots.Split(',',StringSplitOptions.RemoveEmptyEntries|StringSplitOptions.TrimEntries);
   if(values.TryGetValue("--required-mounts-file",out var mounts)){UnixPrivatePaths.File(mounts);options.RequiredSourceMounts=JsonSerializer.Deserialize<DariaTech.Contracts.SourceMountRequirement[]>(File.ReadAllText(mounts))??throw new InvalidOperationException("Mount identities required");}
+  if(values.TryGetValue("--proxmox-restore-guest-ids",out var restoreIds))options.AllowedProxmoxRestoreGuestIds=restoreIds.Split(',',StringSplitOptions.RemoveEmptyEntries).Select(x=>int.Parse(x,System.Globalization.CultureInfo.InvariantCulture)).ToArray();
+  if(values.TryGetValue("--proxmox-restore-storages",out var storages))options.AllowedProxmoxRestoreStorages=storages.Split(',',StringSplitOptions.RemoveEmptyEntries|StringSplitOptions.TrimEntries);
+  options.AllowProxmoxRestore|=flags.Contains("--allow-proxmox-restore");
   options.AllowProxmoxSnapshots|=flags.Contains("--allow-proxmox-snapshots");
   options.AllowRemoteCommands|=flags.Contains("--allow-remote-commands");
   options.AllowManagedConfiguration|=flags.Contains("--allow-managed-configuration");
