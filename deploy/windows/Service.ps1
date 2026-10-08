@@ -45,6 +45,8 @@ if ($Action -eq 'Prepare') {
  } else { New-Item -ItemType Directory -Path $state | Out-Null }
  $acl=New-Object System.Security.AccessControl.DirectorySecurity
  $acl.SetAccessRuleProtection($true,$false)
+ # Stable privileged ownership permits SYSTEM-driven upgrades without trusting an individual installer account.
+ $acl.SetOwner((New-Object System.Security.Principal.SecurityIdentifier('S-1-5-32-544')))
  foreach ($sid in 'S-1-5-18','S-1-5-32-544') {
   $identity=New-Object System.Security.Principal.SecurityIdentifier($sid)
   $rule=New-Object System.Security.AccessControl.FileSystemAccessRule($identity,'FullControl','ContainerInherit,ObjectInherit','None','Allow')

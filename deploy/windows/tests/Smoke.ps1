@@ -56,6 +56,7 @@ try {
  $state=Join-Path $env:ProgramData 'DariaTechBackup'
  if(Test-Path (Join-Path $state 'enrollment-token.txt')){throw 'Enrollment input was not consumed'}
  if(Test-Path (Join-Path $state 'engine-password.txt')){throw 'Engine password input was not consumed'}
+ if((Get-Acl $state).GetOwner([Security.Principal.SecurityIdentifier]).Value -ne 'S-1-5-32-544'){throw 'Agent state owner is not the stable Administrators group'}
  $acl=Get-Acl $state
  if(!$acl.AreAccessRulesProtected){throw 'State directory inherits unsafe ACLs'}
  foreach($rule in $acl.Access){$sid=$rule.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value;if($sid -notin @('S-1-5-18','S-1-5-32-544')){throw 'Unexpected state ACL principal'}}
