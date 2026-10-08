@@ -14,11 +14,18 @@ public sealed class AgentOptions
  public string? RestoreRoot {get;set;}
  public bool AllowManagedConfiguration {get;set;}
  public bool ManageEngine {get;set;}
+ public bool AllowSaasWorkloads {get;set;}
+ public bool AllowSaasRestore {get;set;}
+ public string[] AllowedSaasTenants {get;set;}=[];
+ public bool AllowUnlicensedSaasDevelopment {get;set;}
  public string? ExternalEngineExecutable {get;set;}
  public string Version=>typeof(AgentOptions).Assembly.GetName().Version?.ToString()??"unknown";
  public void Validate()
  {
   if(!string.IsNullOrWhiteSpace(ExternalEngineExecutable)&&(!ManageEngine||AllowAgentUpdates))throw new InvalidOperationException("External engine requires managed operation and separate manual engine/agent updates");
+  if(AllowSaasWorkloads&&(!ManageEngine||AllowedSaasTenants is not {Length:>0 and <=100}||AllowedSaasTenants.Any(string.IsNullOrWhiteSpace)))throw new InvalidOperationException("SaaS requires a managed engine and local cloud-tenant allowlist");
+  if(AllowSaasRestore&&(!AllowSaasWorkloads||!AllowRemoteCommands))throw new InvalidOperationException("SaaS restore requires local SaaS and signed-command opt-ins");
+  if(AllowUnlicensedSaasDevelopment&&!SaasWorkloads.DevelopmentTestingAllowed)throw new InvalidOperationException("Unlicensed SaaS testing requires the isolated development environment");
   if(AllowRemoteCommands&&!ManageEngine)throw new InvalidOperationException("Remote commands require an installer-managed engine instance");
   if(AllowRemoteCommands&&(string.IsNullOrWhiteSpace(CommandPublicKeyFile)||!File.Exists(CommandPublicKeyFile)))throw new InvalidOperationException("Pinned command public key required");
   if(AllowAgentUpdates&&(!ManageEngine||string.IsNullOrWhiteSpace(UpdatePublicKeyFile)||!File.Exists(UpdatePublicKeyFile)||UpdateDownloadHosts.Length==0))throw new InvalidOperationException("Managed engine and pinned update key required");

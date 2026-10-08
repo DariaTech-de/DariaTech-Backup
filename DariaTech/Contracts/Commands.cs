@@ -2,10 +2,12 @@ using System.Security.Cryptography;
 using System.Text.Json;
 namespace DariaTech.Contracts;
 
-public enum RemoteAction { RunBackup, StopBackup, VerifyBackup, Restore, ListRestorePoints, ListRestoreFiles }
+public enum RemoteAction { RunBackup, StopBackup, VerifyBackup, Restore, ListRestorePoints, ListRestoreFiles, RestoreSaas }
 public sealed record RestoreSelection(DateTimeOffset Snapshot,string[] Paths,string DestinationFolder);
-public sealed record CommandInput(Guid JobId,RemoteAction Action,RestoreSelection? Restore,int ValidMinutes,CatalogRequest? Catalog=null);
-public sealed record DeviceCommand(Guid Id,Guid TenantId,Guid DeviceId,string LocalJobId,RemoteAction Action,RestoreSelection? Restore,DateTimeOffset Issued,DateTimeOffset Expires,CatalogRequest? Catalog=null);
+public sealed record CommandInput(Guid JobId,RemoteAction Action,RestoreSelection? Restore,int ValidMinutes,CatalogRequest? Catalog=null,
+ [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] SaasRestoreSelection? SaasRestore=null);
+public sealed record DeviceCommand(Guid Id,Guid TenantId,Guid DeviceId,string LocalJobId,RemoteAction Action,RestoreSelection? Restore,DateTimeOffset Issued,DateTimeOffset Expires,CatalogRequest? Catalog=null,
+ [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] SaasRestoreSelection? SaasRestore=null);
 public sealed record SignedCommand(string Payload,string Signature);
 public sealed record CommandReceipt(string Status,long? TaskId,string? ErrorCode,RestoreCatalog? Catalog=null);
 public static class CommandProtocol
@@ -14,6 +16,8 @@ public static class CommandProtocol
  {
   if(c.Id==Guid.Empty||c.TenantId==Guid.Empty||c.DeviceId!=device||!long.TryParse(c.LocalJobId,out var id)||id<1||!Enum.IsDefined(c.Action)
    ||c.Expires<=now||c.Issued>now.AddSeconds(30)||c.Expires<=c.Issued||c.Expires-c.Issued>TimeSpan.FromMinutes(30))return false;
+  if(c.Action==RemoteAction.RestoreSaas)return c.Restore is null&&c.Catalog is null&&SaasPolicy.ValidRestore(c.SaasRestore,now);
+  if(c.SaasRestore is not null)return false;
   if(c.Action==RemoteAction.ListRestorePoints)return c.Restore is null&&c.Catalog is null;
   if(c.Action==RemoteAction.ListRestoreFiles)return c.Restore is null&&c.Catalog?.Snapshot is {} snapshot&&snapshot.Year>=2000&&snapshot<=now.AddMinutes(5)&&(c.Catalog.Prefix is null||c.Catalog.Prefix.Length<=1000&&!c.Catalog.Prefix.Any(char.IsControl));
   if(c.Catalog is not null)return false;

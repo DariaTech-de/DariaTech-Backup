@@ -8,6 +8,8 @@ public sealed partial class DuplicatiAdapter
  public async Task<string> ApplyConfiguration(ConfigurationAssignment assignment,CancellationToken ct)
  {
   if(!ConfigurationPolicy.Valid(assignment.Definition))throw new InvalidOperationException("Configuration rejected");
+  if(assignment.Definition.Saas is {} source)await RequireSaasProvider(source,false,ct);
+  if(await HasPendingTasks(ct))throw new InvalidOperationException("Configuration cannot change while engine tasks are active");
   using var list=await client.GetAsync("/api/v1/backups",ct);list.EnsureSuccessStatusCode();
   using var doc=JsonDocument.Parse(await list.Content.ReadAsStreamAsync(ct));
   var tag=$"DariaTechManaged:{assignment.JobId:D}";
@@ -20,17 +22,25 @@ public sealed partial class DuplicatiAdapter
   var settings=definition.BackendOptions.Select(x=>new{Name=x.Key,Value=x.Value}).ToList();
   settings.AddRange(new[]{new{Name="encryption-module",Value="aes"},new{Name="passphrase",Value=definition.Passphrase},
    new{Name="keep-versions",Value=definition.KeepVersions.ToString(System.Globalization.CultureInfo.InvariantCulture)},new{Name="disable-module",Value="console-password-input"}});
+  var mountPoint=Path.Combine(Path.GetPathRoot(Path.GetFullPath(agentOptions.StateDirectory))!,"DariaTechCloud",assignment.JobId.ToString("D"));
+  var sources=definition.Sources;
+  if(definition.Saas is {} saas)
+  {
+   settings.AddRange(SaasPolicy.Options(saas).Select(x=>new{Name=x.Key,Value=x.Value}));
+   sources=["@"+mountPoint+"|"+SaasPolicy.Key(saas.Provider)+"://"];
+  }
   var previousSchedule=matches.Length==1?Get(matches[0],"Schedule"):default;
   var schedule=definition.Schedule is {} sc?new {ID=Get(previousSchedule,"ID").ValueKind==JsonValueKind.Number&&Get(previousSchedule,"ID").TryGetInt64(out var sid)?sid:0L,Time=sc.Start.UtcDateTime,Repeat=$"{sc.RepeatHours}h",AllowedDays=sc.Days.Select(x=>x.ToString()).ToArray()}:null;
-  var input=new{Backup=new{Name=definition.Name,TargetURL=definition.TargetUrl,Sources=definition.Sources,Settings=settings,
+  var input=new{Backup=new{Name=definition.Name,TargetURL=definition.TargetUrl,Sources=sources,Settings=settings,
    Tags=new[]{tag,$"DariaTechRevision:{assignment.Revision}"},Metadata=Get(old,"Metadata").ValueKind==JsonValueKind.Object?Get(old,"Metadata"):JsonSerializer.SerializeToElement(new{}),
    Filters=definition.Filters.Select((x,i)=>new{Order=i,x.Include,x.Expression})},Schedule=schedule};
   using var response=string.IsNullOrEmpty(id)?await client.PostAsJsonAsync("/api/v1/backups",input,ct):await client.PutAsJsonAsync($"/api/v1/backup/{Uri.EscapeDataString(id)}",input,ct);
   response.EnsureSuccessStatusCode();
-  if(!string.IsNullOrEmpty(id))return id;
+  if(!string.IsNullOrEmpty(id)){BindSaasJob(id,assignment,mountPoint);return id;}
   // Reconcile using stable engine tags rather than an in-memory response; safe after a service crash.
   using var result=await client.GetAsync("/api/v1/backups",ct);result.EnsureSuccessStatusCode();using var updated=JsonDocument.Parse(await result.Content.ReadAsStreamAsync(ct));
-  return updated.RootElement.EnumerateArray().Where(x=>Get(Get(x,"Backup"),"Tags") is var t&&t.ValueKind==JsonValueKind.Array&&t.EnumerateArray().Any(v=>v.GetString()==tag)).Select(x=>Get(Get(x,"Backup"),"ID").ToString()).Single();
+  var assignedId=updated.RootElement.EnumerateArray().Where(x=>Get(Get(x,"Backup"),"Tags") is var t&&t.ValueKind==JsonValueKind.Array&&t.EnumerateArray().Any(v=>v.GetString()==tag)).Select(x=>Get(Get(x,"Backup"),"ID").ToString()).Single();
+  BindSaasJob(assignedId,assignment,mountPoint);return assignedId;
  }
 }
 

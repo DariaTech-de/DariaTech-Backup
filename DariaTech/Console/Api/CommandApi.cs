@@ -20,12 +20,19 @@ public static class CommandApi
   {
    if(!signer.Enabled)return Results.Problem(statusCode:503,title:"Command signing is not configured");
    if(!Enum.IsDefined(input.Action)||input.ValidMinutes is <1 or >30)return Results.BadRequest();
-   if(input.Action==RemoteAction.Restore&&!ctx.User.IsInRole("Administrator")&&!ctx.User.IsInRole("SuperAdmin"))return Results.Forbid();
+   if(input.Action is RemoteAction.Restore or RemoteAction.RestoreSaas&&!ctx.User.IsInRole("Administrator")&&!ctx.User.IsInRole("SuperAdmin"))return Results.Forbid();
    var job=await db.Jobs.SingleOrDefaultAsync(x=>x.Id==input.JobId&&x.Active);if(job is null)return Results.NotFound();
    var device=await db.Devices.SingleOrDefaultAsync(x=>x.Id==job.DeviceId&&x.Active);if(device is null||!await db.Customers.AnyAsync(x=>x.TenantId==job.TenantId&&x.Active))return Results.NotFound();
-   var now=DateTimeOffset.UtcNow;var command=new DeviceCommand(Guid.NewGuid(),job.TenantId,job.DeviceId,job.LocalId,input.Action,input.Restore,now,now.AddMinutes(input.ValidMinutes),input.Catalog);
+   if(input.Action==RemoteAction.RestoreSaas)
+   {
+    var managed=await db.ManagedJobs.SingleOrDefaultAsync(x=>x.DeviceId==job.DeviceId&&x.LocalJobId==job.LocalId);
+    if(managed is null||managed.AppliedRevision!=managed.LatestRevision||input.SaasRestore?.ConfigurationRevision!=managed.AppliedRevision)return Results.Conflict(new{code="ConfigurationRevisionRequired"});
+    var revision=await db.ConfigurationRevisions.SingleAsync(x=>x.ManagedJobId==managed.Id&&x.Revision==managed.AppliedRevision);
+    if(ConfigurationApi.Read(secrets,revision).Saas is null)return Results.BadRequest();
+   }
+   var now=DateTimeOffset.UtcNow;var command=new DeviceCommand(Guid.NewGuid(),job.TenantId,job.DeviceId,job.LocalId,input.Action,input.Restore,now,now.AddMinutes(input.ValidMinutes),input.Catalog,input.SaasRestore);
    if(!CommandProtocol.Valid(command,job.DeviceId,now))return Results.BadRequest();
-   var signed=signer.Sign(command);if(signed.Payload.Length>80000)return Results.BadRequest();var record=new RemoteCommand{Id=command.Id,TenantId=job.TenantId,JobId=job.Id,DeviceId=job.DeviceId,RequestedBy=ctx.User.FindFirstValue(ClaimTypes.NameIdentifier)!,Action=command.Action,Expires=command.Expires,Status=command.Action==RemoteAction.Restore?"AwaitingApproval":"Pending",Signature=signed.Signature};
+   var signed=signer.Sign(command);if(signed.Payload.Length>80000)return Results.BadRequest();var record=new RemoteCommand{Id=command.Id,TenantId=job.TenantId,JobId=job.Id,DeviceId=job.DeviceId,RequestedBy=ctx.User.FindFirstValue(ClaimTypes.NameIdentifier)!,Action=command.Action,Expires=command.Expires,Status=command.Action is RemoteAction.Restore or RemoteAction.RestoreSaas?"AwaitingApproval":"Pending",Signature=signed.Signature};
    record.EncryptedPayload=secrets.Protect(job.TenantId,$"command:{record.Id}",signed.Payload);db.Commands.Add(record);ManagementApi.Audit(db,ctx,job.TenantId,"command.requested-"+command.Action.ToString().ToLowerInvariant(),record.Id);
    await db.SaveChangesAsync();return Results.Created($"/api/v1/management/commands/{record.Id}",new{record.Id,record.Status});
   }).RequireAuthorization("Operator");

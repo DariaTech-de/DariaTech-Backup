@@ -9,6 +9,7 @@ public sealed partial class DuplicatiAdapter
  public async Task<long> Dispatch(DeviceCommand command,AgentOptions options,CancellationToken ct)
  {
   var jobs=await ReadJobs(ct);if(jobs.All(x=>x.LocalId!=command.LocalJobId))throw new InvalidOperationException("Backup job no longer exists");
+  if(command.Action==RemoteAction.RestoreSaas)return await RestoreSaas(command,ct);
   HttpResponseMessage response;
   if(command.Action==RemoteAction.StopBackup)
   {
