@@ -226,6 +226,18 @@ public sealed class PostgresTests
   foreign.DefaultRequestHeaders.Authorization=new("Bearer",other.Credential);foreign.DefaultRequestHeaders.Add("X-Device-Id",other.DeviceId.ToString());using var none=await foreign.GetAsync("/api/v1/agent/update");Assert.That(none.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
   using var denied=await foreign.PostAsJsonAsync($"/api/v1/agent/updates/{assignment.DeploymentId}/receipt",new UpdateReceipt("Installed",null));Assert.That(denied.StatusCode,Is.EqualTo(HttpStatusCode.NotFound));
  }
+
+ [Test]public async Task LocalRecoveryRotatesCredentialsAndRevokesExistingSessions()
+ {
+  using var userClient=await Login(UserRole.SuperAdmin);await using var db=Db();var actor=await db.Audit.Where(x=>x.Action=="login.success").OrderByDescending(x=>x.Id).Select(x=>x.Actor).FirstAsync();var user=await db.Users.SingleAsync(x=>x.Id==Guid.Parse(actor));var oldVersion=user.SessionVersion;var oldSecret=user.TotpSecret;
+  var passwordFile=Path.Combine(directory,"recovery-password-"+Guid.NewGuid());var output=passwordFile+".totp";File.WriteAllText(passwordFile,"test-only-new-recovery-password-8291");
+  using var serviceScope=factory.Services.CreateScope();var secrets=serviceScope.ServiceProvider.GetRequiredService<ISecretStore>();var config=new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?>{{"Provision:Email",user.Email},{"Provision:PasswordFile",passwordFile},{"Provision:TotpOutputFile",output}}).Build();
+  await Provisioning.RecoverUser(db,secrets,config);Assert.That(user.SessionVersion,Is.Not.EqualTo(oldVersion));Assert.That(user.TotpSecret,Is.Not.EqualTo(oldSecret));Assert.That(File.Exists(output),Is.True);Assert.That(await db.Audit.AnyAsync(x=>x.Action=="user.credentials-recovered"&&x.Resource==user.Id.ToString()),Is.True);
+  using var revoked=await userClient.GetAsync("/api/v1/management/customers");Assert.That(revoked.StatusCode,Is.EqualTo(HttpStatusCode.Unauthorized));
+  var originalVersion=user.SessionVersion;Assert.ThrowsAsync<IOException>(async()=>await Provisioning.RecoverUser(db,secrets,config));
+  await db.Entry(user).ReloadAsync();Assert.That(user.SessionVersion,Is.EqualTo(originalVersion));
+  File.Delete(passwordFile);File.Delete(output);
+ }
  private sealed class TestFactory(string cs,string dir):WebApplicationFactory<Program>
  {
   protected override void ConfigureWebHost(IWebHostBuilder b)

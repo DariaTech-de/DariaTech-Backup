@@ -38,7 +38,7 @@ public sealed class SecurityTests
    Assert.That(store.Unprotect(tenant,"backup",encrypted),Is.EqualTo("test-secret"));
    Assert.Throws<AuthenticationTagMismatchException>(()=>store.Unprotect(Guid.NewGuid(),"backup",encrypted));
    Assert.Throws<AuthenticationTagMismatchException>(()=>store.Unprotect(tenant,"storage",encrypted));
-   var bytes=Convert.FromBase64String(encrypted);bytes[^1]^=1;Assert.Throws<AuthenticationTagMismatchException>(()=>store.Unprotect(tenant,"backup",Convert.ToBase64String(bytes)));
+   var parts=encrypted.Split(':');var bytes=Convert.FromBase64String(parts[2]);bytes[^1]^=1;Assert.Throws<AuthenticationTagMismatchException>(()=>store.Unprotect(tenant,"backup",string.Join(':',parts[0],parts[1],Convert.ToBase64String(bytes))));
   }finally{File.Delete(file);}
  }
  [Test]public void TelemetryRejectsRawErrorsAndInvalidCounts()
@@ -96,6 +96,20 @@ public sealed class SecurityTests
   Assert.That(AgentUpdates.AllowedDownload(new Uri("https://github.com.attacker.invalid/setup"),["github.com"]),Is.False);
   Assert.That(AgentUpdates.AllowedDownload(new Uri("https://127.0.0.1/setup"),["127.0.0.1"]),Is.False);
   var file=Path.GetTempFileName();try{await File.WriteAllBytesAsync(file,bytes);await AgentUpdates.VerifyArtifact(file,m,CancellationToken.None);bytes[0]^=1;await File.WriteAllBytesAsync(file,bytes);Assert.ThrowsAsync<CryptographicException>(async()=>await AgentUpdates.VerifyArtifact(file,m,CancellationToken.None));}finally{File.Delete(file);}
+ }
+ [Test]public void KeyRotationReadsLegacyEnvelopesAndWritesOnlyWithTheNewKey()
+ {
+  var directory=Path.Combine(Path.GetTempPath(),"keyring-"+Guid.NewGuid());Directory.CreateDirectory(directory);
+  var old=Path.Combine(directory,"old.key");var current=Path.Combine(directory,"new.key");File.WriteAllText(old,Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));File.WriteAllText(current,Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
+  try
+  {
+   using var oldStore=new EncryptedSecretStore(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?>{{"Security:MasterKeyFile",old}}).Build());
+   var tenant=Guid.NewGuid();var previous=oldStore.Protect(tenant,"rotation-test","test-only-old-secret");var legacy=previous.Split(':')[2];
+   using var rotated=new EncryptedSecretStore(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?>{{"Security:MasterKeyFile",current},{"Security:LegacyMasterKeyFiles",old}}).Build());
+   Assert.That(rotated.Unprotect(tenant,"rotation-test",previous),Is.EqualTo("test-only-old-secret"));Assert.That(rotated.Unprotect(tenant,"rotation-test",legacy),Is.EqualTo("test-only-old-secret"));
+   var next=rotated.Protect(tenant,"rotation-test","test-only-new-secret");Assert.That(next.Split(':')[1],Is.Not.EqualTo(previous.Split(':')[1]));
+   Assert.Throws<CryptographicException>(()=>oldStore.Unprotect(tenant,"rotation-test",next));Assert.Throws<AuthenticationTagMismatchException>(()=>rotated.Unprotect(Guid.NewGuid(),"rotation-test",legacy));
+  }finally{Directory.Delete(directory,true);}
  }
  [Test]public void AgentRejectsRemoteEngineAndInsecureConsole()
  {

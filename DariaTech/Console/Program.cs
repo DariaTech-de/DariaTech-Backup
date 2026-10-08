@@ -72,11 +72,12 @@ if(args.Contains("--protect-smtp-password"))
  if(!OperatingSystem.IsWindows())File.SetUnixFileMode(output,UnixFileMode.UserRead|UnixFileMode.UserWrite);
  return 0;
 }
-if(args.Contains("--migrate")||args.Contains("--bootstrap-user"))
+if(args.Contains("--migrate")||args.Contains("--bootstrap-user")||args.Contains("--recover-user"))
 {
  using var s=app.Services.CreateScope();s.ServiceProvider.GetRequiredService<TenantScope>().Maintenance=true;
  var db=s.ServiceProvider.GetRequiredService<ManagementDb>();
  if(args.Contains("--migrate")){await db.Database.MigrateAsync();return 0;}
+ if(args.Contains("--recover-user")){await Provisioning.RecoverUser(db,s.ServiceProvider.GetRequiredService<ISecretStore>(),builder.Configuration);return 0;}
  await Provisioning.CreateUser(db,s.ServiceProvider.GetRequiredService<ISecretStore>(),builder.Configuration);return 0;
 }
 // Startup NEVER changes production schema. Operator must run the explicit migration command.
