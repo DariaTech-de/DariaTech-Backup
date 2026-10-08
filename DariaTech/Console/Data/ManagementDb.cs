@@ -57,7 +57,7 @@ public sealed class ManagementDb(DbContextOptions<ManagementDb> options, TenantS
   b.Entity<NotificationDelivery>().HasOne<Alert>().WithMany().HasForeignKey(x=>new{x.TenantId,x.AlertId}).HasPrincipalKey(x=>new{x.TenantId,x.Id}).OnDelete(DeleteBehavior.Restrict);
   b.Entity<NotificationDelivery>().HasIndex(x=>new{x.RuleId,x.AlertId,x.Occurrence,x.Kind,x.Sequence}).IsUnique();
   b.Entity<NotificationDelivery>().HasIndex(x=>new{x.Status,x.Due});
-  b.Entity<ApprovedAgentRelease>().HasIndex(x=>x.Sequence).IsUnique();
+  b.Entity<ApprovedAgentRelease>().HasIndex(x=>new{x.Platform,x.Sequence}).IsUnique();
   b.Entity<ApprovedAgentRelease>().Property(x=>x.Payload).HasMaxLength(16000);
   b.Entity<UpdateDeployment>().HasOne<Device>().WithMany().HasForeignKey(x=>new{x.TenantId,x.DeviceId}).HasPrincipalKey(x=>new{x.TenantId,x.Id}).OnDelete(DeleteBehavior.Restrict);
   b.Entity<UpdateDeployment>().HasOne<ApprovedAgentRelease>().WithMany().HasForeignKey(x=>x.ReleaseId).OnDelete(DeleteBehavior.Restrict);

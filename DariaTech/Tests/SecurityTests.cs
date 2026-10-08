@@ -91,6 +91,9 @@ public sealed class SecurityTests
   using var key=ECDsa.Create(ECCurve.NamedCurves.nistP256);using var other=ECDsa.Create(ECCurve.NamedCurves.nistP256);var now=DateTimeOffset.UtcNow;
   var bytes=RandomNumberGenerator.GetBytes(2048);var m=new AgentUpdateManifest(Guid.NewGuid(),12,"DariaTechBackupAgent","win-x64","0.3.0.0","https://github.com/DariaTech-de/DariaTech-Backup/releases/download/test/Setup.exe",Convert.ToHexString(SHA256.HashData(bytes)),bytes.Length,now,now.AddDays(7));
   var signed=UpdateProtocol.Sign(m,key);Assert.That(UpdateProtocol.Verify(signed,key,now),Is.EqualTo(m));
+  Assert.That(UpdateProtocol.Valid(m with{Platform="linux-arm64"},now),Is.True);
+  Assert.That(UpdateProtocol.Valid(m with{Platform="linux-arm"},now),Is.False);
+  Assert.That(UpdateProtocol.Newer(m,"0.2.0.0",11,"linux-x64"),Is.False);
   Assert.Throws<CryptographicException>(()=>UpdateProtocol.Verify(signed,other,now));
   Assert.Throws<CryptographicException>(()=>UpdateProtocol.Verify(signed,key,now.AddDays(8)));
   Assert.That(UpdateProtocol.Newer(m,"0.2.0.0",11),Is.True);Assert.That(UpdateProtocol.Newer(m,"0.2.0.0",12),Is.False);Assert.That(UpdateProtocol.Newer(m,"0.4.0.0",11),Is.False);

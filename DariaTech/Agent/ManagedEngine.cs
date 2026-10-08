@@ -31,7 +31,7 @@ public sealed class ManagedEngine(AgentOptions options,ProtectedState state,ILog
    if(!OperatingSystem.IsWindows())UnixPrivatePaths.File(input);
    var token=File.ReadAllText(input).Trim();
    using var client=new HttpClient(new HttpClientHandler{AllowAutoRedirect=false}){BaseAddress=new Uri(options.ConsoleUrl),Timeout=TimeSpan.FromSeconds(30)};
-   using var response=await client.PostAsJsonAsync("/api/v1/agent/enroll",new EnrollmentRequest(token,Environment.MachineName,RuntimeInformation.OSDescription,options.Version),ct);
+   using var response=await client.PostAsJsonAsync("/api/v1/agent/enroll",new EnrollmentRequest(token,Environment.MachineName,RuntimeInformation.OSDescription,options.Version,options.Platform),ct);
    if(!response.IsSuccessStatusCode)throw new InvalidOperationException($"Enrollment rejected with HTTP {(int)response.StatusCode}");
    var identity=await response.Content.ReadFromJsonAsync<EnrollmentResponse>(ct)??throw new InvalidOperationException("Missing enrollment response");
    state.Write("identity.bin",new AgentIdentity(identity.DeviceId,identity.Credential));File.Delete(input);

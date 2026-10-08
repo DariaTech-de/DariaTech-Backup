@@ -4,7 +4,7 @@ using DariaTech.Contracts;
 
 if(args.Length!=5||args[0]!="sign-update")
 {
- Console.Error.WriteLine("Usage: DariaTech.Tools sign-update PRIVATE_KEY MANIFEST_JSON ARTIFACT_EXE OUTPUT_JSON");return 2;
+ Console.Error.WriteLine("Usage: DariaTech.Tools sign-update PRIVATE_KEY MANIFEST_JSON ARTIFACT OUTPUT_JSON");return 2;
 }
 if(File.Exists(args[4]))throw new InvalidOperationException("Refusing to overwrite output manifest");
 var manifest=JsonSerializer.Deserialize<AgentUpdateManifest>(File.ReadAllText(args[2]))??throw new InvalidOperationException("Manifest required");

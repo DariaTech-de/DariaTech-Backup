@@ -23,8 +23,16 @@ engine = agent/"engine"
 env = dict(os.environ, DOTNET_CLI_TELEMETRY_OPTOUT="1", DO_NOT_TRACK="1", AUTOUPDATER_Duplicati_SKIP_UPDATE="1")
 def run(command):
     subprocess.run(command, cwd=repo, env=env, check=True)
-run(["dotnet","publish","DariaTech/Agent/DariaTech.Agent.csproj","-c","Release","-r",args.rid,"--self-contained","true","-p:Version="+version,"-o",str(agent)])
-run(["dotnet","publish","Executables/Duplicati.Server/Duplicati.Server.csproj","-c","Release","-r",args.rid,"--self-contained","true","-p:DariaTechOssOnly=true","-o",str(engine)])
+# RID publishes use separate restore graphs. Preserve the checked-in portable lock
+# files so a package build cannot mutate source or break the locked Console build.
+lock_paths = [repo/"DariaTech/Agent/packages.lock.json",repo/"DariaTech/Contracts/packages.lock.json"]
+portable_locks = {p:p.read_bytes() for p in lock_paths}
+try:
+    run(["dotnet","publish","DariaTech/Agent/DariaTech.Agent.csproj","-c","Release","-r",args.rid,"--self-contained","true","-p:Version="+version,"-o",str(agent)])
+    run(["dotnet","publish","Executables/Duplicati.Server/Duplicati.Server.csproj","-c","Release","-r",args.rid,"--self-contained","true","-p:DariaTechOssOnly=true","-o",str(engine)])
+finally:
+    for path,content in portable_locks.items():
+        path.write_bytes(content)
 for file in engine.rglob("*"):
     if file.is_symlink():
         raise SystemExit("Links are not allowed in release payloads")

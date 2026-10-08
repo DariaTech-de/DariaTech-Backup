@@ -39,7 +39,7 @@ public sealed class Worker(AgentOptions options,ProtectedState state,ILogger<Wor
      catch(OperationCanceledException)when(ct.IsCancellationRequested){throw;}
      catch(Exception ex){log.LogWarning("Agent update synchronization failed ({Type})",ex.GetType().Name);}
     }
-    queue.Add(new(options.Version,RuntimeInformation.OSDescription,reachable,jobs,reachable?progress:null));
+    queue.Add(new(options.Version,RuntimeInformation.OSDescription,reachable,jobs,reachable?progress:null,options.Platform));
     // Bound disk use. Lost older snapshots are explicitly reported, never claimed delivered.
     if(queue.Count>1440){queue.RemoveAt(0);log.LogWarning("Telemetry outbox full; oldest snapshot discarded");}
     state.Write("outbox.bin",queue);

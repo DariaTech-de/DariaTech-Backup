@@ -26,7 +26,7 @@ public static class AgentUpdates
    if(await adapter.HasPendingTasks(ct))return;
    using var key=ECDsa.Create();key.ImportFromPem(File.ReadAllText(options.UpdatePublicKeyFile!));
    // Validate the stored manifest again against current time and rehash staged bytes immediately before execution.
-   if(!UpdateProtocol.Valid(journal.Manifest,DateTimeOffset.UtcNow)||!Version.TryParse(options.Version,out var installed)||Version.Parse(journal.Manifest.Version)<=installed)
+   if(!UpdateProtocol.Valid(journal.Manifest,DateTimeOffset.UtcNow)||journal.Manifest.Platform!=options.Platform||!Version.TryParse(options.Version,out var installed)||Version.Parse(journal.Manifest.Version)<=installed)
    {await Report(console,journal.DeploymentId,new("Rejected","UpdateRejected"),ct);state.Write("update.bin",journal with{Status="Rejected"});return;}
    var artifact=Path.Combine(options.StateDirectory,"updates",$"{journal.Manifest.ReleaseId:D}.exe");
    await VerifyArtifact(artifact,journal.Manifest,ct);
@@ -46,7 +46,7 @@ public static class AgentUpdates
   AgentUpdateManifest manifest;
   try{manifest=UpdateProtocol.Verify(assignment.Manifest,trust,DateTimeOffset.UtcNow);}
   catch(Exception e)when(e is CryptographicException or FormatException or System.Text.Json.JsonException){await Report(console,assignment.DeploymentId,new("Rejected","UpdateRejected"),ct);return;}
-  if(!UpdateProtocol.Newer(manifest,options.Version,journal?.HighestSequence??0)||!OperatingSystem.IsWindows())
+  if(!UpdateProtocol.Newer(manifest,options.Version,journal?.HighestSequence??0,options.Platform)||!OperatingSystem.IsWindows())
   {await Report(console,assignment.DeploymentId,new("Rejected","UpdateRejected"),ct);return;}
   if(await adapter.HasPendingTasks(ct))return;
   var folder=Path.Combine(options.StateDirectory,"updates");Directory.CreateDirectory(folder);

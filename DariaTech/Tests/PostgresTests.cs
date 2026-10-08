@@ -278,6 +278,17 @@ public sealed class PostgresTests
   using var applying=await agent.PostAsJsonAsync($"/api/v1/agent/updates/{assignment.DeploymentId}/receipt",new UpdateReceipt("Applying",null));Assert.That(applying.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
   using var installed=await agent.PostAsJsonAsync($"/api/v1/agent/updates/{assignment.DeploymentId}/receipt",new UpdateReceipt("Installed",null));Assert.That(installed.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
   using var rollback=await agent.PostAsJsonAsync($"/api/v1/agent/updates/{assignment.DeploymentId}/receipt",new UpdateReceipt("Applying",null));Assert.That(rollback.StatusCode,Is.EqualTo(HttpStatusCode.Conflict));
+  var linux=m with{ReleaseId=Guid.NewGuid(),Platform="linux-x64",ArtifactUrl="https://github.com/DariaTech-de/DariaTech-Backup/releases/download/test/agent.tar.gz"};
+  using var linuxApproved=await admin.PostAsJsonAsync("/api/v1/management/agent-releases",UpdateProtocol.Sign(linux,key));Assert.That(linuxApproved.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  using var wrongPackage=await admin.PostAsJsonAsync("/api/v1/management/update-deployments",new DeploymentInput(identity.DeviceId,linux.ReleaseId));Assert.That(wrongPackage.StatusCode,Is.EqualTo(HttpStatusCode.Conflict));
+  using var linuxAgent=factory.CreateClient(new(){BaseAddress=new Uri("https://localhost")});
+  using var linuxEnrollment=await linuxAgent.PostAsJsonAsync("/api/v1/agent/enroll",new EnrollmentRequest(await Token(t,site),"LinuxUpdater","Linux","0.2.0","linux-x64"));var linuxIdentity=(await linuxEnrollment.Content.ReadFromJsonAsync<EnrollmentResponse>())!;
+  linuxAgent.DefaultRequestHeaders.Authorization=new("Bearer",linuxIdentity.Credential);linuxAgent.DefaultRequestHeaders.Add("X-Device-Id",linuxIdentity.DeviceId.ToString());
+  using var wrongPlatform=await admin.PostAsJsonAsync("/api/v1/management/update-deployments",new DeploymentInput(linuxIdentity.DeviceId,m.ReleaseId));Assert.That(wrongPlatform.StatusCode,Is.EqualTo(HttpStatusCode.Conflict));
+  using var linuxDeploy=await admin.PostAsJsonAsync("/api/v1/management/update-deployments",new DeploymentInput(linuxIdentity.DeviceId,linux.ReleaseId));Assert.That(linuxDeploy.StatusCode,Is.EqualTo(HttpStatusCode.OK));
+  var linuxAssignment=await linuxAgent.GetFromJsonAsync<UpdateAssignment>("/api/v1/agent/update");Assert.That(UpdateProtocol.Verify(linuxAssignment!.Manifest,key,now).Platform,Is.EqualTo("linux-x64"));
+  using var platformMutation=await linuxAgent.PostAsJsonAsync("/api/v1/agent/heartbeat",new HeartbeatRequest("0.2.0","Linux",true,[],Platform:"osx-x64"));Assert.That(platformMutation.StatusCode,Is.EqualTo(HttpStatusCode.BadRequest));
+
   var(otherTenant,otherSite)=await Customer();using var foreign=factory.CreateClient(new(){BaseAddress=new Uri("https://localhost")});using var otherEnroll=await foreign.PostAsJsonAsync("/api/v1/agent/enroll",new EnrollmentRequest(await Token(otherTenant,otherSite),"OtherUpdater","Windows","0.1.0"));var other=(await otherEnroll.Content.ReadFromJsonAsync<EnrollmentResponse>())!;
   foreign.DefaultRequestHeaders.Authorization=new("Bearer",other.Credential);foreign.DefaultRequestHeaders.Add("X-Device-Id",other.DeviceId.ToString());using var none=await foreign.GetAsync("/api/v1/agent/update");Assert.That(none.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
   using var denied=await foreign.PostAsJsonAsync($"/api/v1/agent/updates/{assignment.DeploymentId}/receipt",new UpdateReceipt("Installed",null));Assert.That(denied.StatusCode,Is.EqualTo(HttpStatusCode.NotFound));

@@ -27,7 +27,7 @@ public sealed class Device : TenantEntity
 }
 public sealed class Agent : TenantEntity
 {
- public Guid DeviceId { get; set; } public string Version { get; set; } = "";
+ public Guid DeviceId { get; set; } public string Version { get; set; } = ""; public string Platform {get;set;}="";
  public string CredentialHash { get; set; } = ""; public bool Revoked { get; set; }
  public DateTimeOffset Registered { get; set; } = DateTimeOffset.UtcNow;
 }
@@ -124,7 +124,7 @@ public sealed class NotificationDelivery : TenantEntity
 
 public sealed class ApprovedAgentRelease
 {
- public Guid Id {get;set;} public long Sequence {get;set;} public string Version {get;set;}="";
+ public Guid Id {get;set;} public long Sequence {get;set;} public string Version {get;set;}=""; public string Platform {get;set;}="win-x64";
  public string Payload {get;set;}=""; public string Signature {get;set;}="";
  public DateTimeOffset Expires {get;set;}
 }

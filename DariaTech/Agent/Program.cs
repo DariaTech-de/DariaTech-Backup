@@ -58,7 +58,7 @@ if(args.Contains("enroll"))
  if(!OperatingSystem.IsWindows())UnixPrivatePaths.File(args[index+1]);
  var token=File.ReadAllText(args[index+1]).Trim();
  using var client=new HttpClient(new HttpClientHandler{AllowAutoRedirect=false}){BaseAddress=new Uri(options.ConsoleUrl),Timeout=TimeSpan.FromSeconds(30)};
- using var response=await client.PostAsJsonAsync("/api/v1/agent/enroll",new EnrollmentRequest(token,Environment.MachineName,RuntimeInformation.OSDescription,options.Version));response.EnsureSuccessStatusCode();
+ using var response=await client.PostAsJsonAsync("/api/v1/agent/enroll",new EnrollmentRequest(token,Environment.MachineName,RuntimeInformation.OSDescription,options.Version,options.Platform));response.EnsureSuccessStatusCode();
  var identity=await response.Content.ReadFromJsonAsync<EnrollmentResponse>()??throw new InvalidOperationException("Invalid enrollment response");state.Write("identity.bin",new AgentIdentity(identity.DeviceId,identity.Credential));
  System.Console.WriteLine($"Registered device {identity.DeviceId}");return;
 }

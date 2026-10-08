@@ -19,9 +19,11 @@ public sealed class AgentOptions
  public string[] AllowedSaasTenants {get;set;}=[];
  public bool AllowUnlicensedSaasDevelopment {get;set;}
  public string? ExternalEngineExecutable {get;set;}
+ public string Platform=>(OperatingSystem.IsWindows()?"win":OperatingSystem.IsMacOS()?"osx":OperatingSystem.IsLinux()?"linux":"unknown")+"-"+(System.Runtime.InteropServices.RuntimeInformation.OSArchitecture==System.Runtime.InteropServices.Architecture.Arm64?"arm64":System.Runtime.InteropServices.RuntimeInformation.OSArchitecture==System.Runtime.InteropServices.Architecture.X64?"x64":"unsupported");
  public string Version=>typeof(AgentOptions).Assembly.GetName().Version?.ToString()??"unknown";
  public void Validate()
  {
+  if(!DariaTech.Contracts.UpdateProtocol.Platforms.Contains(Platform))throw new PlatformNotSupportedException("Supported OS and x64/ARM64 architecture required");
   if(!string.IsNullOrWhiteSpace(ExternalEngineExecutable)&&(!ManageEngine||AllowAgentUpdates))throw new InvalidOperationException("External engine requires managed operation and separate manual engine/agent updates");
   if(AllowSaasWorkloads&&(!ManageEngine||AllowedSaasTenants is not {Length:>0 and <=100}||AllowedSaasTenants.Any(string.IsNullOrWhiteSpace)))throw new InvalidOperationException("SaaS requires a managed engine and local cloud-tenant allowlist");
   if(AllowSaasRestore&&(!AllowSaasWorkloads||!AllowRemoteCommands))throw new InvalidOperationException("SaaS restore requires local SaaS and signed-command opt-ins");
