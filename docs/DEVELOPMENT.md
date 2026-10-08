@@ -24,7 +24,7 @@ dotnet test DariaTech/Tests/DariaTech.Tests.csproj -c Release
 
 Without engine DLL, that test is explicitly skipped. Without a test PostgreSQL DSN, DB tests fail setup; they are never silently converted to in-memory tests. The engine fixture uses generated secrets, encrypted local storage, actual engine API task execution and byte-for-byte restore verification. It does not expose test credentials in outputs.
 
-Schema changes: create/review EF migration and snapshot, test upgrade, then run `--migrate` as an explicit operator command. Do not use EnsureCreated or automatic startup migration in production. CI must run the OSS engine checks and management security tests against PostgreSQL. The Windows installer workflow tests SYSTEM provisioning, DPAPI/ACL isolation, enrollment, real engine authentication, heartbeat, upgrade, restart and uninstall. Windows VSS/reboot and signed installer/update validation remain release gates.
+Schema changes: create/review EF migration and snapshot, test upgrade, then run `--migrate` as an explicit operator command. Do not use EnsureCreated or automatic startup migration in production. CI must run the OSS engine checks and management security tests against PostgreSQL. The Windows installer workflow tests SYSTEM provisioning, DPAPI/ACL isolation, enrollment, real engine authentication, heartbeat, upgrade, restart and uninstall. Windows CI also tests process-owned local TCP connections, protected restore roots, signed distinct-version updates, artifact tampering and offline/missing-binary repair. Customer-platform VSS/reboot, arbitrary mid-installer interruption and Authenticode remain release gates.
 
 ## Status
 

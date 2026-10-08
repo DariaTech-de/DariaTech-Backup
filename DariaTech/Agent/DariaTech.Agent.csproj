@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk.Worker">
- <PropertyGroup><OutputType>Exe</OutputType><Version>0.1.0</Version></PropertyGroup>
+ <PropertyGroup><OutputType>Exe</OutputType><Version>0.2.0</Version></PropertyGroup>
  <ItemGroup><ProjectReference Include="../Contracts/DariaTech.Contracts.csproj" /><PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.10" /><PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.10" /></ItemGroup>
  <ItemGroup><Content Include="../../branding/product.json" Link="product.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" /></ItemGroup>
 </Project>

@@ -44,6 +44,8 @@ public sealed class BackupRun : TenantEntity
  public RunStatus Status { get; set; } public long? Bytes { get; set; } public long? Files { get; set; }
  public long? StorageBytes { get; set; } public double? Progress { get; set; }
  public string? ErrorCode { get; set; }
+ public long? QuotaFreeBytes {get;set;} public long? QuotaTotalBytes {get;set;}
+ public bool? QuotaWarning {get;set;} public bool? QuotaError {get;set;} public bool? RetentionError {get;set;}
 }
 public sealed class EnrollmentToken : TenantEntity
 {
@@ -84,4 +86,51 @@ public sealed class NotificationRule : TenantEntity
 {
  public string Channel { get; set; } = "Email"; public string Recipient { get; set; } = "";
  public int RepeatMinutes { get; set; } = 1440; public bool Enabled { get; set; }
+}
+
+public sealed class ManagedJob : TenantEntity
+{
+ public Guid DeviceId { get; set; } public string Name { get; set; } = "";
+ public long LatestRevision { get; set; } public long AppliedRevision { get; set; } public long LastReportedRevision { get; set; }
+ public string? LocalJobId { get; set; } public string Status { get; set; } = "Pending";
+}
+public sealed class ConfigurationRevision : TenantEntity
+{
+ public Guid ManagedJobId { get; set; } public long Revision { get; set; }
+ public string EncryptedConfiguration { get; set; } = "";
+ public DateTimeOffset Created { get; set; } = DateTimeOffset.UtcNow;
+}
+
+public sealed class RemoteCommand : TenantEntity
+{
+ public Guid DeviceId { get; set; } public Guid JobId { get; set; }
+ public string RequestedBy { get; set; } = ""; public string? ApprovedBy { get; set; }
+ public string EncryptedPayload { get; set; } = ""; public string Signature { get; set; } = ""; public string? EncryptedCatalog {get;set;}
+ public RemoteAction Action { get; set; } public DateTimeOffset Expires { get; set; }
+ public string Status { get; set; } = "Pending"; public long? TaskId { get; set; }
+ public string? ErrorCode { get; set; }
+}
+
+public sealed class NotificationDelivery : TenantEntity
+{
+ public Guid RuleId {get;set;} public Guid AlertId {get;set;}
+ public DateTimeOffset Occurrence {get;set;} public int Sequence {get;set;}
+ public string Kind {get;set;}="Alert"; public string Status {get;set;}="Pending";
+ public DateTimeOffset Created {get;set;}=DateTimeOffset.UtcNow;
+ public DateTimeOffset Due {get;set;}=DateTimeOffset.UtcNow;
+ public DateTimeOffset? LeaseUntil {get;set;} public DateTimeOffset? Sent {get;set;}
+ public int Attempts {get;set;} public string? ErrorCode {get;set;}
+}
+
+public sealed class ApprovedAgentRelease
+{
+ public Guid Id {get;set;} public long Sequence {get;set;} public string Version {get;set;}="";
+ public string Payload {get;set;}=""; public string Signature {get;set;}="";
+ public DateTimeOffset Expires {get;set;}
+}
+public sealed class UpdateDeployment : TenantEntity
+{
+ public Guid DeviceId {get;set;} public Guid ReleaseId {get;set;}
+ public string Status {get;set;}="Approved"; public string? ErrorCode {get;set;}
+ public DateTimeOffset Approved {get;set;}=DateTimeOffset.UtcNow;
 }

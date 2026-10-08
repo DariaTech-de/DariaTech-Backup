@@ -56,6 +56,7 @@ try {
  $state=Join-Path $env:ProgramData 'DariaTechBackup'
  if(Test-Path (Join-Path $state 'enrollment-token.txt')){throw 'Enrollment input was not consumed'}
  if(Test-Path (Join-Path $state 'engine-password.txt')){throw 'Engine password input was not consumed'}
+ if((Get-Acl $state).GetOwner([Security.Principal.SecurityIdentifier]).Value -ne 'S-1-5-32-544'){throw 'Agent state owner is not the stable Administrators group'}
  $acl=Get-Acl $state
  if(!$acl.AreAccessRulesProtected){throw 'State directory inherits unsafe ACLs'}
  foreach($rule in $acl.Access){$sid=$rule.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value;if($sid -notin @('S-1-5-18','S-1-5-32-544')){throw 'Unexpected state ACL principal'}}
@@ -71,6 +72,26 @@ try {
  if($jobs.Count -ne 0){throw 'Installer created unsolicited backup jobs'}
  $engine=Get-CimInstance Win32_Process -Filter "Name='Duplicati.Server.exe'"
  if(!$engine -or $engine.CommandLine.Contains($password)){throw 'Engine missing or password exposed on command line'}
+ $agentExe=Join-Path (Join-Path ${env:ProgramFiles} 'DariaTech Backup') 'DariaTech.Agent.exe'
+ $engineProcess=Get-Process -Id $engine.ProcessId;$ticks=$engineProcess.StartTime.ToUniversalTime().Ticks
+ & $agentExe --check-engine-port $engine.ProcessId $ticks 8210
+ if($LASTEXITCODE){throw 'Owned engine TCP connection was rejected'}
+ $rejected=Start-Process $agentExe -ArgumentList @('--check-engine-port',$PID.ToString(),((Get-Process -Id $PID).StartTime.ToUniversalTime().Ticks).ToString(),'8210') -Wait -PassThru -NoNewWindow -RedirectStandardError (Join-Path $temporary 'ownership-rejected.txt')
+ if(!$rejected.ExitCode){throw 'Foreign process ownership was accepted for the engine port'}
+ Write-Host 'PASS: authenticated connection ownership; rejected a foreign owner before sending HTTP data.'
+ $restoreProbe=Join-Path $state 'restore-security-probe';New-Item -ItemType Directory $restoreProbe|Out-Null
+ $rootAcl=New-Object Security.AccessControl.DirectorySecurity;$rootAcl.SetAccessRuleProtection($true,$false);$rootAcl.SetOwner((New-Object Security.Principal.SecurityIdentifier('S-1-5-32-544')))
+ foreach($sid in 'S-1-5-18','S-1-5-32-544'){$rootAcl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier($sid)),'FullControl','ContainerInherit,ObjectInherit','None','Allow')))}
+ Set-Acl $restoreProbe $rootAcl
+ & $agentExe --check-restore-root $restoreProbe
+ if($LASTEXITCODE){throw 'Protected restore root was rejected'}
+ $rootAcl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier('S-1-1-0')),'Read','Allow')));Set-Acl $restoreProbe $rootAcl
+ $rejected=Start-Process $agentExe -ArgumentList @('--check-restore-root',('"'+$restoreProbe+'"')) -Wait -PassThru -NoNewWindow -RedirectStandardError (Join-Path $temporary 'restore-root-rejected.txt')
+ if(!$rejected.ExitCode){throw 'World-readable restore root was accepted'}
+ Remove-Item $restoreProbe -Force
+ Write-Host 'PASS: protected restore root accepted; root exposed to ordinary users rejected.'
+
+
  for($i=0;$i -lt 80;$i++) {
   if(Test-Path $env:FIXTURE_RESULT){$result=Get-Content $env:FIXTURE_RESULT -Raw|ConvertFrom-Json;if($result.enrolled -and $result.heartbeats -gt 0){break}}
   Start-Sleep 1
@@ -78,7 +99,15 @@ try {
  if(!$result -or !$result.enrolled -or $result.heartbeats -lt 1){throw 'No authenticated engine-reachable heartbeat received'}
  $identityHash=(Get-FileHash (Join-Path $state 'identity.bin')).Hash
  $credentialHash=(Get-FileHash (Join-Path $state 'engine-credential.bin')).Hash
+ $configFile=Join-Path (Join-Path ${env:ProgramFiles} 'DariaTech Backup') 'appsettings.json'
+ $configuration=Get-Content $configFile -Raw|ConvertFrom-Json
+ $configuration.Agent | Add-Member AllowManagedConfiguration $true -Force
+ $configuration.Agent | Add-Member CommandPublicKeyFile (Join-Path $state 'commands-public.pem') -Force
+ $configuration.Agent | Add-Member RestoreRoot (Join-Path $state 'Restores') -Force
+ $configuration | ConvertTo-Json -Depth 5 | Set-Content $configFile -Encoding UTF8
  Invoke-Setup @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/console=https://localhost:18443')
+ $preserved=Get-Content $configFile -Raw|ConvertFrom-Json
+ if(!$preserved.Agent.AllowManagedConfiguration -or $preserved.Agent.CommandPublicKeyFile -ne $configuration.Agent.CommandPublicKeyFile -or $preserved.Agent.RestoreRoot -ne $configuration.Agent.RestoreRoot){throw 'Upgrade discarded local management opt-in or trust settings'}
  if((Get-FileHash (Join-Path $state 'identity.bin')).Hash -ne $identityHash -or (Get-FileHash (Join-Path $state 'engine-credential.bin')).Hash -ne $credentialHash){throw 'Upgrade changed enrolled identity or engine credential'}
  Stop-Service DariaTechBackupAgent
  Start-Sleep 3

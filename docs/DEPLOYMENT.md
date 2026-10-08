@@ -14,7 +14,7 @@ cd /opt/dariatech-backup
 git rev-parse HEAD
 ```
 
-Record the commit used for deployment. The following instructions build images locally from that checked-out source; a registry or GitHub Release binary is not required. This is the first management slice, not a completed production release; see IMPLEMENTATION_PLAN.md for outstanding features and release gates.
+Record the commit used for deployment. The following instructions build images locally from that checked-out source; a registry or GitHub Release binary is not required. See IMPLEMENTATION_PLAN.md and PRODUCTION_ROADMAP.md for implemented capabilities and remaining production release gates.
 
 ## Initial deployment
 
@@ -84,8 +84,8 @@ Caddy listens on 80/443. Point DNS at the host and allow certificate issuance. C
 
 - `/health/live` is process liveness; `/health/ready` checks PostgreSQL access. Health endpoints contain no tenant data. Console container runs as a non-root user with a read-only root filesystem, dropped capabilities and a writable dedicated key volume.
 - Persist postgres-data, console-keys and Caddy certificate/config volumes. Back up PostgreSQL AND the encryption master key using separate protected storage. Verify restoration in an isolated environment; losing the master key makes encrypted secrets unreadable.
-- Monitoring configuration: OfflineMinutes (default 30), BackupAgeHours (24), PollSeconds (60), LatestApprovedVersion (unset by default). A version entry only drives monitoring; it does not enable an updater.
-- SMTP/notifications and automatic configuration/update distribution are not implemented. Do not assume alerts send email.
+- Monitoring configuration: OfflineMinutes (30), BackupAgeHours (24), PollSeconds (60), RepeatedFailureCount (3), QuotaCriticalPercent (5), QuotaWarningPercent (10). Warning must exceed critical; invalid thresholds prevent startup. LatestApprovedVersion is a fallback; valid approved release records take precedence. Monitoring alone never enables an updater.
+- Notifications require the explicit SMTP overlay and real STARTTLS credentials. Managed configuration, signed operations and approved updates each require local agent opt-in and the documented trust keys; default deployments do not enable remote execution.
 - For updates: back up DB/key volumes, review migration SQL, run explicit migrate, deploy image, verify readiness and rollback plan. Never start an older binary against an incompatible migrated schema.
 - Build environment proxy CAs can be mounted with `docker build --secret id=proxy_bundle,src=/etc/ssl/certs/ca-certificates.crt -f DariaTech/Console/Dockerfile .`; retain TLS verification. The CA mount is not persisted in image layers.
 
@@ -120,3 +120,13 @@ install -m 0755 scripts/dariatech-backup-update /usr/local/bin/dariatech-backup-
 Then run `sudo dariatech-backup-update`. It fetches a fast-forward update, builds the Console while the existing service stays running, creates a PostgreSQL dump in `/var/backups/dariatech-backup` (root-only), applies explicit migrations through the dedicated maintenance service and waits for the replacement Console to become healthy. Download/build failures stop the command before migration or service replacement. Concurrent updates and tracked local changes are rejected; untracked `.env` and Compose override files remain supported. There is no automatic schema downgrade or rollback after a migration. Protect/retain database dump files according to your data retention policy; encrypted data requires the original secret files and key volume for recovery. This updates the Console, not Windows agents.
 
 After a successful update, the installed `/usr/local/bin/dariatech-backup-update` command refreshes itself from the checked-out script. Its orchestration checks can be run without Docker services using `bash scripts/tests/update-command.sh`; these cover success and failures during fetch, build, backup, migration and health verification.
+
+## Optional production notifications
+
+SMTP uses mandatory STARTTLS (normally port 587), platform certificate validation and no cleartext fallback. Port 465 implicit TLS is not supported by this transport. Set SMTP_HOST, SMTP_PORT, SMTP_SENDER, SMTP_USERNAME in the deployment environment; credentials never belong in .env. Create the password envelope using the Console's `--protect-smtp-password` mode with Provision__PasswordFile pointing to a protected input file and Provision__OutputFile to `.secrets/smtp-password.enc`; use the same master key as the Console. The input contains the SMTP password only, not an administrator login password. Mount a writable protected provisioning directory for this maintenance invocation; remove the plaintext input immediately afterwards. Keep ownership/read permissions compatible with the app UID. Never regenerate the master key to solve file permissions.
+
+Enable the explicit `deploy/compose.notifications.yml` overlay only after configuring SMTP and creating the encrypted file; configure a tenant notification rule through the authenticated API. Disabled is the default. Verify one real alert and recovery email using your actual provider before production. API delivery records distinguish Pending, Sending, Retry, Sent, Cancelled and DeadLetter. After eight failures a delivery becomes DeadLetter; there is no false "Sent" status. At most one outstanding alert delivery per occurrence/rule is planned, with reminders no more frequently than the configured interval (minimum 60 minutes).
+
+The durable queue survives restarts and retries failed deliveries. SMTP cannot guarantee exactly-once delivery across a crash between server acceptance and database commit; stable Message-ID values help mail systems deduplicate the retry. A successful SMTP acceptance is not proof that a recipient read or received the message. Backups continue if SMTP is unavailable. Renewed alert occurrences get fresh notifications; resolved incidents cancel pending stale alert messages and send recovery only if an alert was previously sent. Message bodies contain customer/device names and fixed status codes, never source paths, passwords or raw engine logs.
+
+Maintenance commands for emergency administrator recovery, customer erasure and history retention must use the migration/table-owner connection, protected master/legacy keys and a controlled maintenance container. Reuse the migration service's secret/network profile to avoid using the ordinary app role or colliding with the Console's fixed IP. These commands never run automatically on application startup. Dry-run retention/erasure first and preserve the audit/deletion record. An erased customer's backups on storage must be disposed according to its contract, outside this central metadata operation.

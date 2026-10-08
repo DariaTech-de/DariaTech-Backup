@@ -48,7 +48,9 @@ public sealed class ManagedEngine(AgentOptions options,ProtectedState state,ILog
    var started=false;
    try
    {
+    state.Write("engine-instance.bin",Guid.NewGuid());
     process.Start();started=true;using var job=WindowsJob.Attach(process);
+    state.Write("engine-process.bin",new EngineProcessIdentity(process.Id,process.StartTime.ToUniversalTime().Ticks));
     process.BeginOutputReadLine();process.BeginErrorReadLine();
     await process.WaitForExitAsync(ct);log.LogWarning("Bundled engine exited with code {Code}; restarting",process.ExitCode);
    }

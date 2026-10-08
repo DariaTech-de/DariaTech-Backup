@@ -103,14 +103,47 @@ namespace DariaTech.Console.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasAlternateKey("TenantId", "Id");
-
                     b.HasIndex("DeviceId", "Key")
                         .IsUnique();
 
                     b.HasIndex("TenantId", "DeviceId");
 
                     b.ToTable("Alerts");
+                });
+
+            modelBuilder.Entity("DariaTech.Console.Data.ApprovedAgentRelease", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("Expires")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasMaxLength(120000)
+                        .HasColumnType("character varying(120000)");
+
+                    b.Property<long>("Sequence")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Signature")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Version")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Sequence")
+                        .IsUnique();
+
+                    b.ToTable("AgentReleases");
                 });
 
             modelBuilder.Entity("DariaTech.Console.Data.AuditEvent", b =>
@@ -222,6 +255,21 @@ namespace DariaTech.Console.Data.Migrations
                     b.Property<double?>("Progress")
                         .HasColumnType("double precision");
 
+                    b.Property<bool?>("QuotaError")
+                        .HasColumnType("boolean");
+
+                    b.Property<long?>("QuotaFreeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("QuotaTotalBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool?>("QuotaWarning")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool?>("RetentionError")
+                        .HasColumnType("boolean");
+
                     b.Property<DateTimeOffset>("Started")
                         .HasColumnType("timestamp with time zone");
 
@@ -247,6 +295,41 @@ namespace DariaTech.Console.Data.Migrations
                         {
                             t.HasCheckConstraint("backup_run_statistics", "\"Bytes\" >= 0 AND \"Files\" >= 0 AND \"StorageBytes\" >= 0 AND (\"Completed\" IS NULL OR \"Completed\" >= \"Started\")");
                         });
+                });
+
+            modelBuilder.Entity("DariaTech.Console.Data.ConfigurationRevision", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("Created")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EncryptedConfiguration")
+                        .IsRequired()
+                        .HasMaxLength(120000)
+                        .HasColumnType("character varying(120000)");
+
+                    b.Property<Guid>("ManagedJobId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("ManagedJobId", "Revision")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "ManagedJobId");
+
+                    b.ToTable("ConfigurationRevisions");
                 });
 
             modelBuilder.Entity("DariaTech.Console.Data.Customer", b =>
@@ -403,6 +486,114 @@ namespace DariaTech.Console.Data.Migrations
                     b.ToTable("EnrollmentTokens");
                 });
 
+            modelBuilder.Entity("DariaTech.Console.Data.ManagedJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("AppliedRevision")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("DeviceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("LastReportedRevision")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("LatestRevision")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("LocalJobId")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "DeviceId");
+
+                    b.ToTable("ManagedJobs");
+                });
+
+            modelBuilder.Entity("DariaTech.Console.Data.NotificationDelivery", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AlertId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("Created")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("Due")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset?>("LeaseUntil")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("Occurrence")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RuleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("Sent")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("Status", "Due");
+
+                    b.HasIndex("TenantId", "AlertId");
+
+                    b.HasIndex("TenantId", "RuleId");
+
+                    b.HasIndex("RuleId", "AlertId", "Occurrence", "Kind", "Sequence")
+                        .IsUnique();
+
+                    b.ToTable("Deliveries");
+                });
+
             modelBuilder.Entity("DariaTech.Console.Data.NotificationRule", b =>
                 {
                     b.Property<Guid>("Id")
@@ -430,9 +621,76 @@ namespace DariaTech.Console.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.ToTable("NotificationRules");
+                });
+
+            modelBuilder.Entity("DariaTech.Console.Data.RemoteCommand", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Action")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ApprovedBy")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("DeviceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("EncryptedCatalog")
+                        .HasMaxLength(120000)
+                        .HasColumnType("character varying(120000)");
+
+                    b.Property<string>("EncryptedPayload")
+                        .IsRequired()
+                        .HasMaxLength(120000)
+                        .HasColumnType("character varying(120000)");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset>("Expires")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("JobId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RequestedBy")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Signature")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<long?>("TaskId")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
                     b.HasAlternateKey("TenantId", "Id");
 
-                    b.ToTable("NotificationRules");
+                    b.HasIndex("TenantId", "DeviceId");
+
+                    b.HasIndex("TenantId", "JobId");
+
+                    b.HasIndex("DeviceId", "Status", "Expires");
+
+                    b.ToTable("Commands");
                 });
 
             modelBuilder.Entity("DariaTech.Console.Data.Role", b =>
@@ -554,6 +812,47 @@ namespace DariaTech.Console.Data.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Tenants");
+                });
+
+            modelBuilder.Entity("DariaTech.Console.Data.UpdateDeployment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("Approved")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DeviceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("ReleaseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("ReleaseId");
+
+                    b.HasIndex("DeviceId", "ReleaseId")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "DeviceId");
+
+                    b.ToTable("UpdateDeployments");
                 });
 
             modelBuilder.Entity("DariaTech.Console.Data.User", b =>
@@ -686,6 +985,22 @@ namespace DariaTech.Console.Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("DariaTech.Console.Data.ConfigurationRevision", b =>
+                {
+                    b.HasOne("DariaTech.Console.Data.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DariaTech.Console.Data.ManagedJob", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ManagedJobId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("DariaTech.Console.Data.Customer", b =>
                 {
                     b.HasOne("DariaTech.Console.Data.Tenant", null)
@@ -727,11 +1042,73 @@ namespace DariaTech.Console.Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("DariaTech.Console.Data.ManagedJob", b =>
+                {
+                    b.HasOne("DariaTech.Console.Data.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DariaTech.Console.Data.Device", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "DeviceId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DariaTech.Console.Data.NotificationDelivery", b =>
+                {
+                    b.HasOne("DariaTech.Console.Data.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DariaTech.Console.Data.Alert", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "AlertId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DariaTech.Console.Data.NotificationRule", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "RuleId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("DariaTech.Console.Data.NotificationRule", b =>
                 {
                     b.HasOne("DariaTech.Console.Data.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DariaTech.Console.Data.RemoteCommand", b =>
+                {
+                    b.HasOne("DariaTech.Console.Data.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DariaTech.Console.Data.Device", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "DeviceId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DariaTech.Console.Data.BackupJob", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "JobId")
+                        .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -750,6 +1127,28 @@ namespace DariaTech.Console.Data.Migrations
                     b.HasOne("DariaTech.Console.Data.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DariaTech.Console.Data.UpdateDeployment", b =>
+                {
+                    b.HasOne("DariaTech.Console.Data.ApprovedAgentRelease", null)
+                        .WithMany()
+                        .HasForeignKey("ReleaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DariaTech.Console.Data.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DariaTech.Console.Data.Device", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "DeviceId")
+                        .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

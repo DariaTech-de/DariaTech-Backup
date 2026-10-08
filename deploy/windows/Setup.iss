@@ -3,6 +3,8 @@
 AppId={{53F55FCA-80E2-4314-BE49-2103CCCFB211}
 AppName={#ProductName}
 AppVersion={#ProductVersion}
+VersionInfoVersion={#ProductVersion}.0
+VersionInfoProductVersion={#ProductVersion}.0
 AppPublisher={#CompanyName}
 AppSupportURL={#SupportUrl}
 DefaultDirName={autopf}\{#ProductName}

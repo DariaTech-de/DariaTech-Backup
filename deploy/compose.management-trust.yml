@@ -1,0 +1,10 @@
+# Public update key is independent of the private command-signing key.
+services:
+  console:
+    environment:
+      Commands__SigningKeyFile: /run/secrets/command_signing_key
+      Updates__PublicKeyFile: /run/secrets/update_public_key
+    secrets: [command_signing_key, update_public_key]
+secrets:
+  command_signing_key: {file: .secrets/commands-private.pem}
+  update_public_key: {file: .secrets/updates-public.pem}

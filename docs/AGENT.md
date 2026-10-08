@@ -78,3 +78,48 @@ Active progress is a separate snapshot, not a fabricated historical BackupRun. C
 Branding pilot.2 uses the official DariaTech assets documented in [branding provenance](../branding/README.md). Windows workflow [37693913159](https://github.com/DariaTech-de/DariaTech-Backup/actions/runs/37693913159) passed installation, enrollment, engine authentication, heartbeat, upgrade, restart and uninstall checks for this package.
 
 Pilot.3 includes the German dark-green installer and a separate DariaTech theme for the local ngax UI and OEM login page. [Windows workflow 37700114299](https://github.com/DariaTech-de/DariaTech-Backup/actions/runs/37700114299) passed installer build, service/enrollment, real engine authentication, heartbeat, upgrade, restart and uninstall. Local login and authenticated ngax rendering were also inspected against the real engine at desktop/mobile widths. The theme is maintained in branding/engine.css and branding/login.css; authentication and backup behavior remain upstream components.
+
+## Managed configuration opt-in
+
+Set `Agent:AllowManagedConfiguration=true` in the protected local agent configuration only after reviewing policy and source/destination access. Default false preserves existing local-only deployments. The agent fetches active device-bound assignments over authenticated HTTPS, rejects script/module/keyfile injection, enforces AES encryption and a secure storage connection policy, and uses the engine's backup/schedule endpoints. Local backup jobs are untouched.
+
+Engine tags `DariaTechManaged:<job UUID>` provide stable identity: repeating a create after a crash reconciles the existing job. The DPAPI/AES-protected configuration journal rejects revision rollback or mutation and persists acknowledgements before delivery. Failed engine requests can be retried; Applied receipts are replayed without reapplying the configuration. The Console does not report a job as Applied until it receives the receipt. An HTTP save success proves engine acceptance, not that the target is reachable or a backup has succeeded; telemetry/monitoring provide that evidence.
+
+Central policy initially exposes keep-versions, filters, AES and hourly repeat/day scheduling. More engine capabilities remain available in local job configuration. Never delete an agent journal to force a revision rollback in production. Restore an older desired definition as a new increasing revision instead. Keep the local service configuration and state accessible only to SYSTEM/administrators.
+
+## Remote-operation trust
+
+Generate a private/public ECDSA key pair outside Git with `scripts/generate-command-signing-key.sh /protected/keys`. Mount the private key read-only on the Console and set `Commands__SigningKeyFile`. Distribute **only the public key** over your trusted RMM/local installer administration channel; set Agent:CommandPublicKeyFile and Agent:AllowRemoteCommands=true. Remote commands require ManageEngine=true, default disabled. No automatic trust of a key fetched with a command. Changing the pinned key requires trusted local administration.
+
+Restore additionally requires a pre-existing absolute Agent:RestoreRoot under local administrator control. The agent rejects linked parent directories and any existing destination; overwrite and restoring original permissions are disabled. A destination cannot be an original system/source directory. Two independent Console administrators must request/approve the restore.
+
+The protected write-ahead command journal is flushed before calling the engine. Duplicate deliveries replay receipts; a crash before durable acceptance yields Indeterminate, never blind re-execution. Engine instance UUIDs change on each managed child start so reused task IDs after a restart cannot be mistaken for the previous command. Task history loss remains pending/unknown rather than claiming success. Review an Indeterminate operation before issuing a new UUID. Do not remove journals during upgrades.
+
+## Incremental history capture
+
+The agent also pages the engine's local result log by stable record ID. A protected atomic spool holds pagination continuation, parsed allowlisted backup statistics and pending deliveries together. Large backlogs continue across service restarts; the cursor advances only with durable captured statistics, and queued batches are removed only after authenticated Console acceptance. Replayed delivery is idempotent by job/run identity. Raw messages/errors, source/target paths and credentials never leave the agent through this channel. Old runs use the result's own backend statistics; absent historical storage usage remains unknown rather than borrowing today's size.
+
+This captures every parseable Backup result still available in the local engine database, not logs already pruned/deleted before enrollment or failures with no structured Backup result. Such hard errors remain explicit generic EngineOperationFailed incidents from engine metadata. Keep the engine databases until the agent has delivered their history. Deleting a local job/database before capture can destroy its local evidence; management cannot reconstruct it from nonexistent data.
+
+## Protected remote restore root (Windows)
+
+Provision locally as an administrator, outside ordinary user profiles. Remote restore deliberately refuses an exposed root or untrusted ancestry. For example:
+
+```powershell
+$restoreRoot = Join-Path $env:ProgramData 'DariaTechBackup\Restores'
+New-Item -ItemType Directory -Path $restoreRoot -Force | Out-Null
+$restoreAcl = New-Object Security.AccessControl.DirectorySecurity
+$restoreAcl.SetAccessRuleProtection($true, $false)
+$restoreAcl.SetOwner((New-Object Security.Principal.SecurityIdentifier('S-1-5-32-544')))
+foreach ($sid in 'S-1-5-18','S-1-5-32-544') {
+    $identity = New-Object Security.Principal.SecurityIdentifier($sid)
+    $rule = New-Object Security.AccessControl.FileSystemAccessRule($identity,'FullControl','ContainerInherit,ObjectInherit','None','Allow')
+    $restoreAcl.AddAccessRule($rule)
+}
+Set-Acl -Path $restoreRoot -AclObject $restoreAcl
+& "$env:ProgramFiles\DariaTech Backup\DariaTech.Agent.exe" --check-restore-root $restoreRoot
+```
+
+Only after the check succeeds, set Agent:RestoreRoot to that path in the protected local configuration. New restore folders inherit restricted permissions. Grant customer access afterwards through a deliberate local administrator action. No existing destination is overwritten.
+
+Managed engine HTTP connections verify the Windows kernel's connection-owner PID and creation time against the protected launched-child identity before transmitting credentials. Task completion with a nonempty upstream ErrorMessage/Exception is reported Failed/EngineTaskFailed; raw text is never forwarded.

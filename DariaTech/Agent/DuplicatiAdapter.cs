@@ -6,13 +6,13 @@ using System.Text.Json;
 using DariaTech.Contracts;
 namespace DariaTech.Agent;
 
-public sealed class DuplicatiAdapter : IDisposable
+public sealed partial class DuplicatiAdapter : IDisposable
 {
  private readonly HttpClient client;
  private readonly ProtectedState state;
- public DuplicatiAdapter(AgentOptions options,ProtectedState store)
+ public DuplicatiAdapter(AgentOptions options,ProtectedState store,HttpMessageHandler? handler=null)
  {
-  state=store;client=new HttpClient(new HttpClientHandler{AllowAutoRedirect=false,UseProxy=false}){BaseAddress=new Uri(options.EngineUrl),Timeout=TimeSpan.FromSeconds(15)};
+  state=store;client=new HttpClient(handler??(options.ManageEngine?OwnedEngineConnection.Handler(options,store):new HttpClientHandler{AllowAutoRedirect=false,UseProxy=false})){BaseAddress=new Uri(options.EngineUrl),Timeout=TimeSpan.FromSeconds(15)};
  }
  public async Task<JobReport[]> ReadJobs(CancellationToken ct)
  {
@@ -68,13 +68,15 @@ public sealed class DuplicatiAdapter : IDisposable
   var status=parsed.ToLowerInvariant() switch {"success"=>RunStatus.Success,"warning"=>RunStatus.Warning,"error"=>RunStatus.Failed,"fatal"=>RunStatus.Failed,_=>RunStatus.Unknown};
   if(Get(result,"Interrupted").ValueKind==JsonValueKind.True)status=RunStatus.Cancelled;
   var error=status switch {RunStatus.Failed=>"BackupFailed",RunStatus.Warning=>"BackupWarning",RunStatus.Cancelled=>"Cancelled",_=>null};
-  return new RunReport($"backup:{start.Value.UtcTicks}",start.Value,end,status,NullableNumber(Get(result,"SizeOfExaminedFiles")),NullableNumber(Get(result,"ExaminedFiles")),NullableNumber(Get(metadata,"TargetFilesSize")),null,error);
+  return new RunReport($"backup:{start.Value.UtcTicks}",start.Value,end,status,NullableNumber(Get(result,"SizeOfExaminedFiles")),NullableNumber(Get(result,"ExaminedFiles")),NullableNumber(Get(Get(result,"BackendStatistics"),"KnownFileSize"))??NullableNumber(Get(metadata,"TargetFilesSize")),null,error,NullableNumber(Get(Get(result,"BackendStatistics"),"FreeQuotaSpace")),NullableNumber(Get(Get(result,"BackendStatistics"),"TotalQuotaSpace")),Boolean(Get(Get(result,"BackendStatistics"),"ReportedQuotaWarning")),Boolean(Get(Get(result,"BackendStatistics"),"ReportedQuotaError")),OperationError(Get(Get(result,"DeleteResults"),"ParsedResult")));
  }
  public static JsonElement Get(JsonElement e,string name)
  {
   if(e.ValueKind==JsonValueKind.Object)foreach(var p in e.EnumerateObject())if(p.Name.Equals(name,StringComparison.OrdinalIgnoreCase))return p.Value;
   return default;
  }
+ private static bool? OperationError(JsonElement e)=>e.ToString() switch {"Error" or "Fatal"=>true,"Success" or "Warning"=>false,_=>null};
+ private static bool? Boolean(JsonElement e)=>e.ValueKind is JsonValueKind.True or JsonValueKind.False?e.GetBoolean():null;
  private static long? NullableNumber(JsonElement e)=>long.TryParse(e.ToString(),NumberStyles.Integer,CultureInfo.InvariantCulture,out var v)&&v>=0?v:null;
  private static long Number(JsonElement e)=>long.TryParse(e.ToString(),NumberStyles.Integer,CultureInfo.InvariantCulture,out var v)?Math.Max(0,v):0;
  private static DateTimeOffset? Date(JsonElement e)

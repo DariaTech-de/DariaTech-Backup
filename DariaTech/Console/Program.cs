@@ -23,6 +23,7 @@ builder.WebHost.ConfigureKestrel(o=>{o.Limits.MaxRequestBodySize=256*1024;o.AddS
 builder.Services.ConfigureHttpJsonOptions(o=>{o.SerializerOptions.UnmappedMemberHandling=System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow;o.SerializerOptions.RespectNullableAnnotations=true;o.SerializerOptions.RespectRequiredConstructorParameters=true;});
 builder.Services.AddHttpContextAccessor();builder.Services.AddScoped<TenantScope>();
 builder.Services.AddDbContext<ManagementDb>(o=>o.UseNpgsql(builder.Configuration.GetConnectionString("Management")??throw new InvalidOperationException("Management database connection is required")));
+builder.Services.AddSingleton<CommandSigning>();
 builder.Services.AddSingleton<ISecretStore,EncryptedSecretStore>();
 builder.Services.AddDataProtection().SetApplicationName("DariaTech.ManagedBackup").PersistKeysToFileSystem(new DirectoryInfo(builder.Configuration["Security:KeyDirectory"]??"./keys"));
 builder.Services.AddOptions<KeyManagementOptions>().Configure<ISecretStore>((o,s)=>o.XmlEncryptor=new KeyXmlEncryptor(s));
@@ -40,8 +41,11 @@ builder.Services.AddAuthorization(o=>
 });
 builder.Services.AddAntiforgery(o=>{o.HeaderName="X-CSRF-Token";o.Cookie.SecurePolicy=builder.Environment.IsDevelopment()?CookieSecurePolicy.SameAsRequest:CookieSecurePolicy.Always;});
 builder.Services.AddRazorPages(o=>{o.Conventions.AuthorizeFolder("/");o.Conventions.AllowAnonymousToPage("/Login");o.Conventions.AllowAnonymousToPage("/Licenses");});
-builder.Services.Configure<MonitoringOptions>(builder.Configuration.GetSection("Monitoring"));
+builder.Services.AddOptions<MonitoringOptions>().Bind(builder.Configuration.GetSection("Monitoring"))
+ .Validate(o=>o.OfflineMinutes is >=1 and <=1440&&o.BackupAgeHours is >=1 and <=8760&&o.PollSeconds is >=10 and <=3600&&o.RepeatedFailureCount is >=2 and <=20&&o.QuotaCriticalPercent is >=1 and <=99&&o.QuotaWarningPercent>o.QuotaCriticalPercent&&o.QuotaWarningPercent<=99,"Invalid monitoring thresholds").ValidateOnStart();
 builder.Services.AddHostedService<Monitoring>();
+builder.Services.AddOptions<NotificationOptions>().Bind(builder.Configuration.GetSection("Notifications")).Validate(o=>o.Valid(),"Valid SMTP settings and encrypted password file required").ValidateOnStart();
+builder.Services.AddSingleton<INotificationTransport,SmtpTransport>();builder.Services.AddHostedService<Notifications>();
 builder.Services.AddRateLimiter(o=>
 {
  o.RejectionStatusCode=429;
@@ -59,11 +63,28 @@ builder.Services.Configure<ForwardedHeadersOptions>(o=>
 });
 builder.Services.AddHealthChecks().AddCheck<DatabaseHealth>("postgresql");
 var app=builder.Build();
-if(args.Contains("--migrate")||args.Contains("--bootstrap-user"))
+if(args.Contains("--protect-smtp-password"))
+{
+ var input=builder.Configuration["Provision:PasswordFile"]??throw new InvalidOperationException("Provision:PasswordFile required");
+ var output=builder.Configuration["Provision:OutputFile"]??throw new InvalidOperationException("Provision:OutputFile required");
+ if(File.Exists(output))throw new InvalidOperationException("Refusing to overwrite existing SMTP password envelope");
+ var password=File.ReadAllText(input).TrimEnd('\r','\n');if(password.Length<1||password.Length>2000)throw new InvalidOperationException("Invalid SMTP password length");
+ File.WriteAllText(output,app.Services.GetRequiredService<ISecretStore>().Protect(Guid.Empty,"smtp-password",password));
+ if(!OperatingSystem.IsWindows())File.SetUnixFileMode(output,UnixFileMode.UserRead|UnixFileMode.UserWrite);
+ return 0;
+}
+if(args.Contains("--migrate")||args.Contains("--bootstrap-user")||args.Contains("--recover-user")||args.Contains("--erase-customer")||args.Contains("--prune-history"))
 {
  using var s=app.Services.CreateScope();s.ServiceProvider.GetRequiredService<TenantScope>().Maintenance=true;
  var db=s.ServiceProvider.GetRequiredService<ManagementDb>();
+ if(args.Contains("--erase-customer"))
+ {
+  if(!Guid.TryParse(builder.Configuration["Privacy:TenantId"],out var tenant))throw new InvalidOperationException("Privacy:TenantId required");
+  await Privacy.EraseCustomer(db,tenant,builder.Configuration.GetValue<bool>("Privacy:Apply"));System.Console.WriteLine(builder.Configuration.GetValue<bool>("Privacy:Apply")?"Central customer erasure completed; audit pseudonymous references retained":"Dry run valid; no data erased. Set Privacy:Apply=true for deliberate erasure.");return 0;
+ }
+ if(args.Contains("--prune-history")){var counts=await Privacy.Prune(db,builder.Configuration.GetValue<int>("Privacy:RetentionDays",180),builder.Configuration.GetValue<bool>("Privacy:Apply"));System.Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new{counts.Runs,counts.Deliveries,counts.Alerts,counts.Tokens,counts.Commands,Applied=builder.Configuration.GetValue<bool>("Privacy:Apply")}));return 0;}
  if(args.Contains("--migrate")){await db.Database.MigrateAsync();return 0;}
+ if(args.Contains("--recover-user")){await Provisioning.RecoverUser(db,s.ServiceProvider.GetRequiredService<ISecretStore>(),builder.Configuration);return 0;}
  await Provisioning.CreateUser(db,s.ServiceProvider.GetRequiredService<ISecretStore>(),builder.Configuration);return 0;
 }
 // Startup NEVER changes production schema. Operator must run the explicit migration command.
@@ -99,5 +120,5 @@ app.Use(async(c,next)=>
  await next();
 });
 app.MapHealthChecks("/health/ready");app.MapGet("/health/live",()=>Results.Ok(new{status="live"}));
-app.MapManagementApi();app.MapAgentApi();app.MapRazorPages();await app.RunAsync();return 0;
+app.MapHistoryApi();app.MapUpdateApi();app.MapNotificationApi();app.MapCommandApi();app.MapConfigurationApi();app.MapManagementApi();app.MapAgentApi();app.MapRazorPages();await app.RunAsync();return 0;
 public partial class Program { }
