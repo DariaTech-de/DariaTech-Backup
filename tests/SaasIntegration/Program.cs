@@ -20,11 +20,11 @@ void Check(bool condition, string name)
     passed++;
     Console.WriteLine("PASS " + name);
 }
-async Task Reject(Func<Task> operation, string name)
+async Task Reject(Func<Task> operation, string name, Type expected)
 {
     var rejected = false;
     try { await operation(); }
-    catch { rejected = true; } // Raw exceptions can include provider inputs; do not log them.
+    catch (Exception error) { rejected = error.GetType() == expected; } // Never log raw provider exceptions.
     Check(rejected, name);
 }
 void Password(IList<ICommandLineArgument> commands, string name)
@@ -45,20 +45,20 @@ Password(google.SupportedCommands, "google-client-secret");
 Password(google.SupportedCommands, "google-refresh-token");
 Password(google.SupportedCommands, "google-service-account-json");
 await Reject(() => office.InitializeAsync(CancellationToken.None),
-    "Office365 initialization rejects missing metadata configuration before authentication");
+    "Office365 initialization rejects missing metadata configuration before authentication", typeof(UserInformationException));
 await Reject(() => google.InitializeAsync(CancellationToken.None),
-    "Google initialization rejects missing metadata configuration");
+    "Google initialization rejects missing metadata configuration", typeof(UserInformationException));
 
 await Reject(() =>
 {
     using var invalid = new OfficeSource("office365://", "/offline-test", new());
     return Task.CompletedTask;
-}, "Office365 refuses missing application credentials");
+}, "Office365 refuses missing application credentials", typeof(UserInformationException));
 using var unconfiguredGoogle = new GoogleSource("googleworkspace://", "/offline-test",
     new() { ["machine-id"] = "isolated-development-test",
             ["store-metadata-content-in-database"] = "true" });
 await Reject(() => unconfiguredGoogle.TestAsync(CancellationToken.None),
-    "Google connectivity refuses missing credentials without a successful result");
+    "Google connectivity refuses missing credentials without a successful result", typeof(Exception));
 
 // Upstream deliberately grants five development seats without a key. Preserve this
 // behavior; it is NOT evidence of a purchased entitlement or permission for production.
