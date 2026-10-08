@@ -1,0 +1,45 @@
+@page
+@model JobActionsModel
+<h1>@Model.Job.Name · Aktionen und Restore</h1>
+<p><a asp-page="/Device" asp-route-id="@Model.Device.Id">@Model.Device.Name</a> · @Model.Job.Ownership</p>
+@if(Model.Provider is not null){<p>@Model.Provider · @Model.DirectoryTenant · angewendete Revision @Model.Managed?.AppliedRevision</p>}
+@if(Model.Error is not null){<p role="alert">@Model.Error</p>}
+@if(!Model.SigningEnabled){<p>Die Console benötigt einen eingerichteten Befehlssignaturschlüssel. Aktionen sind bis dahin gesperrt.</p>}
+else{
+<form method="post" asp-page-handler="Request">
+ <input type="hidden" asp-for="JobId" />
+ <label asp-for="Action">Aktion</label><select asp-for="Action">
+ <option value="RunBackup">Backup starten</option><option value="StopBackup">Lauf stoppen</option><option value="VerifyBackup">Backup prüfen</option>
+ <option value="ListRestorePoints">Restore-Zeitpunkte laden</option><option value="ListRestoreFiles">Dateien / Objekte laden</option>
+ @if(Model.Administrator){<option value="Restore">Dateien in neues lokales Restore-Verzeichnis wiederherstellen</option>}
+ @if(Model.Administrator&&Model.Provider is not null){<option value="RestoreSaas">Objekte im SaaS-Tenant wiederherstellen</option>}
+ </select>
+ <label asp-for="Snapshot">Sicherungszeitpunkt · UTC</label><input asp-for="Snapshot" type="datetime-local" asp-format="{0:yyyy-MM-ddTHH:mm}" />
+ <label asp-for="Prefix">Optionaler Katalogfilter</label><input asp-for="Prefix" />
+ <label asp-for="Paths">Ausgewählte Dateipfade / Objektpfade · einer je Zeile</label><textarea asp-for="Paths"></textarea>
+ <label asp-for="DestinationFolder">Lokaler Restore · neuer Ordnername unter dem freigegebenen Restore-Verzeichnis</label><input asp-for="DestinationFolder" />
+ @if(Model.Provider is not null){
+ <label asp-for="ProviderTarget">SaaS-Restore · relativer Zielpfad im selben Tenant</label><input asp-for="ProviderTarget" />
+ <label><input asp-for="ConfirmProviderWrites" /> Ich bestätige Schreibzugriffe durch den SaaS-Restore auf diesen Tenant.</label>
+ }
+ <p>Restore benötigt die Freigabe eines zweiten Administrators. Befehle sind signiert, gerätegebunden und laufen nach 15 Minuten ab. Der Agent benötigt seine lokale Freigabe für die jeweilige Aktion.</p>
+ <button type="submit">Aktion anfordern</button>
+</form>
+}
+@if(Model.Catalog is {} catalog){
+ <section class="panel"><h2>Restore-Katalog</h2>
+ @if(catalog.Truncated){<p>Der Katalog wurde begrenzt. Den Filter eingrenzen, um weitere Objekte zu laden.</p>}
+ @foreach(var point in catalog.Points){<p>@point.Time.ToUniversalTime().ToString("u") · @point.Files Dateien · @point.Bytes Bytes</p>}
+ @foreach(var file in catalog.Files){<p><code>@file.Path</code> · @file.Bytes Bytes</p>}
+ </section>
+}
+<section class="panel"><h2>Angeforderte Aktionen</h2><table><thead><tr><th>Aktion</th><th>Status</th><th>Ablaufzeit</th><th>Ergebnis</th><th>Freigabe / Katalog</th></tr></thead><tbody>
+@foreach(var command in Model.Commands){
+ <tr><td>@command.Action</td><td>@command.Status</td><td>@command.Expires.ToUniversalTime().ToString("u")</td><td>@command.ErrorCode</td><td>
+ @if(command.EncryptedCatalog is not null){<a asp-route-id="@Model.JobId" asp-route-catalogId="@command.Id">Katalog öffnen</a>}
+ @if(Model.Administrator&&command.Status=="AwaitingApproval"&&command.RequestedBy!=Model.Actor){
+ <form method="post" asp-page-handler="Approve"><input type="hidden" name="JobId" value="@Model.JobId" /><input type="hidden" name="commandId" value="@command.Id" /><button type="submit">Restore freigeben</button></form>
+ }
+ </td></tr>
+}
+</tbody></table></section>

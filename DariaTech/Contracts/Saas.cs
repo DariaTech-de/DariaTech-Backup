@@ -16,7 +16,7 @@ public static class SaasPolicy
  {SaasProvider.Microsoft365=>"office365",SaasProvider.GoogleWorkspace=>"googleworkspace",_=>throw new InvalidOperationException("Unknown SaaS provider")};
  public static bool Valid(SaasSource? source)
  {
-  if(source is null||!Enum.IsDefined(source.Provider)||source.Credentials is null||source.Credentials.Count>6||
+  if(source is null||string.IsNullOrWhiteSpace(source.DirectoryTenant)||!Enum.IsDefined(source.Provider)||source.Credentials is null||source.Credentials.Count>6||
    source.RootTypes is null||source.UserTypes is null||source.RootTypes.Length is <1 or >8||source.UserTypes.Length is <1 or >12||
    source.RootTypes.Distinct().Count()!=source.RootTypes.Length||source.UserTypes.Distinct().Count()!=source.UserTypes.Length)return false;
   if(source.Provider==SaasProvider.Microsoft365)
@@ -36,10 +36,11 @@ public static class SaasPolicy
      !email.Host.Equals(source.DirectoryTenant,StringComparison.OrdinalIgnoreCase))return false;
   if(source.Credentials.TryGetValue("google-service-account-json",out var json))
   {
-   if(source.Credentials.Count!=2||json.Length>16000)return false;
+   if(source.Credentials.Count!=2||string.IsNullOrWhiteSpace(json)||json.Length>16000)return false;
    try
    {
     using var document=JsonDocument.Parse(json);var root=document.RootElement;
+    if(root.ValueKind!=JsonValueKind.Object||root.EnumerateObject().Select(x=>x.Name).Distinct().Count()!=root.EnumerateObject().Count()||root.TryGetProperty("universe_domain",out var universe)&&universe.GetString()!="googleapis.com")return false;
     return root.GetProperty("type").GetString()=="service_account"&&
      root.GetProperty("token_uri").GetString()=="https://oauth2.googleapis.com/token"&&
      root.GetProperty("client_email").GetString() is {} address&&MailAddress.TryCreate(address,out var account)&&account.Host.EndsWith(".iam.gserviceaccount.com",StringComparison.Ordinal)&&

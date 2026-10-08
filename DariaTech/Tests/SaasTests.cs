@@ -62,7 +62,7 @@ public sealed class SaasTests
   public string? Body {get;private set;}
   protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct)
   {
-   if(request.Method==HttpMethod.Get)return new(HttpStatusCode.OK){Content=JsonContent.Create(new{RestoreDestinationProviderModules=new[]{new{Key="office365"}},LocalLicenseStatus=new{IsConfigured=true,IsValid=true}})};
+   if(request.Method==HttpMethod.Get)return new(HttpStatusCode.OK){Content=JsonContent.Create(new{RestoreDestinationProviderModules=new[]{new{Key="office365"}},LocalLicenseStatus=new{IsConfigured=true,IsValid=true,Features=new Dictionary<string,string>{{"duplicati:office365:users","5"},{"duplicati:office365:sites","5"}}}})};
    Body=await request.Content!.ReadAsStringAsync(ct);return new(HttpStatusCode.OK){Content=JsonContent.Create(new{ID=42})};
   }
  }

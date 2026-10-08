@@ -11,27 +11,8 @@ public static class ConfigurationApi
  {
   var g=app.MapGroup("/api/v1/management").RequireAuthorization();
   g.MapGet("/managed-jobs",async(ManagementDb db)=>await db.ManagedJobs.ToListAsync());
-  g.MapPost("/devices/{deviceId:guid}/managed-jobs",async(Guid deviceId,ConfigurationInput input,ManagementDb db,ISecretStore secrets,HttpContext ctx)=>
-  {
-   if(input.ExpectedRevision!=0||!ConfigurationPolicy.Valid(input.Definition))return Results.BadRequest();
-   var device=await db.Devices.SingleOrDefaultAsync(x=>x.Id==deviceId&&x.Active);if(device is null)return Results.NotFound();
-   var job=new ManagedJob{TenantId=device.TenantId,DeviceId=device.Id,Name=input.Definition.Name,LatestRevision=1};db.ManagedJobs.Add(job);
-   AddRevision(db,secrets,job,input.Definition);ManagementApi.Audit(db,ctx,job.TenantId,"backup.configuration-created",job.Id);
-   await db.SaveChangesAsync();return Results.Created($"/api/v1/management/managed-jobs/{job.Id}",job);
-  }).RequireAuthorization("Admin");
-  g.MapPut("/managed-jobs/{id:guid}",async(Guid id,ConfigurationInput input,ManagementDb db,ISecretStore secrets,HttpContext ctx)=>
-  {
-   if(input.ExpectedRevision<1||!ConfigurationPolicy.Valid(input.Definition))return Results.BadRequest();
-   await using var tx=await db.Database.BeginTransactionAsync();await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({BitConverter.ToInt64(id.ToByteArray())})");
-   var job=await db.ManagedJobs.SingleOrDefaultAsync(x=>x.Id==id);if(job is null)return Results.NotFound();
-   if(job.LatestRevision!=input.ExpectedRevision)return Results.Conflict(new{code="RevisionConflict"});
-   var old=await db.ConfigurationRevisions.SingleAsync(x=>x.ManagedJobId==id&&x.Revision==job.LatestRevision);
-   var definition=Read(secrets,old);
-   // Rotating the backup passphrase or destination silently makes the existing chain inaccessible.
-   if(definition.Passphrase!=input.Definition.Passphrase||definition.TargetUrl!=input.Definition.TargetUrl||!SaasPolicy.SameDirectory(definition.Saas,input.Definition.Saas))return Results.Conflict(new{code="NewBackupChainRequired"});
-   job.LatestRevision++;job.Name=input.Definition.Name;job.Status="Pending";AddRevision(db,secrets,job,input.Definition);
-   ManagementApi.Audit(db,ctx,job.TenantId,"backup.configuration-changed",job.Id);await db.SaveChangesAsync();await tx.CommitAsync();return Results.Ok(job);
-  }).RequireAuthorization("Admin");
+  g.MapPost("/devices/{deviceId:guid}/managed-jobs",Create).RequireAuthorization("Admin");
+  g.MapPut("/managed-jobs/{id:guid}",Update).RequireAuthorization("Admin");
   app.MapGet("/api/v1/agent/configurations",async(ManagementDb db,TenantScope scope,ISecretStore secrets,HttpContext ctx)=>
   {
    var agent=await DeviceAuthentication.Authenticate(ctx,db,scope);if(agent is null)return Results.Unauthorized();
@@ -63,6 +44,29 @@ public static class ConfigurationApi
    db.Audit.Add(new AuditEvent{TenantId=job.TenantId,Actor=agent.DeviceId.ToString(),Action="backup.configuration-"+receipt.Status.ToLowerInvariant(),Resource=id.ToString()});
    await db.SaveChangesAsync();await tx.CommitAsync();return Results.NoContent();
   }).RequireRateLimiting("Agent");
+ }
+ public static async Task<IResult> Create(Guid deviceId,ConfigurationInput input,ManagementDb db,ISecretStore secrets,HttpContext ctx)
+ {
+  if(!ctx.User.IsInRole("SuperAdmin")&&!ctx.User.IsInRole("Administrator"))return Results.Forbid();
+   if(input.ExpectedRevision!=0||!ConfigurationPolicy.Valid(input.Definition))return Results.BadRequest();
+   var device=await db.Devices.SingleOrDefaultAsync(x=>x.Id==deviceId&&x.Active);if(device is null)return Results.NotFound();
+   var job=new ManagedJob{TenantId=device.TenantId,DeviceId=device.Id,Name=input.Definition.Name,LatestRevision=1};db.ManagedJobs.Add(job);
+   AddRevision(db,secrets,job,input.Definition);ManagementApi.Audit(db,ctx,job.TenantId,"backup.configuration-created",job.Id);
+   await db.SaveChangesAsync();return Results.Created($"/api/v1/management/managed-jobs/{job.Id}",job);
+ }
+ public static async Task<IResult> Update(Guid id,ConfigurationInput input,ManagementDb db,ISecretStore secrets,HttpContext ctx)
+ {
+  if(!ctx.User.IsInRole("SuperAdmin")&&!ctx.User.IsInRole("Administrator"))return Results.Forbid();
+   if(input.ExpectedRevision<1||!ConfigurationPolicy.Valid(input.Definition))return Results.BadRequest();
+   await using var tx=await db.Database.BeginTransactionAsync();await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({BitConverter.ToInt64(id.ToByteArray())})");
+   var job=await db.ManagedJobs.SingleOrDefaultAsync(x=>x.Id==id);if(job is null)return Results.NotFound();
+   if(job.LatestRevision!=input.ExpectedRevision)return Results.Conflict(new{code="RevisionConflict"});
+   var old=await db.ConfigurationRevisions.SingleAsync(x=>x.ManagedJobId==id&&x.Revision==job.LatestRevision);
+   var definition=Read(secrets,old);
+   // Rotating the backup passphrase or destination silently makes the existing chain inaccessible.
+   if(definition.Passphrase!=input.Definition.Passphrase||definition.TargetUrl!=input.Definition.TargetUrl||!SaasPolicy.SameDirectory(definition.Saas,input.Definition.Saas))return Results.Conflict(new{code="NewBackupChainRequired"});
+   job.LatestRevision++;job.Name=input.Definition.Name;job.Status="Pending";AddRevision(db,secrets,job,input.Definition);
+   ManagementApi.Audit(db,ctx,job.TenantId,"backup.configuration-changed",job.Id);await db.SaveChangesAsync();await tx.CommitAsync();return Results.Ok(job);
  }
  private static void AddRevision(ManagementDb db,ISecretStore secrets,ManagedJob job,ManagedBackupDefinition definition)
  {

@@ -28,6 +28,12 @@ public sealed partial class DuplicatiAdapter
   if(!(agentOptions.AllowUnlicensedSaasDevelopment&&SaasWorkloads.DevelopmentTestingAllowed)&&
      (Get(license,"IsConfigured").ValueKind!=JsonValueKind.True||Get(license,"IsValid").ValueKind!=JsonValueKind.True))
    throw new InvalidOperationException("A valid local SaaS subscription is required for production");
+  if(!(agentOptions.AllowUnlicensedSaasDevelopment&&SaasWorkloads.DevelopmentTestingAllowed))
+  {
+   var features=Get(license,"Features");var family=SaasPolicy.Key(source.Provider);
+   foreach(var root in source.RootTypes.Where(x=>x!="OrganizationalUnits"))
+    if(!int.TryParse(Get(features,$"duplicati:{family}:{root.ToLowerInvariant()}").ToString(),out var seats)||seats<1)throw new InvalidOperationException("The local subscription does not cover the selected SaaS root");
+  }
  }
  private void BindSaasJob(string id,ConfigurationAssignment assignment,string mountPoint)
  {

@@ -7,6 +7,6 @@ using Microsoft.Extensions.Options;
 namespace DariaTech.Console.Pages;
 public sealed class DeviceModel(ManagementDb db,IOptions<MonitoringOptions> o):PageModel
 {
- public DeviceRow Row{get;private set;}=null!;public List<BackupJob> Jobs{get;private set;}=[];public List<BackupRun> Runs{get;private set;}=[];
- public async Task<IActionResult> OnGetAsync(Guid id){var row=(await Overview.Load(db,o.Value)).SingleOrDefault(x=>x.Device.Id==id);if(row is null)return NotFound();Row=row;Jobs=await db.Jobs.Where(x=>x.DeviceId==id).ToListAsync();var ids=Jobs.Select(x=>x.Id).ToArray();Runs=await db.Runs.Where(x=>ids.Contains(x.JobId)).OrderByDescending(x=>x.Started).Take(200).ToListAsync();return Page();}
+ public DeviceRow Row{get;private set;}=null!;public List<BackupJob> Jobs{get;private set;}=[];public List<ManagedJob> Managed{get;private set;}=[];public List<BackupRun> Runs{get;private set;}=[];
+ public async Task<IActionResult> OnGetAsync(Guid id){var row=(await Overview.Load(db,o.Value)).SingleOrDefault(x=>x.Device.Id==id);if(row is null)return NotFound();Row=row;Managed=await db.ManagedJobs.Where(x=>x.DeviceId==id).ToListAsync();Jobs=await db.Jobs.Where(x=>x.DeviceId==id).ToListAsync();var ids=Jobs.Select(x=>x.Id).ToArray();Runs=await db.Runs.Where(x=>ids.Contains(x.JobId)).OrderByDescending(x=>x.Started).Take(200).ToListAsync();return Page();}
 }
