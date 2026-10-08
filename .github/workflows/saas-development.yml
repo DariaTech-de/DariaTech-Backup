@@ -1,0 +1,29 @@
+name: SaaS development integration
+on:
+  push:
+    branches: [master, 'feature/saas-*']
+    paths: ['tests/SaasIntegration/**', 'proprietary/**', '.github/workflows/saas-development.yml', 'global.json', 'Directory.Build.props']
+  pull_request:
+    paths: ['tests/SaasIntegration/**', 'proprietary/**', '.github/workflows/saas-development.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-provider-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DO_NOT_TRACK: '1'
+      USAGEREPORTER_Duplicati_LEVEL: none
+      AUTOUPDATER_Duplicati_SKIP_UPDATE: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - name: Build original modules for development only
+        run: dotnet build tests/SaasIntegration/SaasIntegration.csproj -c Release
+      - name: Offline provider and licensing contract checks
+        run: dotnet run --project tests/SaasIntegration/SaasIntegration.csproj -c Release --no-build
+      # Intentionally no package, publish or upload-artifact step.
