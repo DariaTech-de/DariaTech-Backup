@@ -44,6 +44,9 @@ jobs:
       - name: Test Windows service installation and enrollment
         shell: pwsh
         run: ./deploy/windows/tests/Smoke.ps1
+      - name: Test signed approved update across two agent versions
+        shell: pwsh
+        run: ./deploy/windows/tests/ApprovedUpdate.ps1
       - uses: actions/upload-artifact@v4
         with:
           name: DariaTechBackupSetup-win-x64-unsigned

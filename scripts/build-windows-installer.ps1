@@ -1,10 +1,11 @@
-param([string]$Compiler="${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")
+param([string]$Compiler="${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",[ValidatePattern('^\d+\.\d+\.\d+$')][string]$VersionOverride)
 $ErrorActionPreference='Stop'
 Set-Location (Join-Path $PSScriptRoot '..')
 $brand=Get-Content branding/product.json -Raw | ConvertFrom-Json
 foreach ($value in $brand.PSObject.Properties.Value) { if ($value -is [string] -and ($value.Contains('"') -or $value.Contains("`n"))) { throw 'Unsafe branding value' } }
 $version=([xml](Get-Content DariaTech/Agent/DariaTech.Agent.csproj)).Project.PropertyGroup.Version
-dotnet publish DariaTech/Agent/DariaTech.Agent.csproj -c Release -r win-x64 --self-contained true -o artifacts/windows/agent
+if ($VersionOverride) { $version=$VersionOverride }
+dotnet publish DariaTech/Agent/DariaTech.Agent.csproj -c Release -r win-x64 --self-contained true -p:Version=$version -o artifacts/windows/agent
 if ($LASTEXITCODE) { throw 'Agent publish failed' }
 dotnet publish Executables/Duplicati.Server/Duplicati.Server.csproj -c Release -r win-x64 --self-contained true -p:DariaTechOssOnly=true -o artifacts/windows/engine
 if ($LASTEXITCODE) { throw 'OSS engine publish failed' }
