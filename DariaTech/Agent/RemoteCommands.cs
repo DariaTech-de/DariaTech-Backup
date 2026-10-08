@@ -26,7 +26,11 @@ public sealed partial class DuplicatiAdapter
  public async Task<CommandReceipt> TaskReceipt(long id,CancellationToken ct)
  {
   using var response=await client.GetAsync($"/api/v1/task/{id}",ct);response.EnsureSuccessStatusCode();using var result=JsonDocument.Parse(await response.Content.ReadAsStreamAsync(ct));
-  var status=Get(result.RootElement,"Status").GetString();return status switch {"Completed"=>new("Completed",id,null),"Failed"=>new("Failed",id,"EngineTaskFailed"),_=>new("Accepted",id,null)};
+  var status=Get(result.RootElement,"Status").GetString();
+  // Engine tasks can return normally with a failed result (notably partial restores).
+  // Never forward raw exception/error text, and never turn this into a successful receipt.
+  if(status=="Completed"&&(!string.IsNullOrWhiteSpace(Get(result.RootElement,"ErrorMessage").ToString())||!string.IsNullOrWhiteSpace(Get(result.RootElement,"Exception").ToString())))return new("Failed",id,"EngineTaskFailed");
+  return status switch {"Completed"=>new("Completed",id,null),"Failed"=>new("Failed",id,"EngineTaskFailed"),_=>new("Accepted",id,null)};
  }
  public static string RestoreDestination(string? root,string folder)
  {

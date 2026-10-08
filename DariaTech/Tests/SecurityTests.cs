@@ -113,6 +113,25 @@ public sealed class SecurityTests
    Assert.Throws<CryptographicException>(()=>oldStore.Unprotect(tenant,"rotation-test",next));Assert.Throws<AuthenticationTagMismatchException>(()=>rotated.Unprotect(Guid.NewGuid(),"rotation-test",legacy));
   }finally{Directory.Delete(directory,true);}
  }
+ [TestCase(null,null,"Completed")]
+ [TestCase("test-secret-in-engine-error",null,"Failed")]
+ [TestCase(null,"test-secret-in-engine-exception","Failed")]
+ public async Task TaskCompletionDoesNotHideResultErrorsOrForwardSecretText(string? error,string? exception,string expected)
+ {
+  var directory=Path.Combine(Path.GetTempPath(),"dt-task-result-"+Guid.NewGuid());
+  try
+  {
+   var options=new AgentOptions{StateDirectory=directory};var state=new ProtectedState(options);
+   using var adapter=new DuplicatiAdapter(options,state,new TaskResultHandler(JsonSerializer.Serialize(new{Status="Completed",ErrorMessage=error,Exception=exception})));
+   var receipt=await adapter.TaskReceipt(1,CancellationToken.None);Assert.That(receipt.Status,Is.EqualTo(expected));
+   Assert.That(JsonSerializer.Serialize(receipt),Does.Not.Contain("test-secret"));Assert.That(receipt.ErrorCode,Is.EqualTo(expected=="Failed"?"EngineTaskFailed":null));
+  }finally{if(Directory.Exists(directory))Directory.Delete(directory,true);}
+ }
+ private sealed class TaskResultHandler(string result):HttpMessageHandler
+ {
+  protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct)=>Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK){Content=new StringContent(result)});
+ }
+
  [Test]public void AgentRejectsRemoteEngineAndInsecureConsole()
  {
   Assert.Throws<InvalidOperationException>(()=>new AgentOptions{EngineUrl="https://attacker.example"}.Validate());
