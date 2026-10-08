@@ -27,3 +27,10 @@ document.querySelectorAll('[data-dest-picker]').forEach(picker => {
  });
  picker.addEventListener('change', show);
 });
+// Backup editor: saved destination or a custom one; the hidden custom picker must not block submission.
+document.querySelectorAll('[data-destination-mode]').forEach(radio => radio.addEventListener('change', () => {
+ const custom = document.querySelector('[data-custom-destination]');
+ if (!custom) return;
+ const on = document.querySelector('[data-destination-mode][value=custom]').checked;
+ custom.hidden = !on; custom.disabled = !on;
+}));

@@ -6,7 +6,7 @@
  var path = Context.Request.Path.Value ?? "/";
  string? Current(string p) => (p == "/" ? path == "/" || path.Equals("/Index", StringComparison.OrdinalIgnoreCase) : path.Equals(p, StringComparison.OrdinalIgnoreCase) || (p == "/Devices" && path.Equals("/Device", StringComparison.OrdinalIgnoreCase)) || (p == "/Customers" && path.Equals("/Customer", StringComparison.OrdinalIgnoreCase))) ? "page" : null;
  var monitor = new[]{(Path:"/",Label:"Dashboard",Icon:"dashboard"),(Path:"/Customers",Label:"Kunden",Icon:"customers"),(Path:"/Devices",Label:"Geräte",Icon:"device"),(Path:"/Backups",Label:"Backups",Icon:"backups"),(Path:"/Alerts",Label:"Warnungen",Icon:"alert"),(Path:"/Activity",Label:"Aktivitäten",Icon:"activity")};
- var manage = new[]{(Path:"/Users",Label:"Benutzer",Icon:"users"),(Path:"/Settings",Label:"Einstellungen",Icon:"settings")};
+ var manage = new[]{(Path:"/Targets",Label:"Speicherziele",Icon:"cloud"),(Path:"/Users",Label:"Benutzer",Icon:"users"),(Path:"/Settings",Label:"Einstellungen",Icon:"settings")};
  var name = User.Identity?.Name;
 }
 <!doctype html>

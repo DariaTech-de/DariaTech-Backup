@@ -1,0 +1,38 @@
+@using DariaTech.Contracts
+@using DariaTech.Console.Services
+@model DestinationForm.Picker
+@{
+ var current = Model.Current;
+ var types = DestinationCatalog.All.Where(t => (!t.Deprecated && !t.Untested) || t.Key == current).ToList();
+ var recommended = DestinationForm.Recommended.Select(DestinationCatalog.Find).OfType<DestinationType>().Where(types.Contains).ToList();
+ var others = types.Except(recommended).OrderBy(DestinationForm.Label).ToList();
+ string Val(string type, string name) => type == current && Model.Values.TryGetValue(name, out var v) ? v : "";
+}
+  <div class="field">
+   <label for="dest-key">Speicherziel</label>
+   <select id="dest-key" name="DestinationKey" data-dest-picker disabled="@(!Model.Locked?null:"disabled")">
+    <optgroup label="Häufig genutzt">@foreach(var t in recommended){<option value="@t.Key" selected="@(t.Key==current?"selected":null)">@DestinationForm.Label(t)</option>}</optgroup>
+    <optgroup label="Weitere Ziele">@foreach(var t in others){<option value="@t.Key" selected="@(t.Key==current?"selected":null)">@DestinationForm.Label(t)</option>}</optgroup>
+   </select>
+   @if(Model.Locked){<input type="hidden" name="DestinationKey" value="@current" />}
+  </div>
+  @foreach(var t in types){
+   var active = t.Key == current;
+   var options = DestinationForm.Ordered(t).Where(o => !DestinationForm.Forced(t.Key).ContainsKey(o.Name)).ToList();
+   var main = options.Where(o => !DestinationForm.Advanced(o)).ToList();
+   var advanced = options.Where(DestinationForm.Advanced).ToList();
+   <fieldset class="dest-panel @(active?"active":"")" data-dest="@t.Key" disabled="@(active?null:"disabled")">
+    <legend class="sr-only">@DestinationForm.Label(t)</legend>
+    @if(DestinationForm.Hint(t.Key) is {} hint){<p class="hint">@Ui.Icon("info")@hint</p>}
+    <div class="form-grid">
+     @if(DestinationForm.HasHost(t.Key)){<div class="field"><label for="d-@t.Key-host">@DestinationForm.HostLabel(t.Key)</label><input id="d-@t.Key-host" name="@($"dest.{t.Key}.host")" value="@(active?Model.Dest.Host:"")" readonly="@(!Model.Locked?null:"readonly")" required /></div>}
+     @if(DestinationForm.HasPort(t.Key)){<div class="field"><label for="d-@t.Key-port"><span>Port</span><span class="label-hint">optional</span></label><input id="d-@t.Key-port" name="@($"dest.{t.Key}.port")" inputmode="numeric" value="@(active?Model.Dest.Port:"")" readonly="@(!Model.Locked?null:"readonly")" /></div>}
+     @if(DestinationForm.HasPath(t.Key)){<div class="field @(t.Key=="file"?"span-2":"")"><label for="d-@t.Key-path">@DestinationForm.PathLabel(t.Key)</label><input id="d-@t.Key-path" name="@($"dest.{t.Key}.path")" value="@(active?Model.Dest.Path:"")" readonly="@(!Model.Locked?null:"readonly")" required="@(t.Key=="file"?"required":null)" /></div>}
+     @foreach(var o in main){<partial name="_DestinationOption" model="(t, o, Val(t.Key, o.Name), active && Model.Stored.Contains(o.Name))" />}
+    </div>
+    @if(advanced.Count>0){
+    <details class="advanced"><summary>Erweiterte Optionen <span class="chip">@advanced.Count</span></summary>
+     <div class="form-grid">@foreach(var o in advanced){<partial name="_DestinationOption" model="(t, o, Val(t.Key, o.Name), active && Model.Stored.Contains(o.Name))" />}</div>
+    </details>}
+   </fieldset>
+  }

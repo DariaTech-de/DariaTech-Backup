@@ -6,11 +6,6 @@
  var isNew = Model.ManagedJobId is null;
  ViewData["Title"] = isNew ? "Backup-Job anlegen" : "Backup-Job bearbeiten";
  var providers = new[]{("Files","Dateien und Ordner","device"),("NAS","NAS-Freigabe","server"),("Proxmox","Proxmox VM/LXC","server"),("Microsoft365","Microsoft 365","cloud"),("GoogleWorkspace","Google Workspace","cloud")};
- var current = Model.DestinationKey ?? Model.Destination.Key;
- var types = DestinationCatalog.All.Where(t => (!t.Deprecated && !t.Untested) || t.Key == current).ToList();
- var recommended = DestinationForm.Recommended.Select(DestinationCatalog.Find).OfType<DestinationType>().Where(types.Contains).ToList();
- var others = types.Except(recommended).OrderBy(DestinationForm.Label).ToList();
- string Val(string type, string name) => type == current && Model.OptionValues.TryGetValue(name, out var v) ? v : "";
 }
 <nav class="breadcrumb" aria-label="Brotkrümel"><a href="/Devices">Geräte</a><span aria-hidden="true">/</span><a href="/Device?id=@Model.DeviceId">@Model.Device.Name</a><span aria-hidden="true">/</span><span aria-current="page">@ViewData["Title"]</span></nav>
 <div class="page-heading"><div><span class="eyebrow">@Model.Device.Name</span><h1>@ViewData["Title"]</h1><p class="lead">Quelle, Ziel, Verschlüsselung und Zeitplan – wie in Duplicati, zentral verwaltet.</p></div></div>
@@ -57,33 +52,20 @@
  <section class="card">
   <div class="card-head"><div><h2><span class="step">2</span>Wohin wird gesichert?</h2><span class="sub">Alle Speicherziele der Backup-Engine. Zugangsdaten werden verschlüsselt gespeichert und nur an diesen Agenten übertragen.</span></div></div>
   @if(!isNew){<p class="hint">@Ui.Icon("lock")Das Ziel eines bestehenden Jobs ist fest, damit die Backup-Kette lesbar bleibt. Zugangsdaten und Optionen können Sie ändern; für ein anderes Ziel legen Sie einen neuen Job an.</p>}
-  <div class="field">
-   <label for="dest-key">Speicherziel</label>
-   <select id="dest-key" name="DestinationKey" data-dest-picker disabled="@(isNew?null:"disabled")">
-    <optgroup label="Häufig genutzt">@foreach(var t in recommended){<option value="@t.Key" selected="@(t.Key==current?"selected":null)">@DestinationForm.Label(t)</option>}</optgroup>
-    <optgroup label="Weitere Ziele">@foreach(var t in others){<option value="@t.Key" selected="@(t.Key==current?"selected":null)">@DestinationForm.Label(t)</option>}</optgroup>
-   </select>
-   @if(!isNew){<input type="hidden" name="DestinationKey" value="@current" />}
-  </div>
-  @foreach(var t in types){
-   var active = t.Key == current;
-   var options = DestinationForm.Ordered(t).Where(o => !DestinationForm.Forced(t.Key).ContainsKey(o.Name)).ToList();
-   var main = options.Where(o => !DestinationForm.Advanced(o)).ToList();
-   var advanced = options.Where(DestinationForm.Advanced).ToList();
-   <fieldset class="dest-panel @(active?"active":"")" data-dest="@t.Key" disabled="@(active?null:"disabled")">
-    <legend class="sr-only">@DestinationForm.Label(t)</legend>
-    @if(DestinationForm.Hint(t.Key) is {} hint){<p class="hint">@Ui.Icon("info")@hint</p>}
-    <div class="form-grid">
-     @if(DestinationForm.HasHost(t.Key)){<div class="field"><label for="d-@t.Key-host">@DestinationForm.HostLabel(t.Key)</label><input id="d-@t.Key-host" name="@($"dest.{t.Key}.host")" value="@(active?Model.Destination.Host:"")" readonly="@(isNew?null:"readonly")" required /></div>}
-     @if(DestinationForm.HasPort(t.Key)){<div class="field"><label for="d-@t.Key-port"><span>Port</span><span class="label-hint">optional</span></label><input id="d-@t.Key-port" name="@($"dest.{t.Key}.port")" inputmode="numeric" value="@(active?Model.Destination.Port:"")" readonly="@(isNew?null:"readonly")" /></div>}
-     @if(DestinationForm.HasPath(t.Key)){<div class="field @(t.Key=="file"?"span-2":"")"><label for="d-@t.Key-path">@DestinationForm.PathLabel(t.Key)</label><input id="d-@t.Key-path" name="@($"dest.{t.Key}.path")" value="@(active?Model.Destination.Path:"")" readonly="@(isNew?null:"readonly")" required="@(t.Key=="file"?"required":null)" /></div>}
-     @foreach(var o in main){<partial name="_DestinationOption" model="(t, o, Val(t.Key, o.Name), active && Model.StoredSecrets.Contains(o.Name))" />}
-    </div>
-    @if(advanced.Count>0){
-    <details class="advanced"><summary>Erweiterte Optionen <span class="chip">@advanced.Count</span></summary>
-     <div class="form-grid">@foreach(var o in advanced){<partial name="_DestinationOption" model="(t, o, Val(t.Key, o.Name), active && Model.StoredSecrets.Contains(o.Name))" />}</div>
-    </details>}
+  @if(isNew && Model.Templates.Count>0){
+   var templateMode = Model.DestinationMode=="template";
+   <div class="choice" role="radiogroup" aria-label="Art des Speicherziels">
+    <label class="choice-option"><input type="radio" name="DestinationMode" value="template" checked="@(templateMode?"checked":null)" data-destination-mode />
+     <span><strong>Gespeichertes Speicherziel</strong><span class="sub">Der Job erhält automatisch einen eigenen Ordner: Kundennummer / Gerät / Job.</span>
+      <select name="TemplateId" aria-label="Gespeichertes Speicherziel">@foreach(var t in Model.Templates){<option value="@t.Id" selected="@(t.Id==Model.TemplateId?"selected":null)">@t.Name@(t.IsDefault?" (Standard)":"") – @DestinationForm.Describe(t.TargetUrl)</option>}</select></span></label>
+    <label class="choice-option"><input type="radio" name="DestinationMode" value="custom" checked="@(templateMode?null:"checked")" data-destination-mode />
+     <span><strong>Eigenes Ziel für diesen Job</strong><span class="sub">Beliebiges Speicherziel der Backup-Engine, z. B. externe Festplatte, NAS oder Cloud des Kunden.</span></span></label>
+   </div>
+   <fieldset class="custom-destination dest-panel-group" data-custom-destination hidden="@(templateMode?"hidden":null)" disabled="@(templateMode?"disabled":null)"><legend class="sr-only">Eigenes Ziel</legend>
+    <partial name="_DestinationPicker" model="new DestinationForm.Picker(Model.DestinationKey ?? Model.Destination.Key, Model.Destination, Model.OptionValues, Model.StoredSecrets, false)" />
    </fieldset>
+  } else {
+   <partial name="_DestinationPicker" model="new DestinationForm.Picker(Model.DestinationKey ?? Model.Destination.Key, Model.Destination, Model.OptionValues, Model.StoredSecrets, !isNew)" />
   }
  </section>
 

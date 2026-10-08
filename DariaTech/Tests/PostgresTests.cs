@@ -163,6 +163,34 @@ public sealed class PostgresTests
    {"dest.ftp.host","ftp.example"},{"dest.ftp.path","backup"},{"Passphrase","picker-passphrase-123456"},{"KeepVersions","30"},{"RepeatHours","24"},{"__RequestVerificationToken",Token(form)}}));
   Assert.That(plain.StatusCode,Is.EqualTo(HttpStatusCode.OK));Assert.That(await plain.Content.ReadAsStringAsync(),Does.Contain("ohne gesicherte Verbindung"));
  }
+ [Test]public async Task SavedDestinationGivesEachJobItsOwnFolderAndStaysOperatorOnly()
+ {
+  var(t,site)=await Customer();await using var db=Db();var device=new Device{TenantId=t.Id,SiteId=site.Id,Name="Template worker"};db.Devices.Add(device);await db.SaveChangesAsync();
+  var number=await db.Customers.Where(x=>x.TenantId==t.Id).Select(x=>x.Number).SingleAsync();
+  using var admin=await Login(UserRole.SuperAdmin);
+  string Token(string html){var m=Regex.Match(html,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");Assert.That(m.Success,Is.True);return WebUtility.HtmlDecode(m.Groups[1].Value);}
+  var name="DariaTech-Speicher "+Guid.NewGuid().ToString("N")[..8];
+  var page=await admin.GetStringAsync("/Targets");
+  using var saved=await admin.PostAsync("/Targets?handler=Save",new FormUrlEncodedContent(new Dictionary<string,string>{
+   {"Name",name},{"IsDefault","true"},{"DestinationKey","ssh"},{"dest.ssh.host","storage.dariatech.example"},{"dest.ssh.port","2222"},{"dest.ssh.path","backups"},
+   {"dest.ssh.opt.auth-username","backup"},{"dest.ssh.opt.auth-password","template-secret-321"},{"dest.ssh.opt.ssh-fingerprint","ssh-ed25519 256 11:22:33"},{"__RequestVerificationToken",Token(page)}}));
+  Assert.That(saved.StatusCode,Is.EqualTo(HttpStatusCode.Redirect));
+  var template=await db.DestinationTemplates.AsNoTracking().SingleAsync(x=>x.Name==name);
+  Assert.That(template.IsDefault,Is.True);Assert.That(template.EncryptedOptions,Does.Not.Contain("template-secret-321"));
+  var list=await admin.GetStringAsync("/Targets");Assert.That(list,Does.Not.Contain("template-secret-321"));
+  var form=await admin.GetStringAsync($"/BackupEdit?deviceId={device.Id}");Assert.That(form,Does.Contain(template.Id.ToString()));
+  using var created=await admin.PostAsync("/BackupEdit",new FormUrlEncodedContent(new Dictionary<string,string>{
+   {"DeviceId",device.Id.ToString()},{"Name","Server täglich"},{"Provider","Files"},{"Sources","/srv/daten"},{"DestinationMode","template"},{"TemplateId",template.Id.ToString()},
+   {"Passphrase","template-passphrase-123456"},{"KeepVersions","30"},{"RepeatHours","24"},{"__RequestVerificationToken",Token(form)}}));
+  Assert.That(created.StatusCode,Is.EqualTo(HttpStatusCode.Redirect));
+  var managed=await db.ManagedJobs.SingleAsync(x=>x.DeviceId==device.Id);
+  var r=await db.ConfigurationRevisions.AsNoTracking().SingleAsync(x=>x.ManagedJobId==managed.Id);
+  var stored=DariaTech.Console.Api.ConfigurationApi.Read(factory.Services.GetRequiredService<ISecretStore>(),r);
+  Assert.That(stored.TargetUrl,Does.Match($"^ssh://storage\\.dariatech\\.example:2222/backups/{Regex.Escape(number)}/Template-worker/Server-t-glich-[0-9a-f]{{6}}$"));
+  Assert.That(stored.BackendOptions["auth-password"],Is.EqualTo("template-secret-321"));Assert.That(stored.BackendOptions["ssh-fingerprint"],Is.EqualTo("ssh-ed25519 256 11:22:33"));
+  using var customer=await Login(UserRole.CustomerAdmin,t.Id);using var denied=await customer.GetAsync("/Targets");Assert.That(denied.StatusCode,Is.EqualTo(HttpStatusCode.Forbidden));
+  db.DestinationTemplates.Remove(await db.DestinationTemplates.SingleAsync(x=>x.Id==template.Id));await db.SaveChangesAsync();
+ }
  [Test]public async Task RealConsoleFormsCreateJobsAndQueueSignedActionsWithoutExposingSecrets()
  {
   var(t,site)=await Customer();await using var db=Db();var device=new Device{TenantId=t.Id,SiteId=site.Id,Name="Form-managed worker"};db.Devices.Add(device);await db.SaveChangesAsync();

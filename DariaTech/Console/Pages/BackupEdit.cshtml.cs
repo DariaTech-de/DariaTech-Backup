@@ -43,6 +43,9 @@ public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets):PageMo
  [BindProperty]public string? SshFingerprint {get;set;}="";
  [BindProperty]public string? Excludes {get;set;}="";
  [BindProperty]public string? DestinationKey {get;set;}
+ [BindProperty]public Guid? TemplateId {get;set;}
+ [BindProperty]public string? DestinationMode {get;set;}="custom";
+ public List<DestinationTemplate> Templates {get;private set;}=[];
  public DestinationForm.Parts Destination {get;private set;}=new("file","","","");
  public Dictionary<string,string> OptionValues {get;private set;}=new(StringComparer.OrdinalIgnoreCase);
  public HashSet<string> StoredSecrets {get;private set;}=new(StringComparer.OrdinalIgnoreCase);
@@ -69,6 +72,8 @@ public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets):PageMo
   else if(id is not null)return NotFound();
   else
   {
+   Templates=await db.DestinationTemplates.OrderBy(x=>x.Name).ToListAsync();
+   if((Templates.FirstOrDefault(x=>x.IsDefault)??Templates.FirstOrDefault()) is {} preferred){TemplateId=preferred.Id;DestinationMode="template";}
    Provider=provider;RootTypes=provider=="Microsoft365"?["Users","Groups","Sites"]:["Users","SharedDrives"];
    UserTypes=provider=="Microsoft365"?["Mailbox","Calendar","Contacts"]:["Gmail","Drive","Calendar"];
   }
@@ -82,22 +87,24 @@ public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets):PageMo
   Device=await db.Devices.SingleOrDefaultAsync(x=>x.Id==DeviceId&&x.Active)??null!;if(Device is null)return NotFound();
   var validBinding=ModelState.IsValid;
   Dictionary<string,string> storage;
-  if(!string.IsNullOrEmpty(DestinationKey))
+  Templates=await db.DestinationTemplates.OrderBy(x=>x.Name).ToListAsync();
+  if(previous is null&&DestinationMode=="template")
+  {
+   // Saved destination: copy URL and options, then give this job its own folder below it.
+   var template=Templates.SingleOrDefault(x=>x.Id==TemplateId);
+   var customer=await db.Customers.Where(x=>x.TenantId==Device.TenantId).Select(x=>x.Number).SingleOrDefaultAsync()??"kunde";
+   storage=template is null?new():DestinationTemplates.Options(secrets,template);
+   TargetUrl=template is null?"":DestinationForm.Below(template.TargetUrl,customer,Device.Name,Name+"-"+Guid.NewGuid().ToString("N")[..6])??"";
+   if(template is null||TargetUrl.Length==0)validBinding=false;
+   DestinationKey=DestinationForm.Parse(TargetUrl).Key;
+  }
+  else if(!string.IsNullOrEmpty(DestinationKey))
   {
    // Destination picker: the URL and options come from the selected engine destination only.
    if(previous is not null)DestinationKey=DestinationForm.Parse(previous.TargetUrl).Key; // an existing backup chain keeps its destination
-   var type=DestinationCatalog.Find(DestinationKey);
-   string Field(string name)=>Request.Form[$"dest.{DestinationKey}.{name}"].ToString();
-   TargetUrl=previous?.TargetUrl??(type is null?"":DestinationForm.Build(DestinationKey,Field("host"),Field("port"),Field("path"))??"");
-   if(type is null||TargetUrl.Length==0)validBinding=false;
-   storage=new(StringComparer.OrdinalIgnoreCase);
-   foreach(var option in type?.Options??[])
-   {
-    var value=Field("opt."+option.Name);
-    if(option.Secret&&value.Length==0&&previous?.BackendOptions.FirstOrDefault(x=>string.Equals(x.Key,option.Name,StringComparison.OrdinalIgnoreCase)).Value is {} kept)value=kept;
-    if(value.Length>0)storage[option.Name]=value;
-   }
-   foreach(var (key,value) in DestinationForm.Forced(type?.Key??""))storage[key]=value;
+   var (url,options)=DestinationForm.Read(Request.Form,DestinationKey,previous?.BackendOptions);
+   storage=options;TargetUrl=previous?.TargetUrl??url??"";
+   if(DestinationCatalog.Find(DestinationKey) is null||TargetUrl.Length==0)validBinding=false;
   }
   else
   {

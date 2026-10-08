@@ -58,6 +58,7 @@ public static class DestinationForm
  public static IReadOnlyDictionary<string,string> Forced(string key)=>key switch{"s3" or "webdav" or "tahoe"=>new Dictionary<string,string>{["use-ssl"]="true"},_=>new Dictionary<string,string>()};
 
  public sealed record Parts(string Key,string Host,string Port,string Path);
+ public sealed record Picker(string Current,Parts Dest,IReadOnlyDictionary<string,string> Values,IReadOnlySet<string> Stored,bool Locked);
  public static Parts Parse(string? url)
  {
   if(!Uri.TryCreate(url,UriKind.Absolute,out var uri)||DestinationCatalog.Resolve(uri.Scheme) is not {Type:{} t})return new("","","","");
@@ -86,6 +87,41 @@ public static class DestinationForm
   var authority=HasHost(key)?Uri.EscapeDataString(host)+(port.Length>0?":"+port:""):"";
   var url=key+"://"+authority+(HasPath(key)?"/"+string.Join('/',segments):"");
   return Uri.TryCreate(url,UriKind.Absolute,out _)?url:null;
+ }
+ // Reads the picker fields of one destination from a posted form. Blank secrets keep the previous value.
+ public static (string? Url,Dictionary<string,string> Options) Read(Microsoft.AspNetCore.Http.IFormCollection form,string key,IReadOnlyDictionary<string,string>? previous=null)
+ {
+  var options=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
+  if(DestinationCatalog.Find(key) is not {} type)return (null,options);
+  string Field(string name)=>form[$"dest.{key}.{name}"].ToString().Trim();
+  foreach(var option in type.Options)
+  {
+   var value=option.Secret?form[$"dest.{key}.opt.{option.Name}"].ToString():Field("opt."+option.Name);
+   if(option.Secret&&value.Length==0&&previous?.FirstOrDefault(x=>string.Equals(x.Key,option.Name,StringComparison.OrdinalIgnoreCase)).Value is {} kept)value=kept;
+   if(value.Length>0)options[option.Name]=value;
+  }
+  foreach(var (k,v) in Forced(type.Key))options[k]=v;
+  return (Build(type.Key,Field("host"),Field("port"),Field("path")),options);
+ }
+ // Each job needs its own folder below a shared destination; Duplicati refuses two backups in one folder.
+ public static string? Below(string baseUrl,params string[] segments)
+ {
+  var parts=Parse(baseUrl);if(parts.Key.Length==0)return null;
+  var clean=segments.Select(Slug).Where(x=>x.Length>0).ToArray();
+  if(parts.Key=="file")
+  {
+   var sep=parts.Path.Contains('\\')||parts.Path.Length>1&&parts.Path[1]==':'?"\\":"/";
+   return Build("file","","",parts.Path.TrimEnd('\\','/')+sep+string.Join(sep,clean));
+  }
+  var path=string.Join('/',new[]{parts.Path.Trim('/')}.Where(x=>x.Length>0).Concat(clean));
+  if(HasPath(parts.Key))return Build(parts.Key,parts.Host,parts.Port,path);
+  var url=parts.Key+"://"+Uri.EscapeDataString(parts.Host)+"/"+string.Join('/',clean.Select(Uri.EscapeDataString)); // folder-style destinations (OAuth drives)
+  return Uri.TryCreate(url,UriKind.Absolute,out _)?url:null;
+ }
+ public static string Slug(string value)
+ {
+  var chars=value.Trim().Select(c=>char.IsAsciiLetterOrDigit(c)||c is '-' or '_' or '.'?c:'-').ToArray();
+  return new string(chars).Trim('-','.').Replace("--","-");
  }
  // Short, secret-free description for job lists.
  public static string Describe(string? url)

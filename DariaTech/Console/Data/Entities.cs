@@ -134,3 +134,11 @@ public sealed class UpdateDeployment : TenantEntity
  public string Status {get;set;}="Approved"; public string? ErrorCode {get;set;}
  public DateTimeOffset Approved {get;set;}=DateTimeOffset.UtcNow;
 }
+// Operator-level saved destination (e.g. the DariaTech storage server). Not tenant data: customer
+// users never see it. Jobs copy URL and options at creation and get their own sub-folder.
+public sealed class DestinationTemplate
+{
+ public Guid Id { get; set; } = Guid.NewGuid(); public string Name { get; set; } = "";
+ public string TargetUrl { get; set; } = ""; public string EncryptedOptions { get; set; } = "";
+ public bool IsDefault { get; set; } public DateTimeOffset Created { get; set; } = DateTimeOffset.UtcNow;
+}
