@@ -2,6 +2,7 @@ using DariaTech.Contracts;
 using DariaTech.Console.Api;
 using DariaTech.Console.Data;
 using DariaTech.Console.Security;
+using DariaTech.Console.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -19,7 +20,7 @@ public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets):PageMo
  [BindProperty]public string? SourceMounts {get;set;}
  [BindProperty]public string? ProxmoxGuestIds {get;set;}
  [BindProperty]public string? Sources {get;set;}="";
- [BindProperty]public string TargetUrl {get;set;}="";
+ [BindProperty]public string? TargetUrl {get;set;}="";
  [BindProperty]public string? Passphrase {get;set;}
  [BindProperty]public int KeepVersions {get;set;}=30;
  [BindProperty]public int RepeatHours {get;set;}=24;
@@ -41,6 +42,10 @@ public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets):PageMo
  [BindProperty]public string? S3Region {get;set;}="";
  [BindProperty]public string? SshFingerprint {get;set;}="";
  [BindProperty]public string? Excludes {get;set;}="";
+ [BindProperty]public string? DestinationKey {get;set;}
+ public DestinationForm.Parts Destination {get;private set;}=new("file","","","");
+ public Dictionary<string,string> OptionValues {get;private set;}=new(StringComparer.OrdinalIgnoreCase);
+ public HashSet<string> StoredSecrets {get;private set;}=new(StringComparer.OrdinalIgnoreCase);
  public Device Device {get;private set;}=null!;
  public string? Error {get;private set;}
  public async Task<IActionResult> OnGetAsync(Guid deviceId,Guid? id,string provider="Files")
@@ -59,6 +64,7 @@ public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets):PageMo
    AuthUsername=previous.BackendOptions.GetValueOrDefault("auth-username")??"";AwsAccessKeyId=previous.BackendOptions.GetValueOrDefault("aws-access-key-id")??"";
    S3Server=previous.BackendOptions.GetValueOrDefault("s3-server-name")??"";S3Region=previous.BackendOptions.GetValueOrDefault("s3-region")??"";SshFingerprint=previous.BackendOptions.GetValueOrDefault("ssh-fingerprint")??"";
    Excludes=string.Join(Environment.NewLine,previous.Filters.Where(x=>!x.Include).Select(x=>x.Expression));
+   ShowDestination(previous);
   }
   else if(id is not null)return NotFound();
   else
@@ -75,11 +81,32 @@ public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets):PageMo
   if(ManagedJobId is not null&&previous is null)return NotFound();
   Device=await db.Devices.SingleOrDefaultAsync(x=>x.Id==DeviceId&&x.Active)??null!;if(Device is null)return NotFound();
   var validBinding=ModelState.IsValid;
-  var storage=previous is null?new Dictionary<string,string>():new(previous.BackendOptions);
-  Set(storage,"auth-username",AuthUsername);Set(storage,"auth-password",AuthPassword);
-  Set(storage,"aws-access-key-id",AwsAccessKeyId);Set(storage,"aws-secret-access-key",AwsSecretKey);
-  Set(storage,"s3-server-name",S3Server);Set(storage,"s3-region",S3Region);Set(storage,"ssh-fingerprint",SshFingerprint);
-  if(Uri.TryCreate(TargetUrl,UriKind.Absolute,out var target)&&target.Scheme is "s3" or "webdav")storage["use-ssl"]="true";
+  Dictionary<string,string> storage;
+  if(!string.IsNullOrEmpty(DestinationKey))
+  {
+   // Destination picker: the URL and options come from the selected engine destination only.
+   if(previous is not null)DestinationKey=DestinationForm.Parse(previous.TargetUrl).Key; // an existing backup chain keeps its destination
+   var type=DestinationCatalog.Find(DestinationKey);
+   string Field(string name)=>Request.Form[$"dest.{DestinationKey}.{name}"].ToString();
+   TargetUrl=previous?.TargetUrl??(type is null?"":DestinationForm.Build(DestinationKey,Field("host"),Field("port"),Field("path"))??"");
+   if(type is null||TargetUrl.Length==0)validBinding=false;
+   storage=new(StringComparer.OrdinalIgnoreCase);
+   foreach(var option in type?.Options??[])
+   {
+    var value=Field("opt."+option.Name);
+    if(option.Secret&&value.Length==0&&previous?.BackendOptions.FirstOrDefault(x=>string.Equals(x.Key,option.Name,StringComparison.OrdinalIgnoreCase)).Value is {} kept)value=kept;
+    if(value.Length>0)storage[option.Name]=value;
+   }
+   foreach(var (key,value) in DestinationForm.Forced(type?.Key??""))storage[key]=value;
+  }
+  else
+  {
+   storage=previous is null?new Dictionary<string,string>():new(previous.BackendOptions);
+   Set(storage,"auth-username",AuthUsername);Set(storage,"auth-password",AuthPassword);
+   Set(storage,"aws-access-key-id",AwsAccessKeyId);Set(storage,"aws-secret-access-key",AwsSecretKey);
+   Set(storage,"s3-server-name",S3Server);Set(storage,"s3-region",S3Region);Set(storage,"ssh-fingerprint",SshFingerprint);
+   if(Uri.TryCreate(TargetUrl,UriKind.Absolute,out var target)&&target.Scheme is "s3" or "webdav")storage["use-ssl"]="true";
+  }
   SaasSource? cloud=null;
   if(Provider is not ("Files" or "NAS" or "Proxmox"))
   {
@@ -110,12 +137,20 @@ public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets):PageMo
    if(ids.Length==0||ids.Any(x=>!int.TryParse(x,out _)))validBinding=false;
    else proxmox=new(ids.Select(x=>int.Parse(x,System.Globalization.CultureInfo.InvariantCulture)).ToArray());
   }
-  var definition=new ManagedBackupDefinition(Name,cloud is null&&proxmox is null?Lines(Sources):[],TargetUrl,
+  var definition=new ManagedBackupDefinition(Name,cloud is null&&proxmox is null?Lines(Sources):[],TargetUrl??"",
    string.IsNullOrEmpty(Passphrase)?previous?.Passphrase??"":Passphrase,storage,KeepVersions,
    (previous?.Filters.Where(x=>x.Include)??[]).Concat(Lines(Excludes).Select(x=>new BackupFilter(false,x))).ToArray(),FirstRun is {} first?new(first.ToUniversalTime(),RepeatHours,Days):null,cloud,sourceMounts,proxmox);
   // Remove all posted secret values before redisplaying any validation error.
   Passphrase=ClientSecret=RefreshToken=ServiceAccountJson=AuthPassword=AwsSecretKey=null;ModelState.Clear();
-  if(!validBinding||!ConfigurationPolicy.Valid(definition)){Error="Bitte Quelle, Zugangsdaten, Ziel, Verschlüsselung und Zeitplan prüfen.";return Page();}
+  if(!validBinding||!ConfigurationPolicy.Valid(definition))
+  {
+   Error=DestinationCatalog.Find(DestinationForm.Parse(definition.TargetUrl).Key) is {} t&&!DestinationCatalog.TransportSecure(DestinationForm.Parse(definition.TargetUrl).Key,storage)
+    ?"Das Ziel ist ohne gesicherte Verbindung konfiguriert. Bitte TLS bzw. den Host-Key-Fingerprint angeben."
+    :"Bitte Quelle, Ziel, Zugangsdaten, Verschlüsselung und Zeitplan prüfen.";
+   ShowDestination(definition with{BackendOptions=storage.Where(x=>DestinationCatalog.Find(DestinationKey)?.Option(x.Key) is {Secret:false}).ToDictionary()});
+   if(previous is not null)foreach(var key in previous.BackendOptions.Keys)if(DestinationCatalog.Find(DestinationKey)?.Option(key) is {Secret:true} o)StoredSecrets.Add(o.Name);
+   return Page();
+  }
   var result=ManagedJobId is {} id?await ConfigurationApi.Update(id,new(Revision,definition),db,secrets,HttpContext):await ConfigurationApi.Create(DeviceId,new(0,definition),db,secrets,HttpContext);
   if(result is IStatusCodeHttpResult {StatusCode:>=400}){Error="Die Konfiguration wurde abgelehnt. Bei einer geänderten Quelle, einem neuen Ziel oder Passwort bitte einen neuen Backup-Job anlegen.";return Page();}
   return RedirectToPage("/Device",new{id=DeviceId});
@@ -127,6 +162,13 @@ public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets):PageMo
   if(HttpContext.Request.Method=="GET")Revision=job.LatestRevision;
   var revision=await db.ConfigurationRevisions.SingleAsync(x=>x.ManagedJobId==id&&x.Revision==job.LatestRevision);
   return ConfigurationApi.Read(secrets,revision);
+ }
+ private void ShowDestination(ManagedBackupDefinition d)
+ {
+  Destination=DestinationForm.Parse(d.TargetUrl);DestinationKey=Destination.Key;
+  var type=DestinationCatalog.Find(Destination.Key);
+  foreach(var (key,value) in d.BackendOptions)
+   if(type?.Option(key) is {} o){if(o.Secret)StoredSecrets.Add(o.Name);else OptionValues[o.Name]=value;}
  }
  private static string[] Lines(string? text)=>(text??"").Split(['\r','\n'],StringSplitOptions.RemoveEmptyEntries|StringSplitOptions.TrimEntries);
  private static void Set(Dictionary<string,string> destination,string key,string? value){if(!string.IsNullOrEmpty(value))destination[key]=value;}

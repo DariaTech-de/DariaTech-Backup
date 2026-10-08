@@ -1,1 +1,3 @@
-<Project Sdk="Microsoft.NET.Sdk" />
+<Project Sdk="Microsoft.NET.Sdk">
+ <ItemGroup><EmbeddedResource Include="Destinations.json" LogicalName="DariaTech.Contracts.Destinations.json" /></ItemGroup>
+</Project>

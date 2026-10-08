@@ -129,6 +129,40 @@ public sealed class PostgresTests
   var number=Guid.NewGuid().ToString();using var response=await admin.PostAsync("/Customers",new FormUrlEncodedContent(new Dictionary<string,string>{{"Input.Name","Form customer"},{"Input.Number",number},{"__RequestVerificationToken",WebUtility.HtmlDecode(match.Groups[1].Value)}}));
   Assert.That(response.StatusCode,Is.EqualTo(HttpStatusCode.Redirect));await using var db=Db();Assert.That(await db.Customers.AnyAsync(x=>x.Number==number),Is.True);
  }
+ [Test]public async Task DestinationPickerStoresEngineDestinationAndKeepsSecretsOnEdit()
+ {
+  var(t,site)=await Customer();await using var db=Db();var device=new Device{TenantId=t.Id,SiteId=site.Id,Name="Picker worker"};db.Devices.Add(device);await db.SaveChangesAsync();
+  using var admin=await Login(UserRole.SuperAdmin);
+  string Token(string html){var m=Regex.Match(html,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");Assert.That(m.Success,Is.True);return WebUtility.HtmlDecode(m.Groups[1].Value);}
+  var form=await admin.GetStringAsync($"/BackupEdit?deviceId={device.Id}");
+  Assert.That(form,Does.Contain("value=\"b2\"").And.Contain("value=\"smb\"").And.Contain("value=\"onedrivev2\""),"destination picker lists engine destinations");
+  using var created=await admin.PostAsync("/BackupEdit",new FormUrlEncodedContent(new Dictionary<string,string>{
+   {"DeviceId",device.Id.ToString()},{"Name","B2 job"},{"Provider","Files"},{"Sources","C:\\Daten"},{"DestinationKey","b2"},
+   {"dest.b2.host","kunde-backup"},{"dest.b2.path","geraet 1"},{"dest.b2.opt.b2-accountid","key-id-123"},{"dest.b2.opt.b2-applicationkey","b2-secret-value-456"},
+   {"Passphrase","picker-passphrase-123456"},{"KeepVersions","30"},{"RepeatHours","24"},{"__RequestVerificationToken",Token(form)}}));
+  Assert.That(created.StatusCode,Is.EqualTo(HttpStatusCode.Redirect),System.Text.RegularExpressions.Regex.Match(await created.Content.ReadAsStringAsync(),"form-error[^<]*<").Value);
+  var managed=await db.ManagedJobs.SingleAsync(x=>x.DeviceId==device.Id);
+  var secrets=factory.Services.GetRequiredService<ISecretStore>();
+  ManagedBackupDefinition Latest(){var r=db.ConfigurationRevisions.AsNoTracking().Where(x=>x.ManagedJobId==managed.Id).OrderByDescending(x=>x.Revision).First();return DariaTech.Console.Api.ConfigurationApi.Read(secrets,r);}
+  var stored=Latest();
+  Assert.That(stored.TargetUrl,Is.EqualTo("b2://kunde-backup/geraet%201"));
+  Assert.That(stored.BackendOptions["b2-applicationkey"],Is.EqualTo("b2-secret-value-456"));
+  var device_page=WebUtility.HtmlDecode(await admin.GetStringAsync($"/Device?id={device.Id}"));Assert.That(device_page,Does.Contain("Ziel: Backblaze B2 · kunde-backup/geraet 1"));
+  var edit=await admin.GetStringAsync($"/BackupEdit?deviceId={device.Id}&id={managed.Id}");
+  Assert.That(edit,Does.Not.Contain("b2-secret-value-456").And.Not.Contain("picker-passphrase-123456").And.Contain("key-id-123"));
+  using var changed=await admin.PostAsync("/BackupEdit",new FormUrlEncodedContent(new Dictionary<string,string>{
+   {"DeviceId",device.Id.ToString()},{"ManagedJobId",managed.Id.ToString()},{"Revision","1"},{"Name","B2 job renamed"},{"Provider","Files"},{"Sources","C:\\Daten"},
+   {"DestinationKey","s3"},{"dest.b2.opt.b2-accountid","key-id-789"},{"KeepVersions","60"},{"RepeatHours","24"},{"__RequestVerificationToken",Token(edit)}}));
+  Assert.That(changed.StatusCode,Is.EqualTo(HttpStatusCode.Redirect));
+  stored=Latest();
+  Assert.That(stored.TargetUrl,Is.EqualTo("b2://kunde-backup/geraet%201"),"destination of an existing chain is fixed even if another key is posted");
+  Assert.That(stored.BackendOptions["b2-applicationkey"],Is.EqualTo("b2-secret-value-456"),"blank secret keeps the stored value");
+  Assert.That(stored.BackendOptions["b2-accountid"],Is.EqualTo("key-id-789"));Assert.That(stored.KeepVersions,Is.EqualTo(60));
+  using var plain=await admin.PostAsync("/BackupEdit",new FormUrlEncodedContent(new Dictionary<string,string>{
+   {"DeviceId",device.Id.ToString()},{"Name","Plain FTP"},{"Provider","Files"},{"Sources","C:\\Daten"},{"DestinationKey","ftp"},
+   {"dest.ftp.host","ftp.example"},{"dest.ftp.path","backup"},{"Passphrase","picker-passphrase-123456"},{"KeepVersions","30"},{"RepeatHours","24"},{"__RequestVerificationToken",Token(form)}}));
+  Assert.That(plain.StatusCode,Is.EqualTo(HttpStatusCode.OK));Assert.That(await plain.Content.ReadAsStringAsync(),Does.Contain("ohne gesicherte Verbindung"));
+ }
  [Test]public async Task RealConsoleFormsCreateJobsAndQueueSignedActionsWithoutExposingSecrets()
  {
   var(t,site)=await Customer();await using var db=Db();var device=new Device{TenantId=t.Id,SiteId=site.Id,Name="Form-managed worker"};db.Devices.Add(device);await db.SaveChangesAsync();

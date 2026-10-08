@@ -74,6 +74,22 @@ public sealed class SecurityTests
   Assert.That(ConfigurationPolicy.Valid(d with{TargetUrl="ssh://storage.example/path",BackendOptions=new(){{"ssh-accept-any-fingerprints","true"}}}),Is.False);
   Assert.That(ConfigurationPolicy.Valid(d with{Sources=["relative/path"]}),Is.False);
  }
+ [Test]public void ManagedConfigurationAcceptsEngineDestinationsWithTheirOwnOptionsOnly()
+ {
+  var d=new ManagedBackupDefinition("Daily",["C:\\Data"],"file:///D:/Backup/","test-only-long-passphrase",new(),30,[],null);
+  Assert.That(DestinationCatalog.All.Count,Is.GreaterThan(20));
+  Assert.That(DestinationCatalog.Find("rclone"),Is.Null,"rclone options name local executables");
+  Assert.That(ConfigurationPolicy.Valid(d with{TargetUrl="b2://bucket/folder",BackendOptions=new(){{"b2-accountid","id"},{"b2-applicationkey","key"}}}),Is.True);
+  Assert.That(ConfigurationPolicy.Valid(d with{TargetUrl="b2://bucket/folder",BackendOptions=new(){{"aws-access-key-id","id"}}}),Is.False,"options of another backend");
+  Assert.That(ConfigurationPolicy.Valid(d with{TargetUrl="smb://nas/share/backup",BackendOptions=new(){{"auth-username","u"},{"auth-password","p"},{"transport","directtcp"}}}),Is.True);
+  Assert.That(ConfigurationPolicy.Valid(d with{TargetUrl="smb://nas/share/backup",BackendOptions=new(){{"transport","carrier-pigeon"}}}),Is.False,"enumeration value");
+  Assert.That(ConfigurationPolicy.Valid(d with{TargetUrl="ftp://host/backup",BackendOptions=new(){{"auth-username","u"}}}),Is.False,"plain FTP");
+  Assert.That(ConfigurationPolicy.Valid(d with{TargetUrl="ftp://host/backup",BackendOptions=new(){{"ftp-encryption-mode","Explicit"}}}),Is.True);
+  Assert.That(ConfigurationPolicy.Valid(d with{TargetUrl="webdavs://dav.example/backup"}),Is.True,"TLS scheme suffix as in the engine");
+  Assert.That(ConfigurationPolicy.Valid(d with{TargetUrl="webdav://dav.example/backup",BackendOptions=new(){{"auth-username","line\nbreak"},{"use-ssl","true"}}}),Is.False);
+  Assert.That(ConfigurationPolicy.Valid(d with{TargetUrl="webdav://dav.example/backup",BackendOptions=new(){{"use-ssl","yes"}}}),Is.False,"boolean value");
+  Assert.That(ConfigurationPolicy.Valid(d with{TargetUrl="ssh://storage.example/path",BackendOptions=new(){{"ssh-fingerprint","ssh-ed25519 256 aa:bb"},{"ssh-keyfile","C:\\key"}}}),Is.False);
+ }
  [Test]public void CommandsRejectTamperingWrongDevicesExpiryAndRestoreTraversal()
  {
   using var key=ECDsa.Create(ECCurve.NamedCurves.nistP256);var device=Guid.NewGuid();var now=DateTimeOffset.UtcNow;

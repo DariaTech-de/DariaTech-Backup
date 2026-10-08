@@ -438,3 +438,25 @@ main>*:nth-child(2){animation-delay:.04s}main>*:nth-child(3){animation-delay:.08
  .story-steps span:nth-child(2),.story-steps span:nth-child(3){display:none}
 }
 body.dark .hero{background:linear-gradient(160deg,#0f4a3b,#0b3329);box-shadow:inset 0 0 0 1px rgb(1 196 166/.25),0 20px 40px -24px rgb(0 0 0/.8)}
+
+/* ---------- Backup job editor ---------- */
+.seg{display:flex;flex-wrap:wrap;gap:6px;padding:6px;border-radius:16px;background:var(--panel);border:1px solid var(--line);width:fit-content;max-width:100%}
+.seg a{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 14px;border-radius:11px;color:var(--muted)!important;font-weight:500;font-size:14px;text-decoration:none!important}
+.seg a:hover{background:var(--sunken);color:var(--ink)!important}
+.seg a[aria-current=page]{background:var(--deep);color:#fff!important}
+body.dark .seg a[aria-current=page]{background:var(--primary)}
+.seg .icon{width:16px;height:16px}
+.step{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:8px;background:var(--ok-bg);color:var(--ok-fg);font-size:13px;font-weight:600;margin-right:10px;vertical-align:1px}
+.dest-panel{border:0;margin:0;padding:0;min-width:0;display:none;flex-direction:column;gap:16px}
+.dest-panel.active{display:flex}
+.advanced{border:1px solid var(--line);border-radius:14px;padding:0 16px}
+.advanced summary{cursor:pointer;padding:14px 0;font-weight:500;font-size:14px;display:flex;align-items:center;gap:8px;list-style:none}
+.advanced summary::-webkit-details-marker{display:none}
+.advanced summary::before{content:"";width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(-45deg);transition:transform .15s;margin-right:4px}
+.advanced[open] summary::before{transform:rotate(45deg)}
+.advanced[open]{padding-bottom:16px}
+.form-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px}
+.dest-line{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.dest-line .icon{width:15px;height:15px;color:var(--primary)}
+input[readonly]{background:var(--sunken);color:var(--muted)}
+.managed-job{display:flex;flex-direction:column;gap:4px;padding:12px 14px;border-radius:12px;background:var(--panel-2);border:1px solid var(--line)}

@@ -18,3 +18,12 @@ document.addEventListener('keydown', e => {
 });
 // Keep the one-time code field numeric while typing or pasting.
 document.querySelectorAll('input.otp').forEach(input => input.addEventListener('input', () => { input.value = input.value.replace(/\D/g, '').slice(0, 6); }));
+// Destination picker: show and enable only the panel of the selected storage destination.
+document.querySelectorAll('[data-dest-picker]').forEach(picker => {
+ const show = () => document.querySelectorAll('.dest-panel').forEach(panel => {
+  const active = panel.dataset.dest === picker.value;
+  panel.classList.toggle('active', active);
+  panel.disabled = !active;
+ });
+ picker.addEventListener('change', show);
+});

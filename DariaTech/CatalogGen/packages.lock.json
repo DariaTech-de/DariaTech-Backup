@@ -1,0 +1,1162 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "Aliyun.OSS.SDK.NetCore": {
+        "type": "Transitive",
+        "resolved": "2.14.1",
+        "contentHash": "UOI6I8Uw8A7pFh2GS6CSpJuhmcHH45k6asex8SRnZed2WWBXeGEaBFyv3HsMJNp+B6gPqyN079sQHWenGd3Y7g=="
+      },
+      "AlphaVSS": {
+        "type": "Transitive",
+        "resolved": "2.0.3",
+        "contentHash": "XN7wk1WcWCqifpNqe4hEBAhk4ykTre25SvA+fVDFMk0fZSUJk0hj2VyYD9rTawVYSftG7f4xlyX5wSfn7mb/aA==",
+        "dependencies": {
+          "AlphaVSS.Native.NetCore": "[2.0.3]"
+        }
+      },
+      "AlphaVSS.Native.NetCore": {
+        "type": "Transitive",
+        "resolved": "2.0.3",
+        "contentHash": "hUJThzRUMfcNBjnCX6u0CvNj4wlyeAlB59hnP4IWgcsRrCXqEOcXriLekGy765JZTg4Re4iErA28j7OnbA08Wg=="
+      },
+      "AWSSDK.Core": {
+        "type": "Transitive",
+        "resolved": "4.0.100.5",
+        "contentHash": "OYkCEqfNDh6uDlsCF+pBCOi9LvaEg9m2iU5xtbMci3yW8SpCIPOijiqB5OINIhdDvrQAltFd0x4BeYfF7GJVSw=="
+      },
+      "AWSSDK.IdentityManagement": {
+        "type": "Transitive",
+        "resolved": "4.0.100.4",
+        "contentHash": "xXCaK9gW9C6s2ZpCGofxTCcPS8Y3ElO24Ke2IuoNwrkDIaGXExpKvEeaOGQuUTJv5ZWmb0ajDqS38R5z/ygTsg==",
+        "dependencies": {
+          "AWSSDK.Core": "[4.0.100.5, 5.0.0)"
+        }
+      },
+      "AWSSDK.S3": {
+        "type": "Transitive",
+        "resolved": "4.0.100.3",
+        "contentHash": "bHe+BZRyC/TnyPw3/l6N96V/hqtBHyjtXINVrVxVl8LTYx2fxNI1HTwknm0jslSkOiOKeHRZ/oduxMcJXBbtsg==",
+        "dependencies": {
+          "AWSSDK.Core": "[4.0.100.3, 5.0.0)"
+        }
+      },
+      "Azure.Core": {
+        "type": "Transitive",
+        "resolved": "1.55.0",
+        "contentHash": "c7femvYS/xEUrLP1sNZN+DoQZmx3X+G3ZXtOOz0RL/7cGMCM3JVqepVmRd3AwM4IK8AtTGS4GOigCO+d/zaSsQ==",
+        "dependencies": {
+          "Microsoft.Bcl.AsyncInterfaces": "10.0.3",
+          "Microsoft.Extensions.Configuration.Abstractions": "10.0.3",
+          "Microsoft.Extensions.Hosting.Abstractions": "10.0.3",
+          "Microsoft.Identity.Client": "4.83.1",
+          "Microsoft.Identity.Client.Extensions.Msal": "4.83.1",
+          "System.ClientModel": "1.11.0",
+          "System.Memory.Data": "10.0.3"
+        }
+      },
+      "Azure.Storage.Blobs": {
+        "type": "Transitive",
+        "resolved": "12.29.1",
+        "contentHash": "pWh7xZBto8YcwiO853AB3uijTfVqs9PDte0Bu9/Zd8O9nwKiitWm0Jej1vsNkmYUzeG1552f8vJPjmtW30pBUQ==",
+        "dependencies": {
+          "Azure.Core": "1.55.0",
+          "Azure.Storage.Common": "12.28.0"
+        }
+      },
+      "Azure.Storage.Common": {
+        "type": "Transitive",
+        "resolved": "12.28.0",
+        "contentHash": "5l8YhNrks38zKLGFW2BBFLwieyamH/xauABSASsdpZv79G0f+n2n22IjkRmUqCmALSupkwRHh2LOhbW3yj5Qgw==",
+        "dependencies": {
+          "Azure.Core": "1.55.0",
+          "System.IO.Hashing": "10.0.3"
+        }
+      },
+      "BouncyCastle.Cryptography": {
+        "type": "Transitive",
+        "resolved": "2.7.0",
+        "contentHash": "U+12df8UEWHgBi04YVf/Lgi2dy3SItlIYvHjjEVa/BngCQIzDCDRBk50DDByCfDvSbe5pRNFr3b7UrVK2kMcLw=="
+      },
+      "CommunityToolkit.HighPerformance": {
+        "type": "Transitive",
+        "resolved": "8.2.1",
+        "contentHash": "0/5BHriP3T/vbHnjL/kgHo9qIOVbwAMeSrz0XWMhL83IwLk3sNhSd2+sCzRKjzufQZWL2xKEFbF93Itwpoijbg=="
+      },
+      "Duplicati.StreamUtil": {
+        "type": "Transitive",
+        "resolved": "1.0.5",
+        "contentHash": "z0GyFesFzHdd4MUkEcpeW/9K3xVV4zaWCdLbOJYrKAvZ/3jH1oQ9Sw8RN44WzgkqtLLaprZdM9wRtUNYyxXVbA=="
+      },
+      "FluentFTP": {
+        "type": "Transitive",
+        "resolved": "54.2.0",
+        "contentHash": "n+OyaqU80gnOltXo2xBPZklAqbtxJAfl2GfblOIe5OCAk4jr/3zYW9Jf1fG6eR/USZq4AKWQcUMmKE9neSk8og=="
+      },
+      "Google.Apis": {
+        "type": "Transitive",
+        "resolved": "1.75.0",
+        "contentHash": "ZqODi2IvyTBezeGztemXv6U/+VinyqxxPiyoW2CZbzIrUp+a35Rt5tzUjXHPXK9nA1YQi/w8ABpYQpBm31ditw==",
+        "dependencies": {
+          "Google.Apis.Core": "1.75.0"
+        }
+      },
+      "Google.Apis.Admin.Directory.directory_v1": {
+        "type": "Transitive",
+        "resolved": "1.68.0.3428",
+        "contentHash": "vduIgS0BuDZNNOiRElzJUQkHYDu3dbBDmypOLezwk3D68+2lFwRJFm2s5tOJ7wZ3ji4oLDwEs0++N8zgX32W0g==",
+        "dependencies": {
+          "Google.Apis": "1.68.0",
+          "Google.Apis.Auth": "1.68.0"
+        }
+      },
+      "Google.Apis.Auth": {
+        "type": "Transitive",
+        "resolved": "1.75.0",
+        "contentHash": "hzuGwUBIQYdFkChXm62E5Suxe+q5PHt2uE5EunGBco2j01uQJGlUgzNujZvGHMlAIEHaytzhdn3v3v52ZPgv2Q==",
+        "dependencies": {
+          "Google.Apis": "1.75.0",
+          "Google.Apis.Core": "1.75.0",
+          "System.Management": "7.0.2"
+        }
+      },
+      "Google.Apis.Calendar.v3": {
+        "type": "Transitive",
+        "resolved": "1.68.0.3430",
+        "contentHash": "ihVG4Q2H4ToI1o90gvFOQuhg7o3KoVckKer1/x3MJlaIa6eLp+mGwyHVgSB42XQAX0hvXANtp9vgEZngvI4mZQ==",
+        "dependencies": {
+          "Google.Apis": "1.68.0",
+          "Google.Apis.Auth": "1.68.0"
+        }
+      },
+      "Google.Apis.Core": {
+        "type": "Transitive",
+        "resolved": "1.75.0",
+        "contentHash": "7AuI44XP4LzMFiOjdk4GCtCxJTIWZcjrXLeGjLYYSpTHHbiPkvm76XNym7zPOnD90sIg+zdTulg+I6D5W5spTQ==",
+        "dependencies": {
+          "Newtonsoft.Json": "13.0.4"
+        }
+      },
+      "Google.Apis.Drive.v3": {
+        "type": "Transitive",
+        "resolved": "1.68.0.3428",
+        "contentHash": "b976cqg3N4srCEeekL7V1BN3qeQ2mAwNbUbIGh+0XdyoONK6CCruYz/5gkw36v9Gt+eVIAOtTai6XhZBO2n1bw==",
+        "dependencies": {
+          "Google.Apis": "1.68.0",
+          "Google.Apis.Auth": "1.68.0"
+        }
+      },
+      "Google.Apis.Gmail.v1": {
+        "type": "Transitive",
+        "resolved": "1.68.0.3427",
+        "contentHash": "SOCapuhgPUxPARbO97TpB26jmyJwyJG1hLeEXjeVnWhgf3sXfANbu4JcPULkEkNC7RUahh02gqiN7jyo3mvedw==",
+        "dependencies": {
+          "Google.Apis": "1.68.0",
+          "Google.Apis.Auth": "1.68.0"
+        }
+      },
+      "Google.Apis.Groupssettings.v1": {
+        "type": "Transitive",
+        "resolved": "1.68.0.2366",
+        "contentHash": "uBzFCARGQtg8fvnyaXHmjli3RMXIIJoYXSIcVphtmox2+Ve+zudBHqt+veVnC7ezAAE2c4rvQzOwVTwt9Snm7w==",
+        "dependencies": {
+          "Google.Apis": "1.68.0",
+          "Google.Apis.Auth": "1.68.0"
+        }
+      },
+      "Google.Apis.HangoutsChat.v1": {
+        "type": "Transitive",
+        "resolved": "1.68.0.3393",
+        "contentHash": "sdVnS1JhQh2ehCVkM4lpcpX1NfMJx82GjxXQNa/PGkI+fHeVJZ97iHF125SMnPi7e1oYJh9XFMkOzJ5eD7K7Zg==",
+        "dependencies": {
+          "Google.Apis": "1.68.0",
+          "Google.Apis.Auth": "1.68.0"
+        }
+      },
+      "Google.Apis.Keep.v1": {
+        "type": "Transitive",
+        "resolved": "1.69.0.3729",
+        "contentHash": "4M3S38zF39Sy3K/BJ3z6KMsyuQDWaxH+NAGm/VPgK6561+57rLDwEZc02ijjYFC+wKgpP2wxqxolIeyOFTSrJA==",
+        "dependencies": {
+          "Google.Apis": "1.69.0",
+          "Google.Apis.Auth": "1.69.0"
+        }
+      },
+      "Google.Apis.PeopleService.v1": {
+        "type": "Transitive",
+        "resolved": "1.69.0.3785",
+        "contentHash": "wWfCxoAGCh+mLQBUB2Ow9+mUh5pAcg045DyHcSusQ6mbWqoU9K/1O0IX8jBcUNxSQkkH6Gb0PoxxJn4wTf9RUw==",
+        "dependencies": {
+          "Google.Apis": "1.69.0",
+          "Google.Apis.Auth": "1.69.0"
+        }
+      },
+      "Google.Apis.Tasks.v1": {
+        "type": "Transitive",
+        "resolved": "1.68.0.3435",
+        "contentHash": "hWQa70QpTAGiKpTa7VayeBmf6QLRrG5OzPds9yDe8neQhsIPgvsd6X4iRQp9lD4M/o0YaMgWjEFoBTudRsailg==",
+        "dependencies": {
+          "Google.Apis": "1.68.0",
+          "Google.Apis.Auth": "1.68.0"
+        }
+      },
+      "jose-jwt": {
+        "type": "Transitive",
+        "resolved": "5.3.0",
+        "contentHash": "Doidvhyg6TN77F6HPL6Ry0KkEz6tnOUlAWfxOMSSESLU6vQSDJerX5/mr8k4xv2kA05W2Y8Ji0HXLPJM+02W9w=="
+      },
+      "JsonSignature": {
+        "type": "Transitive",
+        "resolved": "1.0.0",
+        "contentHash": "lIMFVgrKbokMPH13s1RsnnkIecdiTwtvDLQIit1igek2VmXJb6rKirXuvs6XDIYL12KcpKoH3J0ffq+mnDDiDQ=="
+      },
+      "MegaApiClient": {
+        "type": "Transitive",
+        "resolved": "1.10.4",
+        "contentHash": "T8xTy9nuLSFBb6qC2Ns79UclzKExxNrbt6sOtzMtJetdTBgOLTRkInoA+dFf6jgDWkuL5/4+L+/vKfqqb9M/Rg==",
+        "dependencies": {
+          "Newtonsoft.Json": "10.0.2"
+        }
+      },
+      "Microsoft.Bcl.AsyncInterfaces": {
+        "type": "Transitive",
+        "resolved": "10.0.3",
+        "contentHash": "TV62UsrJZPX6gbt3c4WrtXh7bmaDIcMqf9uft1cc4L6gJXOU07hDGEh+bFQh/L2Az0R1WVOkiT66lFqS6G2NmA=="
+      },
+      "Microsoft.Extensions.Caching.Abstractions": {
+        "type": "Transitive",
+        "resolved": "10.0.11",
+        "contentHash": "vUl798SmruTqqlt/xH2gDk3tJlhk6k3HdOXAHirlRfbNKDym4g/kRpUL9S4sl6F6FsOTOMW+ZsDapqlZMOOiEw==",
+        "dependencies": {
+          "Microsoft.Extensions.Primitives": "10.0.11"
+        }
+      },
+      "Microsoft.Extensions.Caching.Memory": {
+        "type": "Transitive",
+        "resolved": "10.0.11",
+        "contentHash": "el1g0mBEbDBGY2bT9mcSfrTWO8QlPdq2nOCnvQugioOFwHV+bVBMeiakoI0dNOdj8d6Hi9K6HY2xzRUWJiDR3w==",
+        "dependencies": {
+          "Microsoft.Extensions.Caching.Abstractions": "10.0.11",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.11",
+          "Microsoft.Extensions.Logging.Abstractions": "10.0.11",
+          "Microsoft.Extensions.Options": "10.0.11",
+          "Microsoft.Extensions.Primitives": "10.0.11"
+        }
+      },
+      "Microsoft.Extensions.Configuration": {
+        "type": "Transitive",
+        "resolved": "10.0.11",
+        "contentHash": "wlhRqZW8LcJPa+vk2oLAc/REXDItHtkFQdf/QcXYGZbZOO13izcsKY1pCvuFQYwUiZD+hwSZwsKASjqT+BNaVg==",
+        "dependencies": {
+          "Microsoft.Extensions.Configuration.Abstractions": "10.0.11",
+          "Microsoft.Extensions.Primitives": "10.0.11"
+        }
+      },
+      "Microsoft.Extensions.Configuration.Abstractions": {
+        "type": "Transitive",
+        "resolved": "10.0.11",
+        "contentHash": "fVi053xdpda9Em7vSkmgVxO/PtgC2m78ekReKWsgcyskqY0U82Bz/MONwxpGzI0hElYKJfw+fupqMVeKW3fSaA==",
+        "dependencies": {
+          "Microsoft.Extensions.Primitives": "10.0.11"
+        }
+      },
+      "Microsoft.Extensions.Configuration.Binder": {
+        "type": "Transitive",
+        "resolved": "10.0.11",
+        "contentHash": "rFn8RuszZn3qquPVkDytMUlPc2+rXl9MCoygwc1XmAgC5vg5/oXJ8hkOosOrLoBLsqdTy4lFwP6iQdPS9uSYOA==",
+        "dependencies": {
+          "Microsoft.Extensions.Configuration": "10.0.11",
+          "Microsoft.Extensions.Configuration.Abstractions": "10.0.11"
+        }
+      },
+      "Microsoft.Extensions.DependencyInjection": {
+        "type": "Transitive",
+        "resolved": "10.0.11",
+        "contentHash": "PSmotV19c7E3lKed++uYo1kSiXFI+uTl37CBSrhq+CfLC3FCHjG7R91+xPnNehQfHS1b0Tzo/CCLPWH3qaEheg==",
+        "dependencies": {
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.11"
+        }
+      },
+      "Microsoft.Extensions.DependencyInjection.Abstractions": {
+        "type": "Transitive",
+        "resolved": "10.0.11",
+        "contentHash": "/a1aJz4m7ylhEDf25ugQChLQoN5XwoGjWw/BoR/ZWWKsO1v4DdJElS1uyngahz4B/eOzjFk1KNTkarRLE5wsIg=="
+      },
+      "Microsoft.Extensions.Diagnostics": {
+        "type": "Transitive",
+        "resolved": "10.0.11",
+        "contentHash": "HT70uGPxMLqqnOzKMcnQtDmeV4r0KHr4qVCLhP7SXil9jMEm8sQXwcybxVVFGXZJ1V44xV0mLqQ54aZbcR2OiQ==",
+        "dependencies": {
+          "Microsoft.Extensions.Configuration": "10.0.11",
+          "Microsoft.Extensions.Diagnostics.Abstractions": "10.0.11",
+          "Microsoft.Extensions.Options.ConfigurationExtensions": "10.0.11"
+        }
+      },
+      "Microsoft.Extensions.Diagnostics.Abstractions": {
+        "type": "Transitive",
+        "resolved": "10.0.11",
+        "contentHash": "se7Kx8QpJEt+nf26L4qIVAofGTDr1wbexxsh/Fm3Xc04xUkqUXK06KUS7FLwSQYSjqb7q9n+T7MEcXYBhI1Y5g==",
+        "dependencies": {
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.11",
+          "Microsoft.Extensions.Options": "10.0.11"
+        }
+      },
+      "Microsoft.Extensions.FileProviders.Abstractions": {
+        "type": "Transitive",
+        "resolved": "10.0.3",
+        "contentHash": "4TD9AXDRsipTmaemwnjt/DM5Ri0de2JzHQhvZ4woBTjUtL4XrPNsMrOk5oiLJAx1gTrE6pOIhxv+lEde5F6CZA==",
+        "dependencies": {
+          "Microsoft.Extensions.Primitives": "10.0.3"
+        }
+      },
+      "Microsoft.Extensions.Hosting.Abstractions": {
+        "type": "Transitive",
+        "resolved": "10.0.3",
+        "contentHash": "GdMpC10Jf6poxSvUJ4lgYpJ5F/kJeaAoJmrPufjBoPYyCTKKY5Dyl0rZA+LBNvFqTq1cZa/lhlptlUhNvU6xrg==",
+        "dependencies": {
+          "Microsoft.Extensions.Configuration.Abstractions": "10.0.3",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.3",
+          "Microsoft.Extensions.Diagnostics.Abstractions": "10.0.3",
+          "Microsoft.Extensions.FileProviders.Abstractions": "10.0.3",
+          "Microsoft.Extensions.Logging.Abstractions": "10.0.3"
+        }
+      },
+      "Microsoft.Extensions.Http": {
+        "type": "Transitive",
+        "resolved": "10.0.11",
+        "contentHash": "ujx8RvcKzkxPFBguwgiygbwWVHVK0P7HFlNJ6I0JBRb28tzwe42jixBoA+dGmqG9IHepPVcm04vv2IDnU93ekA==",
+        "dependencies": {
+          "Microsoft.Extensions.Configuration.Abstractions": "10.0.11",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.11",
+          "Microsoft.Extensions.Diagnostics": "10.0.11",
+          "Microsoft.Extensions.Logging": "10.0.11",
+          "Microsoft.Extensions.Logging.Abstractions": "10.0.11",
+          "Microsoft.Extensions.Options": "10.0.11"
+        }
+      },
+      "Microsoft.Extensions.Logging": {
+        "type": "Transitive",
+        "resolved": "10.0.11",
+        "contentHash": "nUOJwgFkSiLHiVGFpU22pIJtuWYewuSYQ3JVuP/gdK8ASMT807Px+TYQiRWs6uSsOmoyFTaVCwKXTasczV6BpA==",
+        "dependencies": {
+          "Microsoft.Extensions.DependencyInjection": "10.0.11",
+          "Microsoft.Extensions.Logging.Abstractions": "10.0.11",
+          "Microsoft.Extensions.Options": "10.0.11"
+        }
+      },
+      "Microsoft.Extensions.Logging.Abstractions": {
+        "type": "Transitive",
+        "resolved": "10.0.11",
+        "contentHash": "Ljd0Uxoq5XpScD2Bg0nM/r3mwx7Ao5Uq24eo2ARxbGvqJ7Zht6rt2cJtwVRH4Cv+1ZVMdXz6TB43KbpmsxRrvQ==",
+        "dependencies": {
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.11"
+        }
+      },
+      "Microsoft.Extensions.Options": {
+        "type": "Transitive",
+        "resolved": "10.0.11",
+        "contentHash": "eY1GAKcTfD2maP27J84X9IovT3yjHJ2dVDzPmDg6/XqYvt3jMzJhtfQCLjG9pVsZGAd+8DQ2QrjaDcs2+VQLGw==",
+        "dependencies": {
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.11",
+          "Microsoft.Extensions.Primitives": "10.0.11"
+        }
+      },
+      "Microsoft.Extensions.Options.ConfigurationExtensions": {
+        "type": "Transitive",
+        "resolved": "10.0.11",
+        "contentHash": "syEhXQ/sEaSBFaqzlp9gDGHX/nk6gkQkh1sIUpBO1mlBj3Phu1rmb4ML1uCiyPW9N6Kxfxv3y5FGObC+bV01Qw==",
+        "dependencies": {
+          "Microsoft.Extensions.Configuration.Abstractions": "10.0.11",
+          "Microsoft.Extensions.Configuration.Binder": "10.0.11",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.11",
+          "Microsoft.Extensions.Options": "10.0.11",
+          "Microsoft.Extensions.Primitives": "10.0.11"
+        }
+      },
+      "Microsoft.Extensions.Primitives": {
+        "type": "Transitive",
+        "resolved": "10.0.11",
+        "contentHash": "SXcz+kF+4Oo9b1+55zntpJFYfwb1jw66ioxptyNOOTDc8g2FHnBFWjZpsWfCvZIhzr0x+4e2trVTs4OKwQfBtw=="
+      },
+      "Microsoft.Identity.Client": {
+        "type": "Transitive",
+        "resolved": "4.83.1",
+        "contentHash": "jOLIrZ3cynoqHLLO1cXplFFabrhrMEYs/EuKHvmCyrOm1axqiVFT6nCSnHxk7w5+d2BeQfCdM12Yf/0X7OeS1g==",
+        "dependencies": {
+          "Microsoft.IdentityModel.Abstractions": "8.14.0"
+        }
+      },
+      "Microsoft.Identity.Client.Extensions.Msal": {
+        "type": "Transitive",
+        "resolved": "4.83.1",
+        "contentHash": "I3k4J4Hj4KbLEFanjeUzzDOVecukETaTgEkJ7h2pP/Yazs6SLp6TVUTo/Eo+ptPXMwvc+iX7rBFtMSUrA7R+Mg==",
+        "dependencies": {
+          "Microsoft.Identity.Client": "4.83.1",
+          "System.Security.Cryptography.ProtectedData": "4.5.0"
+        }
+      },
+      "Microsoft.IdentityModel.Abstractions": {
+        "type": "Transitive",
+        "resolved": "8.22.0",
+        "contentHash": "LU3V3owsu4vGpCg2kyL7SsQEuHwcoJ8FSNBqzLADzCf3/PcKUTcx5Plsd51DoTJMfK/WigXV/03UhaN5JXE6uQ=="
+      },
+      "Microsoft.Management.Infrastructure": {
+        "type": "Transitive",
+        "resolved": "3.0.0",
+        "contentHash": "cGZi0q5IujCTVYKo9h22Pw+UwfZDV82HXO8HTxMG2HqntPlT3Ls8jY6punLp4YzCypJNpfCAu2kae3TIyuAiJw==",
+        "dependencies": {
+          "Microsoft.Management.Infrastructure.Runtime.Unix": "3.0.0",
+          "Microsoft.Management.Infrastructure.Runtime.Win": "3.0.0"
+        }
+      },
+      "Microsoft.Management.Infrastructure.Runtime.Unix": {
+        "type": "Transitive",
+        "resolved": "3.0.0",
+        "contentHash": "QZE3uEDvZ0m7LabQvcmNOYHp7v1QPBVMpB/ild0WEE8zqUVAP5y9rRI5we37ImI1bQmW5pZ+3HNC70POPm0jBQ=="
+      },
+      "Microsoft.Management.Infrastructure.Runtime.Win": {
+        "type": "Transitive",
+        "resolved": "3.0.0",
+        "contentHash": "uwMyWN33+iQ8Wm/n1yoPXgFoiYNd0HzJyoqSVhaQZyJfaQrJR3udgcIHjqa1qbc3lS6kvfuUMN4TrF4U4refCQ=="
+      },
+      "Microsoft.Win32.SystemEvents": {
+        "type": "Transitive",
+        "resolved": "10.0.0",
+        "contentHash": "bYdnhuD0XxcVTrxc8RyBjXo+AXYWJPnda3clhGz2Kakleyun1PyrzYV8RezT7ZYmR9OBSOgvpFQcvHo/K8Y90w=="
+      },
+      "MimeKit": {
+        "type": "Transitive",
+        "resolved": "4.17.0",
+        "contentHash": "h/KXsCreJf8RpR/PSAtlbvYtZFndp9N8Wn1Bs248AL7ITyhn+AiIY5bLTvt60tbN2mu6g8KadtBNWygTji2lqg==",
+        "dependencies": {
+          "BouncyCastle.Cryptography": "2.6.2",
+          "System.Security.Cryptography.Pkcs": "10.0.0"
+        }
+      },
+      "Minio": {
+        "type": "Transitive",
+        "resolved": "6.0.0",
+        "contentHash": "otyZTEZaKMpkmYFlX5MNYsijo5xT4BcKATFhBFMWUa2XdUEHNvU1mktGL2hxq/oLWSySDALpPDA0aWCvvnPlTg==",
+        "dependencies": {
+          "CommunityToolkit.HighPerformance": "8.2.1",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "7.0.0",
+          "Microsoft.Extensions.Logging": "7.0.0",
+          "System.IO.Hashing": "7.0.0",
+          "System.Reactive": "6.0.0"
+        }
+      },
+      "Mono.Unix": {
+        "type": "Transitive",
+        "resolved": "7.1.0-final.1.21458.1",
+        "contentHash": "Rhxz4A7By8Q0wEgDqR+mioDsYXGrcYMYPiWE9bSaUKMpG8yAGArhetEQV5Ms6KhKCLdQTlPYLBKPZYoKbAvT/g=="
+      },
+      "Newtonsoft.Json": {
+        "type": "Transitive",
+        "resolved": "13.0.4",
+        "contentHash": "pdgNNMai3zv51W5aq268sujXUyx7SNdE2bj1wZcWjAQrKMFZV260lbqYop1d2GM67JI1huLRwxo9ZqnfF/lC6A=="
+      },
+      "NGettext": {
+        "type": "Transitive",
+        "resolved": "0.6.7",
+        "contentHash": "gT6bf5PVayvTuEIuM2XSNqthrtn9W+LlCX4RD//Nb4hrT3agohHvPdjpROgNGgyXDkjwE74F+EwDwqUgJCJG8A=="
+      },
+      "Otp.NET": {
+        "type": "Transitive",
+        "resolved": "1.4.0",
+        "contentHash": "Fk1NKc0lWmlo6LAFYpFJInRgFKt72knRNEvxndDYoQHFwYOPXav+WEUBvQA0k4lxq5xt0SymrZ+oi0F/G40bPQ=="
+      },
+      "SharpCompress": {
+        "type": "Transitive",
+        "resolved": "0.50.4",
+        "contentHash": "/hxjUR7DEX6mky8/LQXyrnrKioOL6D6veAID1EZpro+q4s02x5dHEYBV3qjEN6lDYYilDoQQ76BcmQj+lRx51w=="
+      },
+      "SMBLibrary": {
+        "type": "Transitive",
+        "resolved": "1.5.4",
+        "contentHash": "v6y+uHuj0GDCdjqWAqvABjWurDZvYs465EkBaGKSvaFsbXhuWVCGulGbjM+1Yn2RVqPxc9Tm1ApSUNPvLKw04w=="
+      },
+      "SMBLibrary.Win32": {
+        "type": "Transitive",
+        "resolved": "1.5.4",
+        "contentHash": "c1Q9YHSfUKY7x/YM6VNPb4oyJMxCOGyMppDG3E5UUtzj8IEkECOrvaV8pjo+zLl3lNTPYrlt93GJEwvXsSUiMA==",
+        "dependencies": {
+          "SMBLibrary": "1.5.4"
+        }
+      },
+      "SQLite": {
+        "type": "Transitive",
+        "resolved": "3.53.4",
+        "contentHash": "KN7jeWqgUPeBRe1FlcpZURzxomuKKEKHmBBQfg+Nx7NkY1LjKhzHvH+3ASkNvhayESE34nMBinL9CV21JfPRJw=="
+      },
+      "sqlite-net-pcl": {
+        "type": "Transitive",
+        "resolved": "1.9.172",
+        "contentHash": "go533+huyvg5bOMmCpX+DyvLrcVRiEBIpqEiDHgXRijWIBBNkWnyMr/w+5ZzrUArKY+4ApucsbBnFtP3QITrJg==",
+        "dependencies": {
+          "SQLitePCLRaw.bundle_green": "2.1.2"
+        }
+      },
+      "SQLitePCLRaw.bundle_e_sqlite3": {
+        "type": "Transitive",
+        "resolved": "3.0.5",
+        "contentHash": "SW8iASIyWMrLzqabUHYQRvALhvD4ylSBsj4PgEVGwc36kQjc9xT5kSV/XQ9rU7nIpBWD+LPyX3Hlw5FzyUzGeQ==",
+        "dependencies": {
+          "SQLite": "3.53.4",
+          "SQLitePCLRaw.config.e_sqlite3": "3.0.5"
+        }
+      },
+      "SQLitePCLRaw.bundle_green": {
+        "type": "Transitive",
+        "resolved": "2.1.2",
+        "contentHash": "e2FRX87YHoSer+tLFX9P/povHLK0uH7UcdimHRPnfTSam+NZChVVXjBxe1MYnyBGlwX5dSs5sTlDg/yZBM7iVw==",
+        "dependencies": {
+          "SQLitePCLRaw.lib.e_sqlite3": "2.1.2",
+          "SQLitePCLRaw.provider.e_sqlite3": "2.1.2"
+        }
+      },
+      "SQLitePCLRaw.config.e_sqlite3": {
+        "type": "Transitive",
+        "resolved": "3.0.5",
+        "contentHash": "aSk8WE5tF2MybESMgtZAEyMVCAWA0nBqOMc48HFoa9UoSdtm3goDXVzNRnefeKIwE6bV9NaNXptn1F9ReMQI0Q==",
+        "dependencies": {
+          "SQLitePCLRaw.provider.e_sqlite3": "3.0.5"
+        }
+      },
+      "SQLitePCLRaw.core": {
+        "type": "Transitive",
+        "resolved": "3.0.5",
+        "contentHash": "k81AYXXRCw3Zj8rOhyBoCsx/U97KYDFI2CSKr/ijl5BwpsW/hX/4kBiDmerFaoust8nxBwa0IHQFw8MmSHRtnQ=="
+      },
+      "SQLitePCLRaw.lib.e_sqlite3": {
+        "type": "Transitive",
+        "resolved": "3.53.3",
+        "contentHash": "ZXiSbBkrlw2Of/dBqny/qtQol7dlThrUD8zH/jkQicCFm2yn2BbhKsQW0+YHAzhANWz4ZJCz7gvo88BwluVhkA=="
+      },
+      "SQLitePCLRaw.provider.e_sqlite3": {
+        "type": "Transitive",
+        "resolved": "3.0.5",
+        "contentHash": "um8YSWduhhuskTG2bHfZrBqMNQOydfU8pcseT+cu5RivOGyoUbCrGXxgoRNTmRYw2VbMWnEZVVFcneZT/5dsBg==",
+        "dependencies": {
+          "SQLitePCLRaw.core": "3.0.5"
+        }
+      },
+      "SSH.NET": {
+        "type": "Transitive",
+        "resolved": "2026.0.0",
+        "contentHash": "Yu9dirPq8l3oaat0+OQ7K0nUf5MmYltpia5UGqsApTG4zTPvBC1cxbNnC3NERij26dUST0A3Ef1QdHSn5ArbWQ==",
+        "dependencies": {
+          "BouncyCastle.Cryptography": "2.7.0",
+          "Microsoft.Extensions.Logging.Abstractions": "8.0.3"
+        }
+      },
+      "SshNet.Agent": {
+        "type": "Transitive",
+        "resolved": "2024.2.0.1",
+        "contentHash": "ZFK6TZfhacusVMbOzYKA8Xr8Zg/XHtqH+pteS9HXBWF+okzrmPfZO0CMW2Nho9r9gEi6gMSFe5Qh9f0jUp8kBA==",
+        "dependencies": {
+          "SSH.NET": "2024.2.0"
+        }
+      },
+      "System.ClientModel": {
+        "type": "Transitive",
+        "resolved": "1.11.0",
+        "contentHash": "1Wl32zh7TbvN+HAO8NqDuaN0Ao2Qu/0j0NJSrXGDtpUQsTXQYJ3C6hd9/Ds2IrgP4agMQYFoXB35GZfC21ByHw==",
+        "dependencies": {
+          "Microsoft.Extensions.Configuration.Abstractions": "10.0.3",
+          "Microsoft.Extensions.Hosting.Abstractions": "10.0.3",
+          "Microsoft.Extensions.Logging.Abstractions": "10.0.3",
+          "System.Memory.Data": "10.0.3"
+        }
+      },
+      "System.CodeDom": {
+        "type": "Transitive",
+        "resolved": "7.0.0",
+        "contentHash": "GLltyqEsE5/3IE+zYRP5sNa1l44qKl9v+bfdMcwg+M9qnQf47wK3H0SUR/T+3N4JEQXF3vV4CSuuo0rsg+nq2A=="
+      },
+      "System.CommandLine": {
+        "type": "Transitive",
+        "resolved": "2.0.0",
+        "contentHash": "Bjklzc5NoxqAGFi7BcGlY2TWAdB06Bq3a5sfRr3ubMRU80Mf98eyq3Y2UgR6xRV0TLznZmfe5T7mUjOunRNcdA=="
+      },
+      "System.IO.FileSystem.AccessControl": {
+        "type": "Transitive",
+        "resolved": "5.0.0",
+        "contentHash": "SxHB3nuNrpptVk+vZ/F+7OHEpoHUIKKMl02bUmYHQr1r+glbZQxs7pRtsf4ENO29TVm2TH3AEeep2fJcy92oYw=="
+      },
+      "System.IO.Hashing": {
+        "type": "Transitive",
+        "resolved": "10.0.3",
+        "contentHash": "La6ICwsdTKhVX+LKN+pvFjQRR3LhLwq3uKdi2knjLzRyPYBSydF4cjXidYxIiTcDD6XVYdsBWQEI8ZxiZ/OdIg=="
+      },
+      "System.Management": {
+        "type": "Transitive",
+        "resolved": "7.0.2",
+        "contentHash": "/qEUN91mP/MUQmJnM5y5BdT7ZoPuVrtxnFlbJ8a3kBJGhe2wCzBfnPFtK2wTtEEcf3DMGR9J00GZZfg6HRI6yA==",
+        "dependencies": {
+          "System.CodeDom": "7.0.0"
+        }
+      },
+      "System.Memory.Data": {
+        "type": "Transitive",
+        "resolved": "10.0.3",
+        "contentHash": "MaGhRfGunmrj/nHjtsi9XkhlYJ/ERGWrbA+BiSKNtGnAjc9XlG5EhAvak6VRcX5LYzPF6pBO8nJ613dTgzabig=="
+      },
+      "System.Reactive": {
+        "type": "Transitive",
+        "resolved": "7.0.0",
+        "contentHash": "VYaSP2Kt+45GFnr3q7c/b4awT48VvueOJV4jPjdUXi5MxC9mSUy+HkJYtm8rGZ6fC3tNHG9gBu/YwNAR/FYqhg=="
+      },
+      "System.Security.Cryptography.Pkcs": {
+        "type": "Transitive",
+        "resolved": "10.0.0",
+        "contentHash": "UPWqLSygJlFerRi9XNIuM0a1VC8gHUIufyP24xQ0sc+XimqUAEcjpOz9DhKpyDjH+5B/wO3RpC0KpkEeDj/ddg=="
+      },
+      "System.Security.Cryptography.ProtectedData": {
+        "type": "Transitive",
+        "resolved": "4.5.0",
+        "contentHash": "wLBKzFnDCxP12VL9ANydSYhk59fC4cvOr9ypYQLPnAj48NQIhqnjdD2yhP8yEKyBJEjERWS9DisKL7rX5eU25Q=="
+      },
+      "Tencent.QCloud.Cos.Sdk": {
+        "type": "Transitive",
+        "resolved": "5.4.11",
+        "contentHash": "xcm+1TgTCDfbQBD/oITSw1xSadpkIYXIuU9LjGRMA5cnHq5dYpWoAQ3Y+EefwIqjCA/W0uYDwT1Gc8aAObp5qA=="
+      },
+      "uplink.NET": {
+        "type": "Transitive",
+        "resolved": "2.14.3623",
+        "contentHash": "xLCC0qB5tn4uuRWjJESIdir40z2z8ygfkqk8ZoVayT9EdqXhX3VShQ7AxA+vPN0ern3YpN1w4zSoVtkkNbpEQQ==",
+        "dependencies": {
+          "sqlite-net-pcl": "1.7.335"
+        }
+      },
+      "uplink.NET.Linux": {
+        "type": "Transitive",
+        "resolved": "2.14.3623",
+        "contentHash": "ZZkhAgDszSk8Hnp8pNLRERJrijc1evv37CjB46uG1TpjfeJzuOupW/FE8DUCgE2c1Rkks8+ZShIUCm4Du4a7dQ=="
+      },
+      "uplink.NET.Mac": {
+        "type": "Transitive",
+        "resolved": "2.13.3484",
+        "contentHash": "35XqV3cYb3oBmiy7oaj5u4yDnZ75DyGO/DvBs5HBX6JwlVMZKDO4+XmZFJGlTq7FUK/7DUGc5kklvG/It1Vy7g=="
+      },
+      "uplink.NET.Win": {
+        "type": "Transitive",
+        "resolved": "2.14.3623",
+        "contentHash": "5TBxpzwvCknlVgH+yWliLIZ33+mHKjFjsvW6128CJ6KfdSp4HPy4Y8DZXr+tGouJ+Ud7Dqe/44vD0pbHyO+j8g=="
+      },
+      "Vanara.Core": {
+        "type": "Transitive",
+        "resolved": "5.0.7",
+        "contentHash": "h395/Y8B3nOiaO+wisRcEOPKO88mqM5XS738L6IX3WjWWT6hH2x5erWZeGHSl8ea9QAqpiCnT9v4wu2dp8DOXg=="
+      },
+      "Vanara.PInvoke.Kernel32": {
+        "type": "Transitive",
+        "resolved": "5.0.7",
+        "contentHash": "09AqZGM/qWvsNuqd3I0VVXka+Dx9JJ3IWIGgIl5Z/3y39PU4/1M/l/EAnhO3hafXFpInso2tXnz/cICwgLa5Rw==",
+        "dependencies": {
+          "Vanara.Core": "5.0.7"
+        }
+      },
+      "ZstdSharp.Port": {
+        "type": "Transitive",
+        "resolved": "0.8.8",
+        "contentHash": "UIDFkA5DC3en3tOJ3Mof11yBx9kUQLsaeo/oFdvN6Bbkr9E9+VCqfIadHci8cu+I51K2Sl7XYWVl2R/mA75NBQ=="
+      },
+      "duplicati.library.autoupdater": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Compression": "[1.0.0, )",
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )",
+          "Duplicati.License": "[1.0.0, )",
+          "JsonSignature": "[1.0.0, )",
+          "Newtonsoft.Json": "[13.0.4, )"
+        }
+      },
+      "duplicati.library.backend.aliyunoss": {
+        "type": "Project",
+        "dependencies": {
+          "Aliyun.OSS.SDK.NetCore": "[2.14.1, )",
+          "Duplicati.Library.Common": "[1.0.0, )",
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.Library.Logging": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )",
+          "Newtonsoft.Json": "[13.0.4, )"
+        }
+      },
+      "duplicati.library.backend.azureblob": {
+        "type": "Project",
+        "dependencies": {
+          "Azure.Storage.Blobs": "[12.29.1, )",
+          "Azure.Storage.Common": "[12.28.0, )",
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )"
+        }
+      },
+      "duplicati.library.backend.backblaze": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.Library.OAuthHelper": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )",
+          "Newtonsoft.Json": "[13.0.4, )"
+        }
+      },
+      "duplicati.library.backend.box": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.Library.Logging": "[1.0.0, )",
+          "Duplicati.Library.OAuthHelper": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )",
+          "Newtonsoft.Json": "[13.0.4, )"
+        }
+      },
+      "duplicati.library.backend.drimecloud": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.AutoUpdater": "[1.0.0, )",
+          "Duplicati.Library.Common": "[1.0.0, )",
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )"
+        }
+      },
+      "duplicati.library.backend.dropbox": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.Library.OAuthHelper": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )",
+          "Newtonsoft.Json": "[13.0.4, )"
+        }
+      },
+      "duplicati.library.backend.duplicati": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Backend.S3": "[1.0.0, )",
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.Library.Snapshots": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )"
+        }
+      },
+      "duplicati.library.backend.file": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.Library.Snapshots": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )"
+        }
+      },
+      "duplicati.library.backend.filejump": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.AutoUpdater": "[1.0.0, )",
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )"
+        }
+      },
+      "duplicati.library.backend.filen": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.Library.Logging": "[1.0.0, )",
+          "Duplicati.Library.OAuthHelper": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )",
+          "Newtonsoft.Json": "[13.0.4, )"
+        }
+      },
+      "duplicati.library.backend.ftp": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )",
+          "FluentFTP": "[54.2.0, )"
+        }
+      },
+      "duplicati.library.backend.googleservices": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.Library.OAuthHelper": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )",
+          "Google.Apis.Auth": "[1.75.0, )",
+          "Newtonsoft.Json": "[13.0.4, )"
+        }
+      },
+      "duplicati.library.backend.idrivee2": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Backend.S3": "[1.0.0, )",
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.Library.SourceProvider.Builtin": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )"
+        }
+      },
+      "duplicati.library.backend.jottacloud": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.Library.OAuthHelper": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )",
+          "Newtonsoft.Json": "[13.0.4, )"
+        }
+      },
+      "duplicati.library.backend.mega": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )",
+          "MegaApiClient": "[1.10.4, )",
+          "Newtonsoft.Json": "[13.0.4, )",
+          "Otp.NET": "[1.4.0, )"
+        }
+      },
+      "duplicati.library.backend.movistarcloud": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.Library.Logging": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )",
+          "Newtonsoft.Json": "[13.0.4, )"
+        }
+      },
+      "duplicati.library.backend.onedrive": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.Library.Logging": "[1.0.0, )",
+          "Duplicati.Library.OAuthHelper": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )",
+          "Newtonsoft.Json": "[13.0.4, )"
+        }
+      },
+      "duplicati.library.backend.openstack": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.Library.OAuthHelper": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )",
+          "Newtonsoft.Json": "[13.0.4, )"
+        }
+      },
+      "duplicati.library.backend.pcloud": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.Library.OAuthHelper": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )"
+        }
+      },
+      "duplicati.library.backend.rclone": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )",
+          "Newtonsoft.Json": "[13.0.4, )"
+        }
+      },
+      "duplicati.library.backend.s3": {
+        "type": "Project",
+        "dependencies": {
+          "AWSSDK.Core": "[4.0.100.5, )",
+          "AWSSDK.IdentityManagement": "[4.0.100.4, )",
+          "AWSSDK.S3": "[4.0.100.3, )",
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.Library.Logging": "[1.0.0, )",
+          "Duplicati.Library.SourceProvider.Builtin": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )",
+          "Minio": "[6.0.0, )",
+          "System.Reactive": "[7.0.0, )"
+        }
+      },
+      "duplicati.library.backend.sharepoint": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )"
+        }
+      },
+      "duplicati.library.backend.smb": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.Library.SourceProvider.Builtin": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )",
+          "SMBLibrary": "[1.5.4, )",
+          "SMBLibrary.Win32": "[1.5.4, )"
+        }
+      },
+      "duplicati.library.backend.sshv2": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.Library.SourceProvider.Builtin": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )",
+          "SSH.NET": "[2026.0.0, )",
+          "SshNet.Agent": "[2024.2.0.1, )"
+        }
+      },
+      "duplicati.library.backend.storj": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Common": "[1.0.0, )",
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )",
+          "Newtonsoft.Json": "[13.0.4, )",
+          "SQLitePCLRaw.bundle_e_sqlite3": "[3.0.5, )",
+          "SQLitePCLRaw.lib.e_sqlite3": "[3.53.3, )",
+          "sqlite-net-pcl": "[1.9.172, )",
+          "uplink.NET": "[2.14.3623, )",
+          "uplink.NET.Linux": "[2.14.3623, )",
+          "uplink.NET.Mac": "[2.13.3484, )",
+          "uplink.NET.Win": "[2.14.3623, )"
+        }
+      },
+      "duplicati.library.backend.tahoelafs": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )",
+          "Newtonsoft.Json": "[13.0.4, )"
+        }
+      },
+      "duplicati.library.backend.tencentcos": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Common": "[1.0.0, )",
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.Library.Logging": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )",
+          "Newtonsoft.Json": "[13.0.4, )",
+          "Tencent.QCloud.Cos.Sdk": "[5.4.11, )"
+        }
+      },
+      "duplicati.library.backend.webdav": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )"
+        }
+      },
+      "duplicati.library.backends": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Backend.AliyunOSS": "[1.0.0, )",
+          "Duplicati.Library.Backend.AzureBlob": "[1.0.0, )",
+          "Duplicati.Library.Backend.Backblaze": "[1.0.0, )",
+          "Duplicati.Library.Backend.Box": "[1.0.0, )",
+          "Duplicati.Library.Backend.DrimeCloud": "[1.0.0, )",
+          "Duplicati.Library.Backend.Dropbox": "[1.0.0, )",
+          "Duplicati.Library.Backend.Duplicati": "[1.0.0, )",
+          "Duplicati.Library.Backend.FTP": "[1.0.0, )",
+          "Duplicati.Library.Backend.File": "[1.0.0, )",
+          "Duplicati.Library.Backend.Filejump": "[1.0.0, )",
+          "Duplicati.Library.Backend.Filen": "[1.0.0, )",
+          "Duplicati.Library.Backend.GoogleServices": "[1.0.0, )",
+          "Duplicati.Library.Backend.Idrivee2": "[1.0.0, )",
+          "Duplicati.Library.Backend.Jottacloud": "[1.0.0, )",
+          "Duplicati.Library.Backend.Mega": "[1.0.0, )",
+          "Duplicati.Library.Backend.MovistarCloud": "[1.0.0, )",
+          "Duplicati.Library.Backend.OneDrive": "[1.0.0, )",
+          "Duplicati.Library.Backend.OpenStack": "[1.0.0, )",
+          "Duplicati.Library.Backend.Rclone": "[1.0.0, )",
+          "Duplicati.Library.Backend.S3": "[1.0.0, )",
+          "Duplicati.Library.Backend.SMB": "[1.0.0, )",
+          "Duplicati.Library.Backend.SSHv2": "[1.0.0, )",
+          "Duplicati.Library.Backend.SharePoint": "[1.0.0, )",
+          "Duplicati.Library.Backend.Storj": "[1.0.0, )",
+          "Duplicati.Library.Backend.TahoeLAFS": "[1.0.0, )",
+          "Duplicati.Library.Backend.TencentCOS": "[1.0.0, )",
+          "Duplicati.Library.Backend.WEBDAV": "[1.0.0, )",
+          "Duplicati.Library.Backend.pCloud": "[1.0.0, )",
+          "Duplicati.Proprietary.LoaderHelper": "[1.0.0, )"
+        }
+      },
+      "duplicati.library.common": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Logging": "[1.0.0, )",
+          "Mono.Unix": "[7.1.0-final.1.21458.1, )",
+          "Newtonsoft.Json": "[13.0.4, )",
+          "System.IO.FileSystem.AccessControl": "[5.0.0, )"
+        }
+      },
+      "duplicati.library.compression": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.Library.Logging": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )",
+          "ZstdSharp.Port": "[0.8.8, )",
+          "sharpcompress": "[0.50.4, )"
+        }
+      },
+      "duplicati.library.interface": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.PackageRef": "[1.0.0, )"
+        }
+      },
+      "duplicati.library.localization": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Logging": "[1.0.0, )",
+          "NGettext": "[0.6.7, )"
+        }
+      },
+      "duplicati.library.logging": {
+        "type": "Project"
+      },
+      "duplicati.library.oauthhelper": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )",
+          "Newtonsoft.Json": "[13.0.4, )"
+        }
+      },
+      "duplicati.library.snapshots": {
+        "type": "Project",
+        "dependencies": {
+          "AlphaVSS": "[2.0.3, )",
+          "Duplicati.Library.AutoUpdater": "[1.0.0, )",
+          "Duplicati.Library.Common": "[1.0.0, )",
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.Library.Logging": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )",
+          "Microsoft.Management.Infrastructure": "[3.0.0, )",
+          "Microsoft.Win32.SystemEvents": "[10.0.0, )",
+          "Newtonsoft.Json": "[13.0.4, )"
+        }
+      },
+      "duplicati.library.sourceprovider.builtin": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.Library.Snapshots": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )"
+        }
+      },
+      "duplicati.library.utility": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Common": "[1.0.0, )",
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.StreamUtil": "[1.0.5, )",
+          "Microsoft.Extensions.Http": "[10.0.11, )",
+          "Microsoft.Management.Infrastructure": "[3.0.0, )",
+          "System.CommandLine": "[2.0.0, )"
+        }
+      },
+      "duplicati.license": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Common": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )"
+        }
+      },
+      "duplicati.packageref": {
+        "type": "Project",
+        "dependencies": {
+          "BouncyCastle.Cryptography": "[2.7.0, )",
+          "Microsoft.Extensions.Caching.Memory": "[10.0.11, )",
+          "Microsoft.Extensions.Logging.Abstractions": "[10.0.11, )",
+          "Microsoft.IdentityModel.Abstractions": "[8.22.0, )"
+        }
+      },
+      "duplicati.proprietary.diskimage": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.Common": "[1.0.0, )",
+          "Duplicati.Library.Interface": "[1.0.0, )",
+          "Duplicati.Library.Localization": "[1.0.0, )",
+          "Duplicati.Library.Logging": "[1.0.0, )",
+          "Duplicati.Library.Snapshots": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )",
+          "Vanara.PInvoke.Kernel32": "[5.0.7, )"
+        }
+      },
+      "duplicati.proprietary.googleworkspace": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.AutoUpdater": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )",
+          "Duplicati.Proprietary.LicenseChecker": "[1.0.0, )",
+          "Google.Apis.Admin.Directory.directory_v1": "[1.68.0.3428, )",
+          "Google.Apis.Auth": "[1.75.0, )",
+          "Google.Apis.Calendar.v3": "[1.68.0.3430, )",
+          "Google.Apis.Drive.v3": "[1.68.0.3428, )",
+          "Google.Apis.Gmail.v1": "[1.68.0.3427, )",
+          "Google.Apis.GroupsSettings.v1": "[1.68.0.2366, )",
+          "Google.Apis.HangoutsChat.v1": "[1.68.0.3393, )",
+          "Google.Apis.Keep.v1": "[1.69.0.3729, )",
+          "Google.Apis.PeopleService.v1": "[1.69.0.3785, )",
+          "Google.Apis.Tasks.v1": "[1.68.0.3435, )"
+        }
+      },
+      "duplicati.proprietary.licensechecker": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.AutoUpdater": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )"
+        }
+      },
+      "duplicati.proprietary.loaderhelper": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.AutoUpdater": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )",
+          "Duplicati.Proprietary.DiskImage": "[1.0.0, )",
+          "Duplicati.Proprietary.GoogleWorkspace": "[1.0.0, )",
+          "Duplicati.Proprietary.LicenseChecker": "[1.0.0, )",
+          "Duplicati.Proprietary.Office365": "[1.0.0, )"
+        }
+      },
+      "duplicati.proprietary.office365": {
+        "type": "Project",
+        "dependencies": {
+          "Duplicati.Library.AutoUpdater": "[1.0.0, )",
+          "Duplicati.Library.Utility": "[1.0.0, )",
+          "Duplicati.Proprietary.LicenseChecker": "[1.0.0, )",
+          "MimeKit": "[4.17.0, )",
+          "jose-jwt": "[5.3.0, )"
+        }
+      }
+    }
+  }
+}
