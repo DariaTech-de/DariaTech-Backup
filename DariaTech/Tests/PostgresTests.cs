@@ -128,6 +128,32 @@ public sealed class PostgresTests
   var number=Guid.NewGuid().ToString();using var response=await admin.PostAsync("/Customers",new FormUrlEncodedContent(new Dictionary<string,string>{{"Input.Name","Form customer"},{"Input.Number",number},{"__RequestVerificationToken",WebUtility.HtmlDecode(match.Groups[1].Value)}}));
   Assert.That(response.StatusCode,Is.EqualTo(HttpStatusCode.Redirect));await using var db=Db();Assert.That(await db.Customers.AnyAsync(x=>x.Number==number),Is.True);
  }
+ [Test]public async Task RealConsoleFormsCreateJobsAndQueueSignedActionsWithoutExposingSecrets()
+ {
+  var(t,site)=await Customer();await using var db=Db();var device=new Device{TenantId=t.Id,SiteId=site.Id,Name="Form-managed worker"};db.Devices.Add(device);await db.SaveChangesAsync();
+  using var admin=await Login(UserRole.SuperAdmin);
+  var form=await admin.GetStringAsync($"/BackupEdit?deviceId={device.Id}&provider=Microsoft365");
+  var match=Regex.Match(form,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");Assert.That(match.Success,Is.True);
+  var source=SaasTests.Office();var values=new List<KeyValuePair<string,string>>
+  {
+   new("DeviceId",device.Id.ToString()),new("Name","Cloud form job"),new("Provider","Microsoft365"),new("DirectoryTenant",source.DirectoryTenant),
+   new("ClientId",source.Credentials["office365-client-id"]),new("ClientSecret",source.Credentials["office365-client-secret"]),
+   new("TargetUrl","file:///D:/CloudStorage"),new("Passphrase","test-form-passphrase-987654"),new("KeepVersions","30"),
+   new("RootTypes","Users"),new("UserTypes","Mailbox"),new("__RequestVerificationToken",WebUtility.HtmlDecode(match.Groups[1].Value))
+  };
+  using var created=await admin.PostAsync("/BackupEdit",new FormUrlEncodedContent(values));Assert.That(created.StatusCode,Is.EqualTo(HttpStatusCode.Redirect));
+  var managed=await db.ManagedJobs.SingleAsync(x=>x.DeviceId==device.Id);
+  var edit=await admin.GetStringAsync($"/BackupEdit?deviceId={device.Id}&id={managed.Id}");
+  Assert.That(edit,Does.Not.Contain("test-form-passphrase-987654").And.Not.Contain(source.Credentials["office365-client-secret"]));
+  var job=new BackupJob{TenantId=t.Id,DeviceId=device.Id,Name="Cloud form job",LocalId="1",Ownership="Managed"};db.Jobs.Add(job);await db.SaveChangesAsync();
+  var actions=await admin.GetStringAsync($"/JobActions?id={job.Id}");
+  match=Regex.Match(actions,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");
+  using var queued=await admin.PostAsync("/JobActions?handler=Request",new FormUrlEncodedContent(new Dictionary<string,string>{{"JobId",job.Id.ToString()},{"Action","RunBackup"},{"__RequestVerificationToken",WebUtility.HtmlDecode(match.Groups[1].Value)}}));
+  Assert.That(queued.StatusCode,Is.EqualTo(HttpStatusCode.Redirect));
+  Assert.That(await db.Commands.AnyAsync(x=>x.JobId==job.Id&&x.Action==RemoteAction.RunBackup&&x.Status=="Pending"),Is.True);
+  using var reader=await Login(UserRole.ReadOnly);using var blocked=await reader.GetAsync($"/BackupEdit?deviceId={device.Id}");Assert.That(blocked.StatusCode,Is.EqualTo(HttpStatusCode.Forbidden));
+ }
+
  [Test]public async Task DatabaseRejectsAuditMutationEvenThroughRawSql()
  {
   await using var db=Db();var e=new AuditEvent{Actor="test",Action="test.append-only",Resource="fixture"};db.Audit.Add(e);await db.SaveChangesAsync();

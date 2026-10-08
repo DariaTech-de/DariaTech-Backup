@@ -47,9 +47,8 @@ public static class SaasPolicy
      root.GetProperty("private_key").GetString() is {} key&&key.StartsWith("-----BEGIN PRIVATE KEY-----",StringComparison.Ordinal)&&key.Length<=10000;
    }catch(Exception error)when(error is JsonException or InvalidOperationException or KeyNotFoundException){return false;}
   }
-  return source.Credentials.Count==4&&source.Credentials.TryGetValue("google-client-id",out var id)&&Secret(id,1000)&&
-   source.Credentials.TryGetValue("google-client-secret",out var password)&&Secret(password,4000)&&
-   source.Credentials.TryGetValue("google-refresh-token",out var refresh)&&Secret(refresh,4000);
+  return false; // Centrally managed Workspace jobs require domain-wide delegated service accounts.
+
  }
  public static bool SameDirectory(SaasSource? previous,SaasSource? next)=>previous is null?next is null:
   next is not null&&previous.Provider==next.Provider&&previous.DirectoryTenant==next.DirectoryTenant;

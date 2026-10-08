@@ -19,7 +19,7 @@ public sealed class SaasTests
   Assert.That(SaasPolicy.Valid(source with{DirectoryTenant="another-domain"}),Is.False);
   Assert.That(SaasPolicy.Valid(source with{UserTypes=["NotAProviderWorkload"]}),Is.False);
   var google=new SaasSource(SaasProvider.GoogleWorkspace,"test.example",new(){{"google-client-id","ci-client"},{"google-client-secret","ci-secret"},{"google-refresh-token","ci-refresh"},{"google-admin-email","admin@test.example"}},["Users"],["Gmail","Drive"]);
-  Assert.That(SaasPolicy.Valid(google),Is.True);
+  Assert.That(SaasPolicy.Valid(google),Is.False); // OAuth identity is not domain-bound; central jobs require service accounts.
   Assert.That(SaasPolicy.Valid(google with{Credentials=new(google.Credentials){["google-admin-email"]="admin@foreign.example"}}),Is.False);
   Assert.That(SaasPolicy.Valid(google with{Credentials=new(){{"google-admin-email","admin@test.example"},{"google-service-account-json",JsonSerializer.Serialize(new{type="service_account",client_email="test@ci.iam.gserviceaccount.com",private_key="-----BEGIN PRIVATE KEY----- CI ONLY",token_uri="https://attacker.invalid/token"})}}}),Is.False);
   Assert.That(SaasPolicy.SameDirectory(source,source with{DirectoryTenant="33333333-3333-3333-3333-333333333333"}),Is.False);

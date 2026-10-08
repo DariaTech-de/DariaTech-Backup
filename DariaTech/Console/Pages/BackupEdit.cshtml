@@ -11,9 +11,8 @@
  else{
   <fieldset><legend>@Model.Provider</legend>
   <label asp-for="DirectoryTenant">@(Model.Provider=="Microsoft365"?"Microsoft-Tenant-ID":"Google-Workspace-Domain")</label><input asp-for="DirectoryTenant" required />
-  <label asp-for="ClientId">Anwendungs-ID / OAuth-Client-ID</label><input asp-for="ClientId" />
-  <label for="ClientSecret">Client Secret · leer lassen, um bestehendes Secret zu erhalten</label><input type="password" name="ClientSecret" id="ClientSecret" autocomplete="new-password" />
-  @if(Model.Provider=="GoogleWorkspace"){<label asp-for="AdminEmail">Delegierter Workspace-Administrator</label><input asp-for="AdminEmail" type="email" required /><label for="RefreshToken">OAuth Refresh Token</label><input type="password" name="RefreshToken" id="RefreshToken" autocomplete="new-password" /><label for="ServiceAccountJson">Alternativ: Service-Account-JSON mit Domain-wide Delegation</label><textarea name="ServiceAccountJson" id="ServiceAccountJson" autocomplete="off"></textarea>}
+  @if(Model.Provider=="Microsoft365"){<label asp-for="ClientId">Anwendungs-ID</label><input asp-for="ClientId" /><label for="ClientSecret">Client Secret · leer lassen, um bestehendes Secret zu erhalten</label><input type="password" name="ClientSecret" id="ClientSecret" autocomplete="new-password" />}
+  @if(Model.Provider=="GoogleWorkspace"){<label asp-for="AdminEmail">Delegierter Workspace-Administrator</label><input asp-for="AdminEmail" type="email" required /><label for="ServiceAccountJson">Service-Account-JSON mit Domain-wide Delegation</label><textarea name="ServiceAccountJson" id="ServiceAccountJson" autocomplete="off"></textarea>}
   <label asp-for="RootTypes">Bereiche</label><select asp-for="RootTypes" multiple>
   @foreach(var root in Model.Provider=="Microsoft365"?new[]{"Users","Groups","Sites"}:new[]{"Users","Groups","SharedDrives","Sites","OrganizationalUnits"}){<option value="@root">@root</option>}
   </select>
