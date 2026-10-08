@@ -521,6 +521,89 @@ Assert.That(html,Does.Contain("Agent 0.2.0 · Pilot").And.Contain(url).And.Conta
   using var denied=await customerAdmin.PostAsync($"/Customer?id={customer.Id}&handler=Enroll",new FormUrlEncodedContent(new Dictionary<string,string>{{"id",customer.Id.ToString()},{"siteId",site.Id.ToString()},{"validMinutes","30"},{"platform","win-x64"},{"__RequestVerificationToken",Token(await customerAdmin.GetStringAsync($"/Customer?id={customer.Id}"))}}));
   Assert.That(denied.StatusCode,Is.Not.EqualTo(HttpStatusCode.OK));
  }
+ [Test]public async Task StorageLocationsAreScopedPerCustomerWithCustomerDefaultFirst()
+ {
+  var(a,siteA)=await Customer();var(b,siteB)=await Customer();await using var db=Db();
+  var deviceA=new Device{TenantId=a.Id,SiteId=siteA.Id,Name="A worker"};var deviceB=new Device{TenantId=b.Id,SiteId=siteB.Id,Name="B worker"};db.Devices.AddRange(deviceA,deviceB);await db.SaveChangesAsync();
+  using var admin=await Login(UserRole.SuperAdmin);
+  string Token(string html){var m=Regex.Match(html,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");Assert.That(m.Success,Is.True);return WebUtility.HtmlDecode(m.Groups[1].Value);}
+  async Task<HttpResponseMessage> Save(string name,Guid? scope,string host)=>await admin.PostAsync("/Targets?handler=Save",new FormUrlEncodedContent(new Dictionary<string,string>{
+   {"Name",name},{"Scope",scope?.ToString()??""},{"IsDefault","true"},{"DestinationKey","webdav"},{"dest.webdav.host",host},{"dest.webdav.path","backup"},
+   {"dest.webdav.opt.use-ssl","true"},{"dest.webdav.opt.auth-username","u"},{"dest.webdav.opt.auth-password","scoped-secret-"+name},{"__RequestVerificationToken",Token(await admin.GetStringAsync("/Targets"))}}));
+  var tag=Guid.NewGuid().ToString("N")[..6];
+  using(var g=await Save("Alle "+tag,null,"central.example"))Assert.That(g.StatusCode,Is.EqualTo(HttpStatusCode.Redirect));
+  using(var own=await Save("Nextcloud A "+tag,a.Id,"cloud.customer-a.example"))Assert.That(own.StatusCode,Is.EqualTo(HttpStatusCode.Redirect));
+  // The same name may exist once per scope.
+  using(var same=await Save("Alle "+tag,a.Id,"other.customer-a.example"))Assert.That(same.StatusCode,Is.EqualTo(HttpStatusCode.Redirect));
+  var global=await db.DestinationTemplates.AsNoTracking().SingleAsync(x=>x.Name=="Alle "+tag&&x.TenantId==null);
+  var customerA=await db.DestinationTemplates.AsNoTracking().SingleAsync(x=>x.Name=="Nextcloud A "+tag);
+  Assert.That(customerA.TenantId,Is.EqualTo(a.Id));
+  Assert.That(await db.DestinationTemplates.CountAsync(x=>x.TenantId==a.Id&&x.IsDefault),Is.EqualTo(1),"one default per customer");
+  // Options are encrypted for the customer: decrypting them for another tenant fails.
+  var store=factory.Services.GetRequiredService<ISecretStore>();
+  Assert.That(DestinationTemplates.Options(store,customerA)["auth-password"],Is.EqualTo("scoped-secret-Nextcloud A "+tag));
+  Assert.That(()=>store.Unprotect(Guid.Empty,$"destination-template:{customerA.Id}",customerA.EncryptedOptions),Throws.Exception);
+  var formA=await admin.GetStringAsync($"/BackupEdit?deviceId={deviceA.Id}");var formB=await admin.GetStringAsync($"/BackupEdit?deviceId={deviceB.Id}");
+  var selectedA=Regex.Match(formA,"<option value=\"([0-9a-f-]{36})\" selected=\"selected\"").Groups[1].Value;
+  Assert.That(await db.DestinationTemplates.AsNoTracking().Where(x=>x.TenantId==a.Id&&x.IsDefault).Select(x=>x.Id.ToString()).SingleAsync(),Is.EqualTo(selectedA),"the customer's default is preselected");
+  Assert.That(formA,Does.Contain(global.Id.ToString()));
+  Assert.That(formB,Does.Contain(global.Id.ToString()).And.Not.Contain(customerA.Id.ToString()),"other customers never see it");
+  // Using another customer's location is refused like a missing one.
+  using var foreign=await admin.PostAsync("/BackupEdit",new FormUrlEncodedContent(new Dictionary<string,string>{
+   {"DeviceId",deviceB.Id.ToString()},{"Name","Foreign"},{"Provider","Files"},{"Sources","/srv"},{"DestinationMode","template"},{"TemplateId",customerA.Id.ToString()},
+   {"Passphrase","foreign-passphrase-123456"},{"KeepVersions","30"},{"RepeatHours","24"},{"__RequestVerificationToken",Token(formB)}}));
+  Assert.That(foreign.StatusCode,Is.EqualTo(HttpStatusCode.OK));Assert.That(await db.ManagedJobs.AnyAsync(x=>x.DeviceId==deviceB.Id),Is.False);
+  var customerPage=await admin.GetStringAsync($"/Customer?id={await db.Customers.Where(x=>x.TenantId==a.Id).Select(x=>x.Id).SingleAsync()}");
+  Assert.That(WebUtility.HtmlDecode(customerPage),Does.Contain("Nextcloud A "+tag).And.Contain("Nur dieser Kunde · Standard").And.Not.Contain("scoped-secret"));
+  db.DestinationTemplates.RemoveRange(await db.DestinationTemplates.Where(x=>x.Name.EndsWith(tag)).ToListAsync());await db.SaveChangesAsync();
+ }
+ [Test]public async Task BackupOfAReplacedDeviceIsRecoverableOnAnotherDeviceWithoutBackingUpIntoIt()
+ {
+  var(t,site)=await Customer();var(other,otherSite)=await Customer();
+  async Task<(HttpClient Client,EnrollmentResponse Identity)> Enroll(Tenant tenant,Site s,string name)
+  {
+   var client=factory.CreateClient(new(){BaseAddress=new Uri("https://localhost")});
+   using var e=await client.PostAsJsonAsync("/api/v1/agent/enroll",new EnrollmentRequest(await Token(tenant,s),name,"Windows","0.2.0"));var identity=(await e.Content.ReadFromJsonAsync<EnrollmentResponse>())!;
+   client.DefaultRequestHeaders.Authorization=new("Bearer",identity.Credential);client.DefaultRequestHeaders.Add("X-Device-Id",identity.DeviceId.ToString());return (client,identity);
+  }
+  var (oldPc,oldId)=await Enroll(t,site,"Alter PC");var (newPc,newId)=await Enroll(t,site,"Neuer PC");var (foreignPc,foreignId)=await Enroll(other,otherSite,"Fremd");
+  using(oldPc)using(newPc)using(foreignPc){
+  using var admin=await Login(UserRole.SuperAdmin);using var csrf=System.Text.Json.JsonDocument.Parse(await admin.GetStringAsync("/api/v1/management/csrf"));admin.DefaultRequestHeaders.Add("X-CSRF-Token",csrf.RootElement.GetProperty("token").GetString());
+  var definition=new ManagedBackupDefinition("Buchhaltung",["C:\\Daten"],"webdav://cloud.example/backup/K1/AlterPC/Buchhaltung","recovery-passphrase-987654",new(){{"use-ssl","true"},{"auth-username","u"},{"auth-password","p"}},30,[],new(DateTimeOffset.UtcNow,24,Enum.GetValues<DayOfWeek>()));
+  using var created=await admin.PostAsJsonAsync($"/api/v1/management/devices/{oldId.DeviceId}/managed-jobs",new ConfigurationInput(0,definition));
+  var source=(await created.Content.ReadFromJsonAsync<ManagedJob>())!;
+  using(var applied=await oldPc.PostAsJsonAsync($"/api/v1/agent/configurations/{source.Id}/receipt",new ConfigurationReceipt(1,"3","Applied")))Assert.That(applied.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  await using var db=Db();var customer=await db.Customers.Where(x=>x.TenantId==t.Id).Select(x=>x.Id).SingleAsync();
+  string Form(string html){var m=Regex.Match(html,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");Assert.That(m.Success,Is.True);return WebUtility.HtmlDecode(m.Groups[1].Value);}
+  async Task<HttpResponseMessage> Recover(Guid target)=>await admin.PostAsync($"/Customer?id={customer}&handler=Recover",new FormUrlEncodedContent(new Dictionary<string,string>{
+   {"id",customer.ToString()},{"sourceJobId",source.Id.ToString()},{"targetDeviceId",target.ToString()},{"__RequestVerificationToken",Form(await admin.GetStringAsync($"/Customer?id={customer}"))}}));
+  var page=WebUtility.HtmlDecode(await admin.GetStringAsync($"/Customer?id={customer}"));
+  Assert.That(page,Does.Contain("Backups & Wiederherstellung").And.Contain("Buchhaltung").And.Contain("Auf anderes Gerät wiederherstellen").And.Not.Contain("recovery-passphrase"));
+  using(var foreign=await Recover(foreignId.DeviceId)){Assert.That(WebUtility.HtmlDecode(await foreign.Content.ReadAsStringAsync()),Does.Contain("anderes aktives Gerät desselben Kunden"));}
+  using(var self=await Recover(oldId.DeviceId))Assert.That(self.StatusCode,Is.EqualTo(HttpStatusCode.OK));
+  using(var ok=await Recover(newId.DeviceId))Assert.That(ok.StatusCode,Is.EqualTo(HttpStatusCode.Redirect));
+  using(var again=await Recover(newId.DeviceId))Assert.That(WebUtility.HtmlDecode(await again.Content.ReadAsStringAsync()),Does.Contain("bereits zur Wiederherstellung verbunden"));
+  var copy=await db.ManagedJobs.AsNoTracking().SingleAsync(x=>x.DeviceId==newId.DeviceId);
+  Assert.That(copy.RestoreOnly,Is.True);Assert.That(copy.SourceManagedJobId,Is.EqualTo(source.Id));
+  Assert.That(await db.ManagedJobs.CountAsync(x=>x.DeviceId==foreignId.DeviceId),Is.Zero);
+  // The new device receives the same destination and passphrase, but no schedule.
+  var assignment=(await newPc.GetFromJsonAsync<ConfigurationAssignment[]>("/api/v1/agent/configurations"))!.Single();
+  Assert.That(assignment.Definition.TargetUrl,Is.EqualTo(definition.TargetUrl));Assert.That(assignment.Definition.Passphrase,Is.EqualTo(definition.Passphrase));
+  Assert.That(assignment.Definition.Schedule,Is.Null);Assert.That(assignment.Definition.RestoreOnly,Is.True);Assert.That(ConfigurationPolicy.Valid(assignment.Definition),Is.True);
+  Assert.That(ConfigurationPolicy.Valid(assignment.Definition with{Schedule=definition.Schedule}),Is.False,"a recovery copy can never be scheduled");
+  using(var applied=await newPc.PostAsJsonAsync($"/api/v1/agent/configurations/{copy.Id}/receipt",new ConfigurationReceipt(1,"9","Applied")))Assert.That(applied.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  var backup=await db.Jobs.AsNoTracking().SingleAsync(x=>x.DeviceId==newId.DeviceId&&x.LocalId=="9");
+  var actions=await admin.GetStringAsync($"/JobActions?id={backup.Id}");
+  Assert.That(actions,Does.Not.Contain("value=\"RunBackup\"").And.Contain("ListRestorePoints"));
+  using var run=await admin.PostAsync("/JobActions?handler=Request",new FormUrlEncodedContent(new Dictionary<string,string>{{"JobId",backup.Id.ToString()},{"Action","RunBackup"},{"__RequestVerificationToken",Form(actions)}}));
+  Assert.That(await db.Commands.AnyAsync(x=>x.DeviceId==newId.DeviceId&&x.Action==RemoteAction.RunBackup),Is.False,"no backup into another device's destination");
+  using var list=await admin.PostAsync("/JobActions?handler=Request",new FormUrlEncodedContent(new Dictionary<string,string>{{"JobId",backup.Id.ToString()},{"Action","ListRestorePoints"},{"__RequestVerificationToken",Form(actions)}}));
+  Assert.That(await db.Commands.AnyAsync(x=>x.DeviceId==newId.DeviceId&&x.Action==RemoteAction.ListRestorePoints),Is.True);
+  // The recovery flag cannot be removed by editing the job.
+  using var edit=await admin.PutAsJsonAsync($"/api/v1/management/managed-jobs/{copy.Id}",new ConfigurationInput(1,assignment.Definition with{RestoreOnly=null}));
+  Assert.That(edit.StatusCode,Is.EqualTo(HttpStatusCode.Conflict));
+  }
+ }
  private sealed class TestFactory(string cs,string dir):WebApplicationFactory<Program>
  {
   protected override void ConfigureWebHost(IWebHostBuilder b)

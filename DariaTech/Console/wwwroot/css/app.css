@@ -505,3 +505,8 @@ body.dark .link-button{color:var(--accent)!important}
 .command code{font:500 12.5px/1.55 var(--mono);white-space:pre;color:var(--ink)}
 .hash{overflow-wrap:anywhere}
 .managed-optin{max-width:640px}
+.notice{color:var(--ok-fg);background:var(--ok-bg);border-radius:12px;padding:12px 14px;font-size:13.5px;margin:0 24px 16px}
+.recover{display:inline-block;max-width:420px}
+.recover summary{list-style:none;cursor:pointer}
+.recover summary::-webkit-details-marker{display:none}
+.recover[open]{display:flex;flex-direction:column;gap:10px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--sunken);margin-top:8px;white-space:normal}

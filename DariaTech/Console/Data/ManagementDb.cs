@@ -33,7 +33,8 @@ public sealed class ManagementDb(DbContextOptions<ManagementDb> options, TenantS
    e.HasQueryFilter(Expression.Lambda(Expression.OrElse(global.Body,
     Expression.Equal(Expression.Convert(Expression.Property(p,"TenantId"),typeof(Guid?)),tenant.Body)),p));
   }
-  b.Entity<DestinationTemplate>(e=>{e.HasQueryFilter(x=>scope.Global);e.HasIndex(x=>x.Name).IsUnique();e.HasIndex(x=>x.IsDefault).IsUnique().HasFilter("\"IsDefault\"");});
+  b.Entity<DestinationTemplate>(e=>{e.HasQueryFilter(x=>scope.Global);e.HasIndex(x=>new{x.TenantId,x.Name}).IsUnique().AreNullsDistinct(false);e.HasIndex(x=>x.TenantId).IsUnique().HasFilter("\"IsDefault\"").AreNullsDistinct(false);
+   e.HasOne<Tenant>().WithMany().HasForeignKey(x=>x.TenantId).OnDelete(DeleteBehavior.Cascade);});
   b.Entity<Customer>().HasIndex(x => x.TenantId).IsUnique();
   b.Entity<Customer>().HasIndex(x => x.Number).IsUnique();
   b.Entity<Site>().HasIndex(x => new {x.TenantId, x.Name}).IsUnique();

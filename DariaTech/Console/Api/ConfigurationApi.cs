@@ -64,9 +64,31 @@ public static class ConfigurationApi
    var old=await db.ConfigurationRevisions.SingleAsync(x=>x.ManagedJobId==id&&x.Revision==job.LatestRevision);
    var definition=Read(secrets,old);
    // Rotating the backup passphrase or destination silently makes the existing chain inaccessible.
+   if(definition.RestoreOnly!=input.Definition.RestoreOnly)return Results.Conflict(new{code="RestoreOnlyFixed"});
    if(definition.Passphrase!=input.Definition.Passphrase||definition.TargetUrl!=input.Definition.TargetUrl||!SaasPolicy.SameDirectory(definition.Saas,input.Definition.Saas)||(definition.Proxmox is null)!=(input.Definition.Proxmox is null))return Results.Conflict(new{code="NewBackupChainRequired"});
    job.LatestRevision++;job.Name=input.Definition.Name;job.Status="Pending";AddRevision(db,secrets,job,input.Definition);
    ManagementApi.Audit(db,ctx,job.TenantId,"backup.configuration-changed",job.Id);await db.SaveChangesAsync();await tx.CommitAsync();return Results.Ok(job);
+ }
+ // Recovery to another device (Acronis "recover to another machine"): the target device gets a copy of the
+ // source job with the same destination and passphrase but no schedule. Its engine then lists versions and
+ // restores directly from the destination, so this works when the original device is gone.
+ public static async Task<(ManagedJob? Job,string? Error)> CreateRecoveryCopy(Guid sourceId,Guid targetDeviceId,ManagementDb db,ISecretStore secrets,HttpContext ctx)
+ {
+  if(!ctx.User.IsInRole("SuperAdmin")&&!ctx.User.IsInRole("Administrator"))return (null,"Keine Berechtigung.");
+  var source=await db.ManagedJobs.SingleOrDefaultAsync(x=>x.Id==sourceId&&!x.RestoreOnly);if(source is null)return (null,"Backup nicht gefunden.");
+  var target=await db.Devices.SingleOrDefaultAsync(x=>x.Id==targetDeviceId&&x.Active&&x.TenantId==source.TenantId);
+  if(target is null||target.Id==source.DeviceId)return (null,"Bitte ein anderes aktives Gerät desselben Kunden wählen.");
+  var revision=await db.ConfigurationRevisions.SingleAsync(x=>x.ManagedJobId==source.Id&&x.Revision==source.LatestRevision);
+  var original=Read(secrets,revision);
+  if(original.Saas is not null||original.Proxmox is not null)return (null,"Cloud- und Proxmox-Backups werden über ihre eigene Wiederherstellung zurückgeholt.");
+  if(await db.ManagedJobs.AnyAsync(x=>x.DeviceId==target.Id&&x.SourceManagedJobId==source.Id))return (null,"Dieses Backup ist auf dem Gerät bereits zur Wiederherstellung verbunden.");
+  var sourceDevice=await db.Devices.Where(x=>x.Id==source.DeviceId).Select(x=>x.Name).SingleAsync();
+  var name=$"Wiederherstellung: {original.Name} (von {sourceDevice})";if(name.Length>200)name=name[..200];
+  var copy=original with{Name=name,Schedule=null,SourceMounts=null,RestoreOnly=true};
+  if(!ConfigurationPolicy.Valid(copy))return (null,"Die Konfiguration des Backups ist ungültig.");
+  var job=new ManagedJob{TenantId=target.TenantId,DeviceId=target.Id,Name=name,LatestRevision=1,RestoreOnly=true,SourceManagedJobId=source.Id};db.ManagedJobs.Add(job);
+  AddRevision(db,secrets,job,copy);ManagementApi.Audit(db,ctx,job.TenantId,"backup.recovery-copy-created",job.Id);
+  await db.SaveChangesAsync();return (job,null);
  }
  private static void AddRevision(ManagementDb db,ISecretStore secrets,ManagedJob job,ManagedBackupDefinition definition)
  {

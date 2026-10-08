@@ -72,8 +72,9 @@ public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets,Command
   else if(id is not null)return NotFound();
   else
   {
-   Templates=await db.DestinationTemplates.OrderBy(x=>x.Name).ToListAsync();
-   if((Templates.FirstOrDefault(x=>x.IsDefault)??Templates.FirstOrDefault()) is {} preferred){TemplateId=preferred.Id;DestinationMode="template";}
+   var tenant=await db.Devices.Where(x=>x.Id==DeviceId).Select(x=>(Guid?)x.TenantId).SingleOrDefaultAsync();
+   if(tenant is not null)Templates=await DestinationTemplates.For(db.DestinationTemplates,tenant.Value).ToListAsync();
+   if(tenant is not null&&DestinationTemplates.Preferred(Templates,tenant.Value) is {} preferred){TemplateId=preferred.Id;DestinationMode="template";}
    Provider=provider;RootTypes=provider=="Microsoft365"?["Users","Groups","Sites"]:["Users","SharedDrives"];
    UserTypes=provider=="Microsoft365"?["Mailbox","Calendar","Contacts"]:["Gmail","Drive","Calendar"];
   }
@@ -87,7 +88,7 @@ public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets,Command
   Device=await db.Devices.SingleOrDefaultAsync(x=>x.Id==DeviceId&&x.Active)??null!;if(Device is null)return NotFound();
   var validBinding=ModelState.IsValid;
   Dictionary<string,string> storage;
-  Templates=await db.DestinationTemplates.OrderBy(x=>x.Name).ToListAsync();
+  Templates=await DestinationTemplates.For(db.DestinationTemplates,Device.TenantId).ToListAsync();
   if(previous is null&&DestinationMode=="template")
   {
    // Saved destination: copy URL and options, then give this job its own folder below it.
@@ -176,7 +177,7 @@ public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets,Command
   string? url;Dictionary<string,string> options;
   if(previous is null&&DestinationMode=="template")
   {
-   var template=await db.DestinationTemplates.SingleOrDefaultAsync(x=>x.Id==TemplateId);if(template is null)return new JsonResult(new{error="Speicherziel nicht gefunden."});
+   var template=await DestinationTemplates.For(db.DestinationTemplates,device.TenantId).SingleOrDefaultAsync(x=>x.Id==TemplateId);if(template is null)return new JsonResult(new{error="Speicherziel nicht gefunden."});
    url=template.TargetUrl;options=DestinationTemplates.Options(secrets,template);
   }
   else

@@ -55,6 +55,8 @@ public static class CommandApi
    if(input.Action is RemoteAction.Restore or RemoteAction.RestoreSaas or RemoteAction.RestoreProxmox&&!ctx.User.IsInRole("Administrator")&&!ctx.User.IsInRole("SuperAdmin"))return Results.Forbid();
    var job=await db.Jobs.SingleOrDefaultAsync(x=>x.Id==input.JobId&&x.Active);if(job is null)return Results.NotFound();
    var device=await db.Devices.SingleOrDefaultAsync(x=>x.Id==job.DeviceId&&x.Active);if(device is null||!await db.Customers.AnyAsync(x=>x.TenantId==job.TenantId&&x.Active))return Results.NotFound();
+   // A recovery copy shares the original device's destination; backing up into it would mix two devices' data.
+   if(input.Action==RemoteAction.RunBackup&&await db.ManagedJobs.AnyAsync(x=>x.DeviceId==job.DeviceId&&x.LocalJobId==job.LocalId&&x.RestoreOnly))return Results.Conflict(new{code="RestoreOnly"});
    if(input.Action==RemoteAction.RestoreSaas)
    {
     var managed=await db.ManagedJobs.SingleOrDefaultAsync(x=>x.DeviceId==job.DeviceId&&x.LocalJobId==job.LocalId);

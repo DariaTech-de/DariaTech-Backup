@@ -9,6 +9,8 @@ public sealed partial class DuplicatiAdapter
  public async Task<long> Dispatch(DeviceCommand command,AgentOptions options,CancellationToken ct)
  {
   var jobs=await ReadJobs(ct);if(jobs.All(x=>x.LocalId!=command.LocalJobId))throw new InvalidOperationException("Backup job no longer exists");
+  // Two devices writing to one destination would corrupt it; a recovery copy only restores.
+  if(command.Action==RemoteAction.RunBackup&&IsRestoreOnly(command.LocalJobId))throw new InvalidOperationException("Recovery copy cannot run backups");
   var cloudBindings=state.Read<Dictionary<string,SaasJobBinding>>("saas-bindings.bin")??[];
   if(command.Action==RemoteAction.RunBackup&&cloudBindings.TryGetValue(command.LocalJobId,out var cloud))await RequireSaasProvider(cloud.Source,false,ct);
   if(command.Action==RemoteAction.RestoreProxmox)return await RestoreProxmox(command,ct);

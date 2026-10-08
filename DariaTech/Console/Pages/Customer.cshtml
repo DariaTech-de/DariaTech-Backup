@@ -24,6 +24,39 @@
  <article class="kpi"><span class="kpi-label">Speicherverbrauch</span><strong>@Ui.Size(Model.Rows.Sum(x=>x.Storage))</strong><span class="sub">Letzter Erfolg @Ui.Ago(Model.Rows.Select(x=>x.LastSuccess).Max())</span></article>
 </section>
 <section class="card card-flush"><div class="card-head padded"><h2>Geräte</h2></div><partial name="_Devices" model="Model.Rows" /></section>
+<section class="card card-flush" id="backups">
+ <div class="card-head padded"><div><h2>Backups &amp; Wiederherstellung</h2><span class="sub">Alle Backups dieses Kunden mit ihrem Speicherziel – auch von Geräten, die offline oder ersetzt sind. Wiederherstellen geht auf jedes aktive Gerät dieses Kunden.</span></div></div>
+ @if(Model.RecoveryMessage is not null){<p class="@(Model.RecoveryFailed?"form-error":"notice") padded" role="status">@Model.RecoveryMessage</p>}
+ @if(Model.Backups.Count==0){<p class="card-empty padded">@Ui.Icon("info")Noch keine Backup-Jobs. Legen Sie auf einem Gerät einen Job an.</p>}
+ else{
+ <div class="table-wrap"><table class="table">
+  <thead><tr><th scope="col">Backup</th><th scope="col">Gerät</th><th scope="col">Speicherziel</th><th scope="col">Letzter Erfolg</th><th scope="col"><span class="sr-only">Aktionen</span></th></tr></thead>
+  <tbody>@foreach(var b in Model.Backups){<tr>
+   <td><strong>@b.Job.Name</strong>@if(b.Job.RestoreOnly){<span class="sub">Wiederherstellungs-Verbindung zu „@(b.SourceName??"Backup")“ · @(b.Job.Status=="Applied"?"bereit":b.Job.Status=="Pending"?"wird eingerichtet":"Fehler")</span>}</td>
+   <td>@b.DeviceName<span class="sub">@(b.DeviceActive?$"Zuletzt online {Ui.Ago(b.LastSeen)}":"Deaktiviert")</span></td>
+   <td>@b.Destination</td>
+   <td>@(b.Job.RestoreOnly?"–":Ui.Ago(b.LastSuccess))</td>
+   <td class="row-actions">
+    @if(b.ActionsJobId is {} actions){<a class="button secondary" href="/JobActions?id=@actions">@(b.Job.RestoreOnly?"Wiederherstellen":"Aktionen")</a>}
+    @if(Model.IsAdmin&&!b.Job.RestoreOnly&&b.Job.LocalJobId is not null){
+    <details class="recover"><summary class="button secondary">Auf anderes Gerät wiederherstellen</summary>
+     <form method="post" asp-page-handler="Recover" class="inline-form">
+      <input type="hidden" name="id" value="@c.Id"><input type="hidden" name="sourceJobId" value="@b.Job.Id">
+      <div class="field"><label for="target-@b.Job.Id">Zielgerät</label><select id="target-@b.Job.Id" name="targetDeviceId">@foreach(var d in Model.ActiveDevices.Where(x=>x.Id!=b.Job.DeviceId)){<option value="@d.Id">@d.Name</option>}</select></div>
+      <button class="button" type="submit">Verbinden</button>
+     </form>
+     <span class="sub">Das Zielgerät erhält Ziel und Backup-Passwort dieses Backups und liest die Versionen direkt aus dem Speicherziel – wie „Ordner verbinden + Passwort“ in Duplicati. Es sichert darüber nicht.</span>
+    </details>}
+   </td>
+  </tr>}</tbody>
+ </table></div>}
+</section>
+<section class="card" id="locations">
+ <div class="card-head"><div><h2>Speicherorte</h2><span class="sub">Wohin neue Backups dieses Kunden gehen. Kundeneigene Ziele haben Vorrang vor den Zielen für alle Kunden.</span></div>
+  @if(Model.CanManageLocations){<a class="button secondary" href="/Targets?customer=@c.TenantId">@Ui.Icon("plus")Eigenes Ziel für diesen Kunden</a>}</div>
+ @if(Model.Locations.Count==0){<p class="card-empty">@Ui.Icon("info")Kein gespeichertes Ziel. Jobs können ein eigenes Ziel verwenden.</p>}
+ <ul class="site-list">@foreach(var l in Model.Locations){<li>@Ui.Icon("cloud")<span><strong>@l.Name</strong><span class="sub">@DestinationForm.Describe(l.TargetUrl)</span></span><span class="chip">@(l.TenantId is null?"Alle Kunden":"Nur dieser Kunde")@(l.IsDefault?" · Standard":"")</span></li>}</ul>
+</section>
 <section class="split">
  <article class="card">
   <div class="card-head"><h2>Standorte</h2><span class="chip">@Model.Sites.Count</span></div>

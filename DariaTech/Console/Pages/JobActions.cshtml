@@ -1,15 +1,17 @@
 @page
 @model JobActionsModel
+@using DariaTech.Console.Services
 <h1>@Model.Job.Name · Aktionen und Restore</h1>
 <p><a asp-page="/Device" asp-route-id="@Model.Device.Id">@Model.Device.Name</a> · @Model.Job.Ownership</p>
 @if(Model.Provider is not null){<p>@Model.Provider · @Model.DirectoryTenant · angewendete Revision @Model.Managed?.AppliedRevision</p>}
 @if(Model.Error is not null){<p role="alert">@Model.Error</p>}
+@if(Model.Managed?.RestoreOnly==true){<p class="card-empty">@Ui.Icon("info")Wiederherstellungs-Verbindung: Dieses Gerät liest das Backup eines anderen Geräts direkt aus dem Speicherziel. Zuerst „Restore-Zeitpunkte laden“, dann Dateien wählen und in ein neues lokales Verzeichnis wiederherstellen. Backups laufen hierüber nicht.</p>}
 @if(!Model.SigningEnabled){<p>Die Console benötigt einen eingerichteten Befehlssignaturschlüssel. Aktionen sind bis dahin gesperrt.</p>}
 else{
 <form method="post" asp-page-handler="Request">
  <input type="hidden" asp-for="JobId" />
  <label asp-for="Action">Aktion</label><select asp-for="Action">
- <option value="RunBackup">Backup starten</option><option value="StopBackup">Lauf stoppen</option><option value="VerifyBackup">Backup prüfen</option>
+ @if(Model.Managed?.RestoreOnly!=true){<option value="RunBackup">Backup starten</option><option value="StopBackup">Lauf stoppen</option>}<option value="VerifyBackup">Backup prüfen</option>
  <option value="ListRestorePoints">Restore-Zeitpunkte laden</option><option value="ListRestoreFiles">Dateien / Objekte laden</option>
  @if(Model.Administrator){<option value="Restore">Dateien in neues lokales Restore-Verzeichnis wiederherstellen</option>}
  @if(Model.Administrator&&Model.Proxmox){<option value="RestoreProxmox">Proxmox-Gast aus ausgewähltem Archiv wiederherstellen</option>}

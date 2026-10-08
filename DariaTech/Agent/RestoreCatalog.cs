@@ -8,7 +8,11 @@ public sealed partial class DuplicatiAdapter
  {
   if(command.Action is not (RemoteAction.ListRestorePoints or RemoteAction.ListRestoreFiles))throw new InvalidOperationException("Invalid catalog action");
   var jobs=await ReadJobs(ct);if(jobs.All(x=>x.LocalId!=command.LocalJobId))throw new InvalidOperationException("Unknown local backup");
-  var url=$"/api/v1/backup/{command.LocalJobId}/"+(command.Action==RemoteAction.ListRestorePoints?"filesets":$"files?folder-contents=true&time={Uri.EscapeDataString(command.Catalog!.Snapshot!.Value.ToUniversalTime().ToString("O"))}"+(command.Catalog.Prefix is {} prefix?$"&filter={Uri.EscapeDataString(prefix)}":""));
+  // A recovery copy has no local database. The engine then reads the file list directly from the destination,
+  // which needs a filter (like "list <filter>" on the command line) and cannot browse folder by folder.
+  var direct=IsRestoreOnly(command.LocalJobId);
+  var filter=command.Catalog?.Prefix??(direct?"*":null);
+  var url=$"/api/v1/backup/{command.LocalJobId}/"+(command.Action==RemoteAction.ListRestorePoints?"filesets":$"files?{(direct?"":"folder-contents=true&")}time={Uri.EscapeDataString(command.Catalog!.Snapshot!.Value.ToUniversalTime().ToString("O"))}"+(filter is not null?$"&filter={Uri.EscapeDataString(filter)}":""));
   using var response=await client.GetAsync(url,ct);response.EnsureSuccessStatusCode();using var result=JsonDocument.Parse(await response.Content.ReadAsStreamAsync(ct));
   var points=new List<RestorePoint>();var files=new List<RestoreFile>();var truncated=false;
   if(command.Action==RemoteAction.ListRestorePoints)

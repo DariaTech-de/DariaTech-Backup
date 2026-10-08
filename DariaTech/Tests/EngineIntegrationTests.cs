@@ -86,6 +86,19 @@ public sealed class EngineIntegrationTests
    File.Delete(Path.Combine(source,"restore-check.bin"));
    using var restored=await client.PostAsJsonAsync($"/api/v1/backup/{id}/restore",new{paths=new[]{Path.Combine(source,"restore-check.bin")},time="now",restore_path=restore,overwrite=true,permissions=false,skip_metadata=true},ct.Token);restored.EnsureSuccessStatusCode();using var restoreTask=JsonDocument.Parse(await restored.Content.ReadAsStringAsync(ct.Token));await WaitTask(client,DuplicatiAdapter.Get(restoreTask.RootElement,"ID").ToString(),ct.Token,password,passphrase);
    var file=Directory.GetFiles(restore,"restore-check.bin",SearchOption.AllDirectories).Single();Assert.That(await File.ReadAllBytesAsync(file,ct.Token),Is.EqualTo(bytes));
+   // Recovery on a replacement device: a recovery copy with only destination and passphrase (no local database,
+   // sources of the old device) lists versions and restores the identical file straight from the destination.
+   var recovery=new ConfigurationAssignment(Guid.NewGuid(),1,new ManagedBackupDefinition("Wiederherstellung",["C:\\Alter-PC\\Daten"],new Uri(destination+Path.DirectorySeparatorChar).AbsoluteUri,passphrase,new(),30,[],null,RestoreOnly:true));
+   var recoveryId=await adapter.ApplyConfiguration(recovery,ct.Token);Assert.That(recoveryId,Is.Not.EqualTo(id));
+   var recoveryCommand=command with{Id=Guid.NewGuid(),LocalJobId=recoveryId};
+   var recoveryPoints=await adapter.ReadCatalog(recoveryCommand with{Action=RemoteAction.ListRestorePoints},ct.Token);Assert.That(recoveryPoints.Points.Length,Is.EqualTo(points.Points.Length));
+   var recoveryFiles=await adapter.ReadCatalog(recoveryCommand with{Action=RemoteAction.ListRestoreFiles,Catalog=new(recoveryPoints.Points[0].Time,null)},ct.Token);
+   Assert.That(recoveryFiles.Files.Select(x=>x.Path),Has.Some.EndsWith("restore-check.bin"));
+   var recovered=Path.Combine(dir,"recovered");
+   using(var restoredCopy=await client.PostAsJsonAsync($"/api/v1/backup/{recoveryId}/restore",new{paths=new[]{Path.Combine(source,"restore-check.bin")},time="now",restore_path=recovered,overwrite=false,permissions=false,skip_metadata=true},ct.Token))
+   {restoredCopy.EnsureSuccessStatusCode();using var copyTask=JsonDocument.Parse(await restoredCopy.Content.ReadAsStringAsync(ct.Token));await WaitTask(client,DuplicatiAdapter.Get(copyTask.RootElement,"ID").ToString(),ct.Token,password,passphrase);}
+   Assert.That(await File.ReadAllBytesAsync(Directory.GetFiles(recovered,"restore-check.bin",SearchOption.AllDirectories).Single(),ct.Token),Is.EqualTo(bytes));
+   Assert.That(async()=>await adapter.Dispatch(recoveryCommand with{Action=RemoteAction.RunBackup},options,ct.Token),Throws.InstanceOf<InvalidOperationException>(),"a recovery copy never backs up into the original destination");
   }
   finally
   {

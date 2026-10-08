@@ -8,7 +8,9 @@ public sealed partial class DuplicatiAdapter
  public async Task<string> ApplyConfiguration(ConfigurationAssignment assignment,CancellationToken ct)
  {
   if(!ConfigurationPolicy.Valid(assignment.Definition))throw new InvalidOperationException("Configuration rejected");
-  SourceChecks.AuthorizeFiles(agentOptions,assignment.Definition.Sources);
+  var restoreOnly=assignment.Definition.RestoreOnly==true;
+  // A recovery copy never reads its sources (they belong to the original device), so they are not authorized here.
+  if(!restoreOnly)SourceChecks.AuthorizeFiles(agentOptions,assignment.Definition.Sources);
   if(assignment.Definition.Saas is {} source)await RequireSaasProvider(source,false,ct);
   if(await HasPendingTasks(ct))throw new InvalidOperationException("Configuration cannot change while engine tasks are active");
   using var list=await client.GetAsync("/api/v1/backups",ct);list.EnsureSuccessStatusCode();
@@ -54,16 +56,24 @@ public sealed partial class DuplicatiAdapter
   var previousSchedule=matches.Length==1?Get(matches[0],"Schedule"):default;
   var schedule=definition.Schedule is {} sc?new {ID=Get(previousSchedule,"ID").ValueKind==JsonValueKind.Number&&Get(previousSchedule,"ID").TryGetInt64(out var sid)?sid:0L,Time=sc.Start.UtcDateTime,Repeat=$"{sc.RepeatHours}h",AllowedDays=sc.Days.Select(x=>x.ToString()).ToArray()}:null;
   var input=new{Backup=new{Name=definition.Name,TargetURL=definition.TargetUrl,Sources=sources,Settings=settings.Select(x=>new{Name=x.Key,Value=x.Value}),
-   Tags=new[]{tag,$"DariaTechRevision:{assignment.Revision}"},Metadata=Get(old,"Metadata").ValueKind==JsonValueKind.Object?Get(old,"Metadata"):JsonSerializer.SerializeToElement(new{}),
+   Tags=restoreOnly?new[]{tag,$"DariaTechRevision:{assignment.Revision}",RestoreOnlyTag}:new[]{tag,$"DariaTechRevision:{assignment.Revision}"},Metadata=Get(old,"Metadata").ValueKind==JsonValueKind.Object?Get(old,"Metadata"):JsonSerializer.SerializeToElement(new{}),
    Filters=definition.Filters.Select((x,i)=>new{Order=i,x.Include,x.Expression})},Schedule=schedule};
   using var response=string.IsNullOrEmpty(id)?await client.PostAsJsonAsync("/api/v1/backups",input,ct):await client.PutAsJsonAsync($"/api/v1/backup/{Uri.EscapeDataString(id)}",input,ct);
   response.EnsureSuccessStatusCode();
-  if(!string.IsNullOrEmpty(id)){BindSaasJob(id,assignment,mountPoint);BindSourceJob(id,assignment);return id;}
+  if(!string.IsNullOrEmpty(id)){BindSaasJob(id,assignment,mountPoint);BindSourceJob(id,assignment);BindRestoreOnly(id,restoreOnly);return id;}
   // Reconcile using stable engine tags rather than an in-memory response; safe after a service crash.
   using var result=await client.GetAsync("/api/v1/backups",ct);result.EnsureSuccessStatusCode();using var updated=JsonDocument.Parse(await result.Content.ReadAsStreamAsync(ct));
   var assignedId=updated.RootElement.EnumerateArray().Where(x=>Get(Get(x,"Backup"),"Tags") is var t&&t.ValueKind==JsonValueKind.Array&&t.EnumerateArray().Any(v=>v.GetString()==tag)).Select(x=>Get(Get(x,"Backup"),"ID").ToString()).Single();
-  BindSaasJob(assignedId,assignment,mountPoint);BindSourceJob(assignedId,assignment);return assignedId;
+  BindSaasJob(assignedId,assignment,mountPoint);BindSourceJob(assignedId,assignment);BindRestoreOnly(assignedId,restoreOnly);return assignedId;
  }
+ public const string RestoreOnlyTag="DariaTechRestoreOnly";
+ // Local journal of recovery copies; RunBackup is refused for them even if the Console asked for it.
+ private void BindRestoreOnly(string localId,bool restoreOnly)
+ {
+  var jobs=state.Read<HashSet<string>>("restore-only-jobs.bin")??[];
+  if(restoreOnly?jobs.Add(localId):jobs.Remove(localId))state.Write("restore-only-jobs.bin",jobs);
+ }
+ internal bool IsRestoreOnly(string localId)=>(state.Read<HashSet<string>>("restore-only-jobs.bin")??[]).Contains(localId);
  private void BindSourceJob(string localId,ConfigurationAssignment assignment)
  {
   var jobs=state.Read<Dictionary<string,string>>("source-jobs.bin")??[];
