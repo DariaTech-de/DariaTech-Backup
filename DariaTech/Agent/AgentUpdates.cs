@@ -30,7 +30,7 @@ public static class AgentUpdates
    {await Report(console,journal.DeploymentId,new("Rejected","UpdateRejected"),ct);state.Write("update.bin",journal with{Status="Rejected"});return;}
    var artifact=Path.Combine(options.StateDirectory,"updates",$"{journal.Manifest.ReleaseId:D}.exe");
    await VerifyArtifact(artifact,journal.Manifest,ct);
-   if(FileVersionInfo.GetVersionInfo(artifact).FileVersion!=journal.Manifest.Version)throw new CryptographicException("Installer version differs from signed manifest");
+   if(ArtifactVersion(artifact)!=journal.Manifest.Version)throw new CryptographicException("Installer version differs from signed manifest");
    await Report(console,journal.DeploymentId,new("Downloaded",null),ct);
    state.Write("update.bin",journal with{Status="Applying",ApplyingSince=DateTimeOffset.UtcNow});
    await Report(console,journal.DeploymentId,new("Applying",null),ct);
@@ -64,6 +64,12 @@ public static class AgentUpdates
  }
  private static async Task Report(HttpClient console,Guid id,UpdateReceipt receipt,CancellationToken ct)
  {using var response=await console.PostAsJsonAsync($"/api/v1/agent/updates/{id}/receipt",receipt,ct);response.EnsureSuccessStatusCode();}
+ public static string ArtifactVersion(string path)
+ {
+  var v=FileVersionInfo.GetVersionInfo(path);
+  // Inno may format the textual FileVersion with three components; compare the signed four-component PE version.
+  return new Version(v.FileMajorPart,v.FileMinorPart,v.FileBuildPart,v.FilePrivatePart).ToString();
+ }
  public static async Task VerifyArtifact(string path,AgentUpdateManifest manifest,CancellationToken ct)
  {
   await using var file=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.Read);
