@@ -13,7 +13,7 @@ public sealed partial class DuplicatiAdapter : IDisposable
  private readonly AgentOptions agentOptions;
  public DuplicatiAdapter(AgentOptions options,ProtectedState store,HttpMessageHandler? handler=null)
  {
-  agentOptions=options;state=store;client=new HttpClient(handler??(options.ManageEngine?OwnedEngineConnection.Handler(options,store):new HttpClientHandler{AllowAutoRedirect=false,UseProxy=false})){BaseAddress=new Uri(options.EngineUrl),Timeout=TimeSpan.FromSeconds(15)};
+  agentOptions=options;state=store;client=new HttpClient(handler??(options.ManageEngine?(OperatingSystem.IsWindows()?OwnedEngineConnection.Handler(options,store):EngineTls.Handler(store)):new HttpClientHandler{AllowAutoRedirect=false,UseProxy=false})){BaseAddress=new Uri(options.EngineUrl),Timeout=TimeSpan.FromSeconds(15)};
  }
  public async Task<JobReport[]> ReadJobs(CancellationToken ct)
  {

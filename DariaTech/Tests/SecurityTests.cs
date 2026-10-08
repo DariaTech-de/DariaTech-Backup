@@ -137,7 +137,7 @@ public sealed class SecurityTests
   Assert.Throws<InvalidOperationException>(()=>new AgentOptions{ExternalEngineExecutable="C:/Program Files/Duplicati/Duplicati.Server.exe"}.Validate());
   Assert.Throws<InvalidOperationException>(()=>new AgentOptions{ManageEngine=true,AllowAgentUpdates=true,ExternalEngineExecutable="C:/Program Files/Duplicati/Duplicati.Server.exe"}.Validate());
   if(!OperatingSystem.IsWindows())
-   Assert.Throws<PlatformNotSupportedException>(()=>EngineInstallation.ValidateExternal("/tmp/Duplicati.Server.exe"));
+   Assert.Throws<InvalidOperationException>(()=>EngineInstallation.ValidateExternal("/tmp/Duplicati.Server.exe"));
  }
 
  [Test]public void AgentRejectsRemoteEngineAndInsecureConsole()

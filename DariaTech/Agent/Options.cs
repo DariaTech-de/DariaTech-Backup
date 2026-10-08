@@ -2,8 +2,8 @@ namespace DariaTech.Agent;
 public sealed class AgentOptions
 {
  public string ConsoleUrl {get;set;}="https://backup.dariatech.de";
- public string EngineUrl {get;set;}="http://127.0.0.1:8200";
- public string StateDirectory {get;set;}=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),"DariaTechBackup");
+ public string EngineUrl {get;set;}=OperatingSystem.IsWindows()?"http://127.0.0.1:8200":"https://127.0.0.1:8210";
+ public string StateDirectory {get;set;}=OperatingSystem.IsWindows()?Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),"DariaTechBackup"):OperatingSystem.IsMacOS()?"/Library/Application Support/DariaTechBackup/state":"/var/lib/dariatech-backup";
  public string? LinuxKeyFile {get;set;}
  public int HeartbeatSeconds {get;set;}=60;
  public bool AllowAgentUpdates {get;set;}
@@ -31,7 +31,8 @@ public sealed class AgentOptions
   if(AllowAgentUpdates&&(!ManageEngine||string.IsNullOrWhiteSpace(UpdatePublicKeyFile)||!File.Exists(UpdatePublicKeyFile)||UpdateDownloadHosts.Length==0))throw new InvalidOperationException("Managed engine and pinned update key required");
   var remote=new Uri(ConsoleUrl);if(remote.Scheme!="https"||!string.IsNullOrEmpty(remote.UserInfo)||remote.AbsolutePath!="/"||!string.IsNullOrEmpty(remote.Query)||!string.IsNullOrEmpty(remote.Fragment))throw new InvalidOperationException("ConsoleUrl must be an HTTPS origin");
   var local=new Uri(EngineUrl);if(!local.IsLoopback||!string.IsNullOrEmpty(local.UserInfo)||local.AbsolutePath!="/"||local.Scheme is not ("http" or "https")||local.Query!=""||local.Fragment!="")throw new InvalidOperationException("EngineUrl must be a loopback origin");
-  if(ManageEngine&&(local.Scheme!="http"||local.Host is not ("127.0.0.1" or "localhost")))throw new InvalidOperationException("Managed engine requires IPv4 HTTP loopback for process-bound transport");
+  if(ManageEngine&&(local.Scheme!=(OperatingSystem.IsWindows()?"http":"https")||local.Host is not ("127.0.0.1" or "localhost")))throw new InvalidOperationException("Managed engine requires IPv4 loopback with platform-bound transport");
+  if(!OperatingSystem.IsWindows()&&(string.IsNullOrWhiteSpace(LinuxKeyFile)||!Path.IsPathFullyQualified(LinuxKeyFile)||!Path.IsPathFullyQualified(StateDirectory)))throw new InvalidOperationException("Unix requires absolute protected state and encryption key paths");
   if(HeartbeatSeconds<10||HeartbeatSeconds>3600)throw new InvalidOperationException("HeartbeatSeconds must be 10..3600");
  }
 }

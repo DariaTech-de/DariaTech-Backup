@@ -4,6 +4,13 @@ using System.Text.Json;
 using DariaTech.Agent;
 using DariaTech.Contracts;
 
+if(args.Length>0&&args[0]=="--initialize")
+{
+ try{var provisioned=UnixProvisioning.Initialize(args);System.Console.WriteLine("Agent service configuration initialized; enrollment completes on service startup.");}
+ catch(Exception error){System.Console.Error.WriteLine($"Agent initialization rejected ({error.GetType().Name}); verify protected input files and local options.");Environment.ExitCode=2;}
+ return;
+}
+
 // Read-only local diagnostic: connect without sending HTTP data or secrets.
 if(args.Length==4&&args[0]=="--check-engine-port")
 {
@@ -31,11 +38,20 @@ if(args.Length==2&&args[0]=="--check-restore-root")
  return;
 }
 
-var builder=Host.CreateApplicationBuilder(new HostApplicationBuilderSettings{Args=args,ContentRootPath=AppContext.BaseDirectory});var options=builder.Configuration.GetSection("Agent").Get<AgentOptions>()??new();options.Validate();var state=new ProtectedState(options);
+var builder=Host.CreateApplicationBuilder(new HostApplicationBuilderSettings{Args=args,ContentRootPath=AppContext.BaseDirectory});
+var configIndex=Array.IndexOf(args,"--agent-config");
+if(configIndex>=0)
+{
+ if(configIndex+1>=args.Length||!Path.IsPathFullyQualified(args[configIndex+1]))throw new InvalidOperationException("Absolute --agent-config required");
+ if(!OperatingSystem.IsWindows())UnixPrivatePaths.File(args[configIndex+1]);
+ builder.Configuration.AddJsonFile(args[configIndex+1],optional:false,reloadOnChange:false);
+}
+var options=builder.Configuration.GetSection("Agent").Get<AgentOptions>()??new();options.Validate();var state=new ProtectedState(options);
 if(args.Contains("enroll"))
 {
  if(state.Read<AgentIdentity>("identity.bin") is not null)throw new InvalidOperationException("Agent is already enrolled");
  var index=Array.IndexOf(args,"--token-file");if(index<0||index+1>=args.Length)throw new InvalidOperationException("enroll requires --token-file");
+ if(!OperatingSystem.IsWindows())UnixPrivatePaths.File(args[index+1]);
  var token=File.ReadAllText(args[index+1]).Trim();
  using var client=new HttpClient(new HttpClientHandler{AllowAutoRedirect=false}){BaseAddress=new Uri(options.ConsoleUrl),Timeout=TimeSpan.FromSeconds(30)};
  using var response=await client.PostAsJsonAsync("/api/v1/agent/enroll",new EnrollmentRequest(token,Environment.MachineName,RuntimeInformation.OSDescription,options.Version));response.EnsureSuccessStatusCode();
@@ -45,10 +61,11 @@ if(args.Contains("enroll"))
 if(args.Contains("set-engine-credential"))
 {
  var index=Array.IndexOf(args,"--credential-file");if(index<0||index+1>=args.Length)throw new InvalidOperationException("--credential-file is required");
+ if(!OperatingSystem.IsWindows())UnixPrivatePaths.File(args[index+1]);
  state.Write("engine-credential.bin",File.ReadAllText(args[index+1]).TrimEnd('\r','\n'));System.Console.WriteLine("Engine credential protected for this service identity");return;
 }
 var brand=JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory,"product.json"))).RootElement;
-builder.Services.AddWindowsService(o=>o.ServiceName=brand.GetProperty("windowsServiceName").GetString()!);
+if(OperatingSystem.IsWindows())builder.Services.AddWindowsService(o=>o.ServiceName=brand.GetProperty("windowsServiceName").GetString()!);
 builder.Services.AddSingleton(options);builder.Services.AddSingleton(state);
 if(options.ManageEngine)builder.Services.AddHostedService<ManagedEngine>();
 builder.Services.AddHostedService<Worker>();await builder.Build().RunAsync();

@@ -13,13 +13,14 @@ public static class EngineInstallation
    ValidateExternal(options.ExternalEngineExecutable);
    return Path.GetFullPath(options.ExternalEngineExecutable);
   }
-  var bundled=Path.Combine(AppContext.BaseDirectory,"engine","Duplicati.Server.exe");
+  var bundled=Path.Combine(AppContext.BaseDirectory,"engine",OperatingSystem.IsWindows()?"Duplicati.Server.exe":"Duplicati.Server");
   if(!File.Exists(bundled))throw new InvalidOperationException("Bundled engine missing");
+  if(!OperatingSystem.IsWindows())UnixPrivatePaths.Installation(bundled);
   return bundled;
  }
  public static void ValidateExternal(string executable)
  {
-  if(!OperatingSystem.IsWindows())throw new PlatformNotSupportedException("External managed engine currently requires Windows");
+  if(!OperatingSystem.IsWindows()){UnixPrivatePaths.Installation(executable);return;}
   if(!Path.IsPathFullyQualified(executable)||executable.StartsWith(@"\\")||
      !string.Equals(Path.GetFileName(executable),"Duplicati.Server.exe",StringComparison.OrdinalIgnoreCase))
    throw new InvalidOperationException("External engine requires a local absolute Duplicati.Server.exe path");
