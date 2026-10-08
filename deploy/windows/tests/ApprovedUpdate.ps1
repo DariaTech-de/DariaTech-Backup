@@ -49,6 +49,11 @@ try {
    if(Test-Path $env:UPDATE_RESULT){$r=Get-Content $env:UPDATE_RESULT -Raw|ConvertFrom-Json;if($r.receipts|Where-Object {$_.phase -eq $Phase -and $_.status -eq $Status}){return}}
    Start-Sleep 1
   }
+  if(Test-Path $env:UPDATE_RESULT){$observed=Get-Content $env:UPDATE_RESULT -Raw|ConvertFrom-Json;Write-Host ('Observed update receipts: '+($observed.receipts|ConvertTo-Json -Compress));Write-Host ('Observed compiled versions: '+($observed.versions|Select-Object -Unique|ConvertTo-Json -Compress))}
+  $service=Get-Service DariaTechBackupAgent -ErrorAction SilentlyContinue;Write-Host ('Service state: '+$service.Status)
+  $installedExe=Join-Path (Split-Path $configFile) 'DariaTech.Agent.exe';if(Test-Path $installedExe){Write-Host ('Installed file version: '+[Diagnostics.FileVersionInfo]::GetVersionInfo($installedExe).FileVersion)}
+  $diagnostic=Join-Path (Split-Path $configFile) 'installer-diagnostic.txt';if(Test-Path $diagnostic){Write-Host ('Installer diagnostic: '+(Get-Content $diagnostic -Raw))}
+  Get-WinEvent -FilterHashtable @{LogName='Application';StartTime=(Get-Date).AddMinutes(-5)} -ErrorAction SilentlyContinue|Where-Object {$_.ProviderName -match 'DariaTech|\.NET Runtime|Application Error'}|Select-Object -First 6|ForEach-Object {Write-Host ('Agent event: '+$_.Message)}
   throw "Missing update receipt: phase $Phase, status $Status"
  }
  Set-Phase 1 $true $false;Wait-Receipt 1 'Rejected'
