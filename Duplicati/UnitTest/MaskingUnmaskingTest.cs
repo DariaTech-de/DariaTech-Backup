@@ -33,6 +33,65 @@ namespace Duplicati.UnitTest;
 public class BackupConfigMaskingTests
 {
     [Test]
+    public void UnmaskWithEquivalentLegacyDuplicatesPreservesMaskedSecrets()
+    {
+        var previous = new Backup
+        {
+            TargetURL = "file:///backup",
+            Sources = new[] { "/source" },
+            Settings = new ISetting[]
+            {
+                new Setting { Name = "passphrase", Value = "test-only-secret", Filter = "" },
+                new Setting { Name = "PASSPHRASE", Value = "test-only-secret", Filter = null },
+                new Setting { Name = "abort-if-source-missing", Value = "true", Filter = "" },
+                new Setting { Name = "abort-if-source-missing", Value = "true", Filter = "" }
+            }
+        };
+        var updated = new Backup
+        {
+            TargetURL = previous.TargetURL,
+            Sources = previous.Sources.ToArray(),
+            Settings = new ISetting[]
+            {
+                new Setting { Name = "passphrase", Value = Connection.PASSWORD_PLACEHOLDER, Filter = "" },
+                new Setting { Name = "abort-if-source-missing", Value = "true", Filter = "" }
+            }
+        };
+
+        updated.UnmaskSensitiveInformation(previous, new Dictionary<long, string>());
+
+        Assert.That(updated.Settings.Single(s => s.Name == "passphrase").Value, Is.EqualTo("test-only-secret"));
+        Assert.That(updated.Settings.Length, Is.EqualTo(2));
+        Assert.That(previous.Settings.Length, Is.EqualTo(4), "Unmasking must not mutate the stored configuration");
+    }
+
+    [TestCase("test-only-other-secret", "")]
+    [TestCase("test-only-secret", "filtered-scope")]
+    public void UnmaskRejectsConflictingDuplicateValuesOrFiltersWithoutExposingSecrets(string value, string filter)
+    {
+        var previous = new Backup
+        {
+            TargetURL = "file:///backup",
+            Sources = new[] { "/source" },
+            Settings = new ISetting[]
+            {
+                new Setting { Name = "passphrase", Value = "test-only-secret", Filter = "" },
+                new Setting { Name = "PASSPHRASE", Value = value, Filter = filter }
+            }
+        };
+        var updated = new Backup
+        {
+            TargetURL = previous.TargetURL,
+            Sources = previous.Sources.ToArray(),
+            Settings = new ISetting[] { new Setting { Name = "passphrase", Value = Connection.PASSWORD_PLACEHOLDER, Filter = "" } }
+        };
+
+        var error = Assert.Throws<InvalidOperationException>(() => updated.UnmaskSensitiveInformation(previous, new Dictionary<long, string>()));
+        Assert.That(error.Message, Does.Contain("Conflicting duplicate setting").And.Not.Contain("test-only-secret").And.Not.Contain("test-only-other-secret"));
+        Assert.That(updated.Settings[0].Value, Is.EqualTo(Connection.PASSWORD_PLACEHOLDER));
+    }
+
+    [Test]
     public void MaskAndUnmaskBackupConfigRoundtrip()
     {
         var placeholder = Connection.PASSWORD_PLACEHOLDER;

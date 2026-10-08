@@ -52,11 +52,30 @@ public sealed class NativeSaasTests
     var definition=new ManagedBackupDefinition("Native "+SaasPolicy.Key(source.Provider),[],new Uri(storage+Path.DirectorySeparatorChar).AbsoluteUri,"test-only-cloud-backup-passphrase",new(),30,[],null,source);
     var assignment=new ConfigurationAssignment(Guid.NewGuid(),1,definition);
     var id=await adapter.ApplyConfiguration(assignment,timeout.Token);
-    Assert.That(await adapter.ApplyConfiguration(assignment,timeout.Token),Is.EqualTo(id));
     using var details=JsonDocument.Parse(await client.GetStringAsync("/api/v1/backup/"+id,timeout.Token));
     var backup=DuplicatiAdapter.Get(details.RootElement,"Backup");
     Assert.That(DuplicatiAdapter.Get(backup,"Sources")[0].ToString(),Does.Contain("|"+SaasPolicy.Key(source.Provider)+"://").And.Not.Contain("test-only-not-a-provider"));
     var settings=DuplicatiAdapter.Get(backup,"Settings");Assert.That(settings.EnumerateArray().Any(x=>DuplicatiAdapter.Get(x,"Name").ToString()=="store-metadata-content-in-database"),Is.True);
+    AssertUniqueSettings(settings);
+    Assert.That(await adapter.ApplyConfiguration(assignment,timeout.Token),Is.EqualTo(id));
+    Assert.That(await adapter.ApplyConfiguration(assignment with{Revision=2,Definition=definition with{KeepVersions=90}},timeout.Token),Is.EqualTo(id));
+    // Reproduce the previous client's persisted duplicate, then repair it through
+    // the normal authenticated API without deleting the job or its backup chain.
+    var legacy=assignment with{JobId=Guid.NewGuid(),Definition=definition with{Name=definition.Name+" legacy duplicate"}};
+    var legacySettings=settings.EnumerateArray().Select(x=>
+    {
+     var name=DuplicatiAdapter.Get(x,"Name").ToString();
+     var value=name=="passphrase"?definition.Passphrase:source.Credentials.GetValueOrDefault(name)??DuplicatiAdapter.Get(x,"Value").ToString();
+     return new{Name=name,Value=value};
+    }).Append(new{Name="abort-if-source-missing",Value="true"}).ToArray();
+    using var created=await client.PostAsJsonAsync("/api/v1/backups",new{Backup=new{Name=legacy.Definition.Name,TargetURL=definition.TargetUrl,
+     Sources=new[]{DuplicatiAdapter.Get(backup,"Sources")[0].ToString()},Settings=legacySettings,Tags=new[]{"DariaTechManaged:"+legacy.JobId.ToString("D")},Metadata=new{}}},timeout.Token);
+    created.EnsureSuccessStatusCode();using var legacyResponse=JsonDocument.Parse(await created.Content.ReadAsStringAsync(timeout.Token));
+    var legacyId=DuplicatiAdapter.Get(legacyResponse.RootElement,"ID").ToString();
+    Assert.That(await adapter.ApplyConfiguration(legacy,timeout.Token),Is.EqualTo(legacyId));
+    Assert.That(await adapter.ApplyConfiguration(legacy,timeout.Token),Is.EqualTo(legacyId));
+    using var repaired=JsonDocument.Parse(await client.GetStringAsync("/api/v1/backup/"+legacyId,timeout.Token));
+    AssertUniqueSettings(DuplicatiAdapter.Get(DuplicatiAdapter.Get(repaired.RootElement,"Backup"),"Settings"));
     // Optional explicit negative integration: real provider authentication with synthetic,
     // invalid credentials, never tenant data. No fake success or entitlement substitution.
     if(Environment.GetEnvironmentVariable("DARIATECH_PROVIDER_NEGATIVE_AUTH")=="1")
@@ -84,5 +103,12 @@ public sealed class NativeSaasTests
    }
    Directory.Delete(directory,true);
   }
+ }
+ private static void AssertUniqueSettings(JsonElement settings)
+ {
+  var names=settings.EnumerateArray().Select(x=>DuplicatiAdapter.Get(x,"Name").ToString()).ToArray();
+  Assert.That(names.Distinct(StringComparer.OrdinalIgnoreCase).Count(),Is.EqualTo(names.Length),"Engine option names must be unique for POST and PUT");
+  var missingSource=settings.EnumerateArray().Single(x=>DuplicatiAdapter.Get(x,"Name").ToString()=="abort-if-source-missing");
+  Assert.That(DuplicatiAdapter.Get(missingSource,"Value").ToString(),Is.EqualTo("true"));
  }
 }

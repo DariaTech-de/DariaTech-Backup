@@ -279,7 +279,19 @@ namespace Duplicati.Server.Database
                 }
             }
 
-            var prevSettings = previous.Settings.ToDictionary(x => x.Name, x => x.Value, StringComparer.OrdinalIgnoreCase);
+            // Older clients could persist the same option more than once. An
+            // equivalent duplicate must not prevent a subsequent update from
+            // repairing that configuration. Never guess between values/scopes.
+            var prevSettings = previous.Settings
+                .GroupBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group =>
+                {
+                    var first = group.First();
+                    if (group.Any(setting => !string.Equals(setting.Value, first.Value, StringComparison.Ordinal)
+                        || !string.Equals(setting.Filter ?? "", first.Filter ?? "", StringComparison.Ordinal)))
+                        throw new InvalidOperationException($"Conflicting duplicate setting '{group.Key}' in previous configuration.");
+                    return first.Value;
+                }, StringComparer.OrdinalIgnoreCase);
             foreach (var setting in this.Settings)
             {
                 if (Connection.IsPasswordPlaceholder(setting.Value))

@@ -100,6 +100,12 @@ available separately through the existing protected restore-root workflow.
 
 ## Verification and remaining operational acceptance
 
+The duplicate-option regression introduced during managed-source integration
+is documented in [SaaS configuration correction](SAAS_CONFIGURATION_FIX.md).
+The correction preserves required source checks and repairs equivalent legacy
+duplicates through normal configuration updates. Existing affected jobs require
+both the corrected agent and engine; conflicting legacy values remain rejected.
+
 ```sh
 dotnet run --project tests/SaasIntegration/SaasIntegration.csproj -c Release
 dotnet test DariaTech/Tests/DariaTech.Tests.csproj -c Release

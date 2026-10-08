@@ -20,14 +20,19 @@ public sealed partial class DuplicatiAdapter
   var id=Get(old,"ID").ToString();
   var definition=assignment.Definition;
   // No script options, database paths, custom modules or arbitrary engine API supplied by the Console.
-  var settings=definition.BackendOptions.Select(x=>new{Name=x.Key,Value=x.Value}).ToList();
-  settings.AddRange(new[]{new{Name="encryption-module",Value="aes"},new{Name="passphrase",Value=definition.Passphrase},
-   new{Name="keep-versions",Value=definition.KeepVersions.ToString(System.Globalization.CultureInfo.InvariantCulture)},new{Name="abort-if-source-missing",Value="true"},new{Name="disable-module",Value="console-password-input"}});
+  // The engine unmask/update path requires unique option names, including options
+  // shared by local and SaaS jobs. Keep one value per case-insensitive engine key.
+  var settings=new Dictionary<string,string>(definition.BackendOptions,StringComparer.OrdinalIgnoreCase)
+  {
+   ["encryption-module"]="aes",["passphrase"]=definition.Passphrase,
+   ["keep-versions"]=definition.KeepVersions.ToString(System.Globalization.CultureInfo.InvariantCulture),
+   ["abort-if-source-missing"]="true",["disable-module"]="console-password-input"
+  };
   var mountPoint=Path.Combine(Path.GetPathRoot(Path.GetFullPath(agentOptions.StateDirectory))!,"DariaTechCloud",assignment.JobId.ToString("D"));
   var sources=definition.Sources;
   if(definition.Saas is {} saas)
   {
-   settings.AddRange(SaasPolicy.Options(saas).Select(x=>new{Name=x.Key,Value=x.Value}));
+   foreach(var option in SaasPolicy.Options(saas))settings[option.Key]=option.Value;
    sources=["@"+mountPoint+"|"+SaasPolicy.Key(saas.Provider)+"://"];
   }
   var requiredMounts=SourceChecks.RequiredMounts(agentOptions,definition);
@@ -41,14 +46,14 @@ public sealed partial class DuplicatiAdapter
    var binding=new ManagedSourceBinding(assignment.JobId,assignment.Revision,sources,requiredMounts,definition.Proxmox);
    // Immutable revision in the hook prevents a failed engine PUT from changing the old job's preflight.
    SourceChecks.Bind(state,binding);
-   settings.Add(new{Name="run-script-before-required",Value=SourceChecks.Hook(agentOptions,assignment.JobId,assignment.Revision)});
-   settings.Add(new{Name="run-script-with-arguments",Value="true"});
-   settings.Add(new{Name="run-script-timeout",Value=definition.Proxmox is null?"60s":"0s"});
-   settings.Add(new{Name="symlink-policy",Value="ignore"});
+   settings["run-script-before-required"]=SourceChecks.Hook(agentOptions,assignment.JobId,assignment.Revision);
+   settings["run-script-with-arguments"]="true";
+   settings["run-script-timeout"]=definition.Proxmox is null?"60s":"0s";
+   settings["symlink-policy"]="ignore";
   }
   var previousSchedule=matches.Length==1?Get(matches[0],"Schedule"):default;
   var schedule=definition.Schedule is {} sc?new {ID=Get(previousSchedule,"ID").ValueKind==JsonValueKind.Number&&Get(previousSchedule,"ID").TryGetInt64(out var sid)?sid:0L,Time=sc.Start.UtcDateTime,Repeat=$"{sc.RepeatHours}h",AllowedDays=sc.Days.Select(x=>x.ToString()).ToArray()}:null;
-  var input=new{Backup=new{Name=definition.Name,TargetURL=definition.TargetUrl,Sources=sources,Settings=settings,
+  var input=new{Backup=new{Name=definition.Name,TargetURL=definition.TargetUrl,Sources=sources,Settings=settings.Select(x=>new{Name=x.Key,Value=x.Value}),
    Tags=new[]{tag,$"DariaTechRevision:{assignment.Revision}"},Metadata=Get(old,"Metadata").ValueKind==JsonValueKind.Object?Get(old,"Metadata"):JsonSerializer.SerializeToElement(new{}),
    Filters=definition.Filters.Select((x,i)=>new{Order=i,x.Include,x.Expression})},Schedule=schedule};
   using var response=string.IsNullOrEmpty(id)?await client.PostAsJsonAsync("/api/v1/backups",input,ct):await client.PutAsJsonAsync($"/api/v1/backup/{Uri.EscapeDataString(id)}",input,ct);
