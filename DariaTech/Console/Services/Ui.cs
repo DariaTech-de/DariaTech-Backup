@@ -18,7 +18,9 @@ public static class Ui
  {
   "DeviceOffline"=>"Gerät offline","EngineUnavailable"=>"Backup-Engine nicht erreichbar","NoBackupJobs"=>"Keine Backup-Jobs eingerichtet",
   "BackupOverdue"=>"Backup überfällig","BackupFailed"=>"Backup fehlgeschlagen","EngineOperationFailed"=>"Engine-Vorgang fehlgeschlagen",
-  "BackupWarning"=>"Backup mit Warnungen beendet","BackupNotSuccessful"=>"Backup nicht vollständig","AgentOutdated"=>"Agent-Version veraltet",_=>code
+  "BackupWarning"=>"Backup mit Warnungen beendet","BackupNotSuccessful"=>"Backup nicht vollständig","AgentOutdated"=>"Agent-Version veraltet",
+  "RepeatedBackupFailures"=>"Wiederholt fehlgeschlagene Backups","BackupVerificationFailed"=>"Backup-Prüfung fehlgeschlagen","RetentionFailed"=>"Aufbewahrung fehlgeschlagen",
+  "StorageCapacityWarning"=>"Speicher fast voll","StorageCapacityCritical"=>"Speicher kritisch voll",_=>code
  };
  public static string Ownership(string o)=>o=="Local"?"Lokal verwaltet":o=="Managed"?"Zentral verwaltet":o;
 
