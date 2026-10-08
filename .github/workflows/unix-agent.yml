@@ -14,6 +14,9 @@ on:
       - 'DariaTech/**'
       - 'deploy/unix/**'
       - 'scripts/build-unix-agent.py'
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 permissions:
   contents: read
 jobs:
