@@ -21,13 +21,19 @@ public sealed class Worker(AgentOptions options,ProtectedState state,ILogger<Wor
    {
     JobReport[] jobs=[];ProgressReport? progress=null;var reachable=true;
     try{jobs=await adapter.ReadJobs(ct);progress=await adapter.ReadProgress(ct);if(progress is not null&&jobs.All(x=>x.LocalId!=progress.LocalJobId))progress=null;}catch(Exception ex)when(ex is HttpRequestException or InvalidOperationException or System.Text.Json.JsonException or TaskCanceledException){reachable=false;log.LogWarning("Local engine unavailable ({Type})",ex.GetType().Name);}
-    if(reachable)
+    var update=state.Read<UpdateJournal>("update.bin");var updating=update is {Status:"Applying"}&&update.Manifest.Version!=options.Version;
+    if(reachable&&!updating&&state.Read<EnginePauseState>("update-preserve-pause.bin") is {Paused:true} pause)
+    {
+     if(pause.Until is null||pause.Until>DateTimeOffset.UtcNow)await adapter.SetPause(true,ct,pause.Until,pause.Until is null);
+     state.Write("update-preserve-pause.bin",pause with{Paused=false});
+    }
+    if(reachable&&!updating)
     {
      try{await ManagedConfiguration.Synchronize(client,adapter,options,state,ct);}
      catch(OperationCanceledException)when(ct.IsCancellationRequested){throw;}
      catch(Exception ex){log.LogWarning("Managed configuration synchronization failed ({Type})",ex.GetType().Name);}
     }
-    if(reachable)
+    if(reachable&&!updating)
     {
      try{await RemoteCommands.Synchronize(client,adapter,options,state,identity.DeviceId,ct);}
      catch(OperationCanceledException)when(ct.IsCancellationRequested){throw;}
@@ -39,7 +45,7 @@ public sealed class Worker(AgentOptions options,ProtectedState state,ILogger<Wor
      catch(OperationCanceledException)when(ct.IsCancellationRequested){throw;}
      catch(Exception ex){log.LogWarning("Agent update synchronization failed ({Type})",ex.GetType().Name);}
     }
-    queue.Add(new(options.Version,RuntimeInformation.OSDescription,reachable,jobs,reachable?progress:null));
+    queue.Add(new(options.Version,RuntimeInformation.OSDescription,reachable,jobs,reachable?progress:null,options.Platform));
     // Bound disk use. Lost older snapshots are explicitly reported, never claimed delivered.
     if(queue.Count>1440){queue.RemoveAt(0);log.LogWarning("Telemetry outbox full; oldest snapshot discarded");}
     state.Write("outbox.bin",queue);

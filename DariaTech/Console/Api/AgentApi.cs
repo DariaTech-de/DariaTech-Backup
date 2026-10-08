@@ -11,6 +11,7 @@ public static class AgentApi
  {
   app.MapPost("/api/v1/agent/enroll",async(EnrollmentRequest r,ManagementDb db,TenantScope scope,HttpContext ctx)=>
   {
+   if(r.Platform is not null&&!UpdateProtocol.Platforms.Contains(r.Platform))return Results.BadRequest();
    if(!ManagementApi.Text(r.Token,64)||r.Token.Length!=64||!ManagementApi.Text(r.Hostname,200)||!ManagementApi.Text(r.OperatingSystem,200)||!ManagementApi.Text(r.AgentVersion,80))return Results.BadRequest();
    await using var tx=await db.Database.BeginTransactionAsync();
    var hash=Tokens.Hash(r.Token);var now=DateTimeOffset.UtcNow;
@@ -20,7 +21,7 @@ public static class AgentApi
    var e=await db.EnrollmentTokens.IgnoreQueryFilters().SingleAsync(x=>x.TokenHash==hash);scope.AgentTenant=e.TenantId;
    if(!await db.Customers.AnyAsync(x=>x.TenantId==scope.AgentTenant&&x.Active))return Results.Unauthorized();
    var d=new Device{TenantId=e.TenantId,SiteId=e.SiteId,Name=r.Hostname,Hostname=r.Hostname,OperatingSystem=r.OperatingSystem};var credential=Tokens.Create();
-   db.Devices.Add(d);db.Agents.Add(new Agent{TenantId=e.TenantId,DeviceId=d.Id,Version=r.AgentVersion,CredentialHash=Tokens.Hash(credential)});
+   db.Devices.Add(d);db.Agents.Add(new Agent{TenantId=e.TenantId,DeviceId=d.Id,Version=r.AgentVersion,Platform=r.Platform??"",CredentialHash=Tokens.Hash(credential)});
    db.Audit.Add(new AuditEvent{TenantId=e.TenantId,Actor="enrollment",Action="device.registered",Resource=d.Id.ToString()});
    await db.SaveChangesAsync();await tx.CommitAsync();ctx.Response.Headers.CacheControl="no-store";return Results.Ok(new EnrollmentResponse(d.Id,credential));
   }).RequireRateLimiting("Enrollment");
@@ -33,11 +34,11 @@ public static class AgentApi
    var a=await db.Agents.IgnoreQueryFilters().SingleOrDefaultAsync(x=>x.DeviceId==id&&x.CredentialHash==hash&&!x.Revoked);
    if(a is null)return Results.Unauthorized();scope.AgentTenant=a.TenantId;
    if(!await db.Customers.AnyAsync(x=>x.TenantId==scope.AgentTenant&&x.Active))return Results.Unauthorized();
-   if(!Valid(r))return Results.BadRequest();
+   if(!Valid(r)||r.Platform is not null&&a.Platform!=""&&r.Platform!=a.Platform)return Results.BadRequest();
    await using var tx=await db.Database.BeginTransactionAsync();
    await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({BitConverter.ToInt64(id.ToByteArray())})");
    var d=await db.Devices.SingleOrDefaultAsync(x=>x.Id==id&&x.Active);if(d is null)return Results.Unauthorized();
-   d.LastHeartbeat=DateTimeOffset.UtcNow;d.EngineReachable=r.EngineReachable;d.OperatingSystem=r.OperatingSystem;a.Version=r.AgentVersion;
+   d.LastHeartbeat=DateTimeOffset.UtcNow;d.EngineReachable=r.EngineReachable;d.OperatingSystem=r.OperatingSystem;a.Version=r.AgentVersion;if(r.Platform is not null)a.Platform=r.Platform;
    d.ActiveJobLocalId=r.ActiveOperation?.LocalJobId;d.Progress=r.ActiveOperation?.Fraction;d.ActiveTaskId=r.ActiveOperation?.TaskId;d.ProgressBytes=r.ActiveOperation?.Bytes??0;d.ProgressFiles=r.ActiveOperation?.Files??0;
    if(r.EngineReachable)
    {
@@ -62,6 +63,7 @@ public static class AgentApi
  public static bool Valid(HeartbeatRequest r)
  {
   var now=DateTimeOffset.UtcNow;
+  if(r.Platform is not null&&!UpdateProtocol.Platforms.Contains(r.Platform))return false;
   if(!ManagementApi.Text(r.AgentVersion,80)||!ManagementApi.Text(r.OperatingSystem,200)||r.Jobs is null||r.Jobs.Length>500||r.Jobs.Any(x=>x is null)||r.Jobs.Select(x=>x.LocalId).Distinct().Count()!=r.Jobs.Length)return false;
   foreach(var j in r.Jobs)
   {

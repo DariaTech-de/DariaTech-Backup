@@ -24,6 +24,7 @@ builder.Services.ConfigureHttpJsonOptions(o=>{o.SerializerOptions.UnmappedMember
 builder.Services.AddHttpContextAccessor();builder.Services.AddScoped<TenantScope>();
 builder.Services.AddDbContext<ManagementDb>(o=>o.UseNpgsql(builder.Configuration.GetConnectionString("Management")??throw new InvalidOperationException("Management database connection is required")));
 builder.Services.AddSingleton<CommandSigning>();
+builder.Services.AddSingleton<AgentReleases>();
 builder.Services.AddSingleton<ISecretStore,EncryptedSecretStore>();
 builder.Services.AddDataProtection().SetApplicationName("DariaTech.ManagedBackup").PersistKeysToFileSystem(new DirectoryInfo(builder.Configuration["Security:KeyDirectory"]??"./keys"));
 builder.Services.AddOptions<KeyManagementOptions>().Configure<ISecretStore>((o,s)=>o.XmlEncryptor=new KeyXmlEncryptor(s));

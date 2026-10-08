@@ -13,7 +13,7 @@ public sealed partial class DuplicatiAdapter : IDisposable
  private readonly AgentOptions agentOptions;
  public DuplicatiAdapter(AgentOptions options,ProtectedState store,HttpMessageHandler? handler=null)
  {
-  agentOptions=options;state=store;client=new HttpClient(handler??(options.ManageEngine?OwnedEngineConnection.Handler(options,store):new HttpClientHandler{AllowAutoRedirect=false,UseProxy=false})){BaseAddress=new Uri(options.EngineUrl),Timeout=TimeSpan.FromSeconds(15)};
+  agentOptions=options;state=store;client=new HttpClient(handler??(options.ManageEngine?(OperatingSystem.IsWindows()?OwnedEngineConnection.Handler(options,store):EngineTls.Handler(store)):new HttpClientHandler{AllowAutoRedirect=false,UseProxy=false})){BaseAddress=new Uri(options.EngineUrl),Timeout=TimeSpan.FromSeconds(15)};
  }
  public async Task<JobReport[]> ReadJobs(CancellationToken ct)
  {
@@ -61,7 +61,7 @@ public sealed partial class DuplicatiAdapter : IDisposable
   var fraction=Get(root,"OverallProgress").TryGetDouble(out var f)&&double.IsFinite(f)?Math.Clamp(f,0,1):0;
   return new ProgressReport(id,Number(Get(root,"TaskID")),fraction,Number(Get(root,"ProcessedFileSize")),Number(Get(root,"ProcessedFileCount")));
  }
- private RunReport? CloudOutcome(string localId,RunReport? run)=>run is {Status:RunStatus.Warning}&&(state.Read<Dictionary<string,SaasJobBinding>>("saas-bindings.bin")??[]).ContainsKey(localId)
+ private RunReport? CloudOutcome(string localId,RunReport? run)=>run is {Status:RunStatus.Warning}&&((state.Read<Dictionary<string,SaasJobBinding>>("saas-bindings.bin")??[]).ContainsKey(localId)||(state.Read<Dictionary<string,string>>("source-jobs.bin")??[]).ContainsKey(localId))
   ?run with{Status=RunStatus.Failed,ErrorCode="BackupFailed"}:run;
  public static RunReport? ParseResult(JsonElement result,JsonElement metadata)
  {

@@ -107,6 +107,7 @@ try {
  $credentialHash=(Get-FileHash (Join-Path $state 'engine-credential.bin')).Hash
  $configFile=Join-Path (Join-Path ${env:ProgramFiles} 'DariaTech Backup') 'appsettings.json'
  $configuration=Get-Content $configFile -Raw|ConvertFrom-Json
+ if($configuration.Agent.AllowManagedConfiguration){throw 'Console-managed jobs must stay disabled without the local /allowmanaged opt-in'}
  # Exercise selection of a separately installed engine using the OSS fixture.
  # This validates the BYOL boundary; it does not claim a licensed SaaS backup.
  $externalRoot=Join-Path ${env:ProgramFiles} ('DariaTech External Engine Fixture-'+[Guid]::NewGuid())
@@ -127,11 +128,11 @@ try {
  $engineAcl.RemoveAccessRuleAll((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier('S-1-1-0')),'Write','ContainerInherit,ObjectInherit','None','Allow')))
  Set-Acl $externalRoot $engineAcl
  $configuration.Agent | Add-Member ExternalEngineExecutable $externalExe -Force
- $configuration.Agent | Add-Member AllowManagedConfiguration $true -Force
  $configuration.Agent | Add-Member CommandPublicKeyFile (Join-Path $state 'commands-public.pem') -Force
  $configuration.Agent | Add-Member RestoreRoot (Join-Path $state 'Restores') -Force
  $configuration | ConvertTo-Json -Depth 5 | Set-Content $configFile -Encoding UTF8
- Invoke-Setup @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/console=https://localhost:18443')
+ # The upgrade opts in through the installer parameter; trust settings are preserved from the existing configuration.
+ Invoke-Setup @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/console=https://localhost:18443','/allowmanaged=1')
  $preserved=Get-Content $configFile -Raw|ConvertFrom-Json
  if($preserved.Agent.ExternalEngineExecutable -ne $externalExe){throw 'Upgrade discarded external engine selection'}
  $selected=Get-CimInstance Win32_Process -Filter "Name='Duplicati.Server.exe'"

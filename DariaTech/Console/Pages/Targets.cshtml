@@ -1,0 +1,35 @@
+@page
+@model TargetsModel
+@using DariaTech.Console.Services
+@{ ViewData["Title"] = "Speicherziele"; var editing = Model.Editing is not null; }
+<div class="page-heading">
+ <div><span class="eyebrow">Verwalten</span><h1>Speicherziele</h1><p class="lead">Gespeicherte Ziele, z. B. Ihr DariaTech-Speicherserver. Neue Backup-Jobs verwenden das Standardziel und erhalten darunter einen eigenen Ordner je Kunde, Gerät und Job.</p></div>
+</div>
+@if(Model.Items.Count==0&&!editing){<div class="empty"><span class="empty-icon">@Ui.Icon("cloud")</span><h2>Noch kein Speicherziel</h2><p>Legen Sie unten Ihr zentrales Ziel an. Jobs können weiterhin auch ein eigenes Ziel verwenden.</p></div>}
+else if(Model.Items.Count>0){
+<section class="card card-flush">
+ <div class="table-wrap"><table class="table">
+  <thead><tr><th scope="col">Name</th><th scope="col">Ziel</th><th scope="col">Status</th><th scope="col"><span class="sr-only">Aktionen</span></th></tr></thead>
+  <tbody>@foreach(var t in Model.Items){<tr>
+   <td><strong>@t.Name</strong><span class="sub">Angelegt @Ui.Date(t.Created)</span></td>
+   <td>@DestinationForm.Describe(t.TargetUrl)</td>
+   <td>@if(t.IsDefault){<span class="status healthy">Standard</span>}</td>
+   <td class="row-actions"><a class="button secondary" asp-route-edit="@t.Id">Bearbeiten</a>
+    <form method="post" asp-page-handler="Delete" asp-route-id="@t.Id"><button class="button secondary" type="submit">Löschen</button></form></td>
+  </tr>}</tbody>
+ </table></div>
+</section>}
+
+<form method="post" asp-page-handler="Save" class="stack">
+ <input type="hidden" asp-for="Id" />
+ @if(Model.Error is not null){<div class="form-error" role="alert">@Model.Error</div>}
+ <section class="card">
+  <div class="card-head"><div><h2>@(editing?$"„{Model.Editing!.Name}“ bearbeiten":"Neues Speicherziel")</h2><span class="sub">Änderungen gelten für neu angelegte Jobs. Bestehende Jobs behalten ihre Konfiguration.</span></div></div>
+  <div class="form-grid">
+   <div class="field"><label asp-for="Name">Name</label><input asp-for="Name" required maxlength="200" placeholder="z. B. DariaTech-Speicherserver" /></div>
+   <div class="field check-field"><label class="check"><input asp-for="IsDefault" type="checkbox" /><span>Als Standard für neue Backup-Jobs verwenden</span></label></div>
+  </div>
+  <partial name="_DestinationPicker" model="Model.Picker" />
+  <div class="form-actions">@if(editing){<a class="button secondary" asp-page="/Targets">Abbrechen</a>}<button type="submit">@Ui.Icon("check")Speicherziel speichern</button></div>
+ </section>
+</form>

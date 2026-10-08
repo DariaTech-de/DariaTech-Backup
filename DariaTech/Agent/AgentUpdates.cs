@@ -5,13 +5,15 @@ using System.Security.Cryptography;
 using DariaTech.Contracts;
 namespace DariaTech.Agent;
 
-public sealed record UpdateJournal(Guid DeploymentId,AgentUpdateManifest Manifest,string Status,long HighestSequence,DateTimeOffset? ApplyingSince=null);
+public sealed record UpdateJournal(Guid DeploymentId,AgentUpdateManifest Manifest,string Status,long HighestSequence,DateTimeOffset? ApplyingSince=null,SignedUpdate? SignedManifest=null);
 public static class AgentUpdates
 {
  public static async Task Synchronize(HttpClient console,DuplicatiAdapter adapter,AgentOptions options,ProtectedState state,CancellationToken ct)
  {
-  if(!options.AllowAgentUpdates)return;
+  if(!options.AllowAgentUpdates||ProxmoxRestore.Active(state,options.StateDirectory))return;
   var journal=state.Read<UpdateJournal>("update.bin");
+  if(journal is {Status:"ApplyFailed"})
+  {await Report(console,journal.DeploymentId,new("Failed","InstallationIndeterminate"),ct);state.Write("update.bin",journal with{Status="Failed"});return;}
   if(journal is {Status:"Applying"})
   {
    var installed=options.Version==journal.Manifest.Version;
@@ -21,19 +23,25 @@ public static class AgentUpdates
   }
   if(journal is {Status:"Downloaded"})
   {
-   if(!OperatingSystem.IsWindows())throw new PlatformNotSupportedException("Automatic installer updates require Windows");
+
    // Never kill a backup/restore to install an update, including queued tasks.
    if(await adapter.HasPendingTasks(ct))return;
    using var key=ECDsa.Create();key.ImportFromPem(File.ReadAllText(options.UpdatePublicKeyFile!));
    // Validate the stored manifest again against current time and rehash staged bytes immediately before execution.
-   if(!UpdateProtocol.Valid(journal.Manifest,DateTimeOffset.UtcNow)||!Version.TryParse(options.Version,out var installed)||Version.Parse(journal.Manifest.Version)<=installed)
+   if(!UpdateProtocol.Valid(journal.Manifest,DateTimeOffset.UtcNow)||journal.Manifest.Platform!=options.Platform||!Version.TryParse(options.Version,out var installed)||Version.Parse(journal.Manifest.Version)<=installed)
    {await Report(console,journal.DeploymentId,new("Rejected","UpdateRejected"),ct);state.Write("update.bin",journal with{Status="Rejected"});return;}
-   var artifact=Path.Combine(options.StateDirectory,"updates",$"{journal.Manifest.ReleaseId:D}.exe");
+   var artifact=OperatingSystem.IsWindows()?Path.Combine(options.StateDirectory,"updates",$"{journal.Manifest.ReleaseId:D}.exe"):UnixUpdates.Artifact(options,journal.Manifest);
    await VerifyArtifact(artifact,journal.Manifest,ct);
-   if(ArtifactVersion(artifact)!=journal.Manifest.Version)throw new CryptographicException("Installer version differs from signed manifest");
+   if(OperatingSystem.IsWindows()&&ArtifactVersion(artifact)!=journal.Manifest.Version)throw new CryptographicException("Installer version differs from signed manifest");
    await Report(console,journal.DeploymentId,new("Downloaded",null),ct);
    state.Write("update.bin",journal with{Status="Applying",ApplyingSince=DateTimeOffset.UtcNow});
    await Report(console,journal.DeploymentId,new("Applying",null),ct);
+   if(!OperatingSystem.IsWindows())
+   {
+    try{await UnixUpdates.Launch(options,state,journal with{Status="Applying",ApplyingSince=DateTimeOffset.UtcNow},ct);}
+    catch{state.Write("update.bin",journal with{Status="ApplyFailed"});throw;}
+    return;
+   }
    // The verified Inno Setup process is independent of the managed-engine kill-on-close job.
    // It stops/replaces/restarts the service; the new process confirms its actual installed version.
    var start=new ProcessStartInfo(artifact){UseShellExecute=false,CreateNoWindow=true,WorkingDirectory=options.StateDirectory};
@@ -46,17 +54,17 @@ public static class AgentUpdates
   AgentUpdateManifest manifest;
   try{manifest=UpdateProtocol.Verify(assignment.Manifest,trust,DateTimeOffset.UtcNow);}
   catch(Exception e)when(e is CryptographicException or FormatException or System.Text.Json.JsonException){await Report(console,assignment.DeploymentId,new("Rejected","UpdateRejected"),ct);return;}
-  if(!UpdateProtocol.Newer(manifest,options.Version,journal?.HighestSequence??0)||!OperatingSystem.IsWindows())
+  if(!UpdateProtocol.Newer(manifest,options.Version,journal?.HighestSequence??0,options.Platform) )
   {await Report(console,assignment.DeploymentId,new("Rejected","UpdateRejected"),ct);return;}
   if(await adapter.HasPendingTasks(ct))return;
-  var folder=Path.Combine(options.StateDirectory,"updates");Directory.CreateDirectory(folder);
+  var folder=Path.Combine(options.StateDirectory,"updates");if(OperatingSystem.IsWindows())Directory.CreateDirectory(folder);else UnixPrivatePaths.Directory(folder,true);
   if((File.GetAttributes(folder)&FileAttributes.ReparsePoint)!=0)throw new InvalidOperationException("Unsafe update staging directory");
-  var file=Path.Combine(folder,$"{manifest.ReleaseId:D}.exe");
+  var file=Path.Combine(folder,$"{manifest.ReleaseId:D}"+(OperatingSystem.IsWindows()?".exe":".tar.gz"));
   try
   {
    await Download(manifest,file,options.UpdateDownloadHosts,ct);await VerifyArtifact(file,manifest,ct);
    if(manifest.Expires<=DateTimeOffset.UtcNow)throw new CryptographicException("Manifest expired while downloading");
-   state.Write("update.bin",new UpdateJournal(assignment.DeploymentId,manifest,"Downloaded",manifest.Sequence));
+   state.Write("update.bin",new UpdateJournal(assignment.DeploymentId,manifest,"Downloaded",manifest.Sequence,SignedManifest:assignment.Manifest));
    await Report(console,assignment.DeploymentId,new("Downloaded",null),ct);
   }
   catch(OperationCanceledException)when(ct.IsCancellationRequested){throw;}
@@ -89,10 +97,12 @@ public static class AgentUpdates
    using var response=await client.GetAsync(url,HttpCompletionOption.ResponseHeadersRead,timeout.Token);
    if((int)response.StatusCode is >=300 and <400){url=new Uri(url,response.Headers.Location??throw new HttpRequestException("Missing redirect"));continue;}
    response.EnsureSuccessStatusCode();if(response.Content.Headers.ContentLength is {} length&&length!=manifest.Length)throw new CryptographicException("Unexpected artifact size");
-   var temporary=path+".partial";
+   var temporary=path+"."+Guid.NewGuid().ToString("N")+".partial";
    try
    {
-    await using var output=new FileStream(temporary,FileMode.Create,FileAccess.Write,FileShare.None);await using var input=await response.Content.ReadAsStreamAsync(timeout.Token);
+    var creation=new FileStreamOptions{Mode=FileMode.CreateNew,Access=FileAccess.Write,Share=FileShare.None};
+    if(!OperatingSystem.IsWindows())creation.UnixCreateMode=UnixFileMode.UserRead|UnixFileMode.UserWrite;
+    await using var output=new FileStream(temporary,creation);await using var input=await response.Content.ReadAsStreamAsync(timeout.Token);
     var buffer=new byte[65536];long received=0;int read;
     while((read=await input.ReadAsync(buffer,timeout.Token))>0){received+=read;if(received>manifest.Length)throw new CryptographicException("Artifact exceeds signed length");await output.WriteAsync(buffer.AsMemory(0,read),timeout.Token);}
     await output.FlushAsync(timeout.Token);output.Flush(true);

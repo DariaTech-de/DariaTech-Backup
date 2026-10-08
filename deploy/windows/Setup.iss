@@ -76,6 +76,7 @@ Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile
 var ConnectionPage: TInputQueryWizardPage;
     Token, TokenFile, ConsoleUrl, EnginePassword, EnginePasswordFile: String;
     SetupError: String;
+    AllowManaged: Boolean;
 
 function InstallSucceeded: Boolean;
 begin
@@ -101,6 +102,7 @@ begin
  Token := ExpandConstant('{param:token|}');
  TokenFile := ExpandConstant('{param:tokenfile|}');
  EnginePasswordFile := ExpandConstant('{param:enginepasswordfile|}');
+ AllowManaged := ExpandConstant('{param:allowmanaged|0}') = '1';
  ConnectionPage := CreateInputQueryPage(wpSelectDir, 'Gerät registrieren',
   'Mit Ihrer DariaTech Console verbinden',
   'Der Registrierungstoken gilt einmalig und ordnet dieses Gerät dem richtigen Kunden und Standort zu. ' +
@@ -138,13 +140,15 @@ begin
 end;
 
 procedure RunHelper(Action: String);
-var Code: Integer;
+var Code: Integer; Extra: String;
 begin
+ Extra := '';
+ if (Action = 'Prepare') and AllowManaged then Extra := ' -AllowManagedConfiguration';
  if Action = 'Prepare' then ShowStatus('Geschütztes Datenverzeichnis wird vorbereitet …')
  else ShowStatus('Gerät wird bei der Console registriert und der Dienst gestartet …');
  if not Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
   '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + ExpandConstant('{app}\Service.ps1') +
-  '" -Action ' + Action + ' -InstallDirectory "' + ExpandConstant('{app}') + '" -ConsoleUrl "' + ConsoleUrl + '"',
+  '" -Action ' + Action + ' -InstallDirectory "' + ExpandConstant('{app}') + '" -ConsoleUrl "' + ConsoleUrl + '"' + Extra,
   '', SW_HIDE, ewWaitUntilTerminated, Code) then RaiseException('Die Dienstinstallation konnte nicht gestartet werden.');
  if Code <> 0 then RaiseException('Dienstinstallation fehlgeschlagen. Prüfen Sie Registrierungstoken, HTTPS-Verbindung und Windows-Anwendungsprotokoll. Lokale Daten bleiben erhalten.');
 end;

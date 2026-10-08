@@ -1,0 +1,2850 @@
+[
+  {
+    "key": "aliyunoss",
+    "name": "Aliyun OSS (Object Storage Service)",
+    "description": "This backend can read and write data to Aliyun OSS.",
+    "deprecated": false,
+    "untested": true,
+    "options": [
+      {
+        "name": "list-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "List operation timeout",
+        "defaultValue": "10m"
+      },
+      {
+        "name": "oss-access-key-id",
+        "type": "String",
+        "secret": false,
+        "summary": "Access Key ID"
+      },
+      {
+        "name": "oss-access-key-secret",
+        "type": "Password",
+        "secret": true,
+        "summary": "Access Key Secret"
+      },
+      {
+        "name": "oss-bucket-name",
+        "type": "String",
+        "secret": false,
+        "summary": "Bucket name"
+      },
+      {
+        "name": "oss-endpoint",
+        "type": "String",
+        "secret": false,
+        "summary": "Endpoint"
+      },
+      {
+        "name": "read-write-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Read/write operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "short-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Short operation timeout",
+        "defaultValue": "30s"
+      }
+    ]
+  },
+  {
+    "key": "aftp",
+    "name": "Alternative FTP",
+    "description": "This backend can read and write data to an FTP based backend. Allowed formats are \"aftp://hostname/folder\" and \"aftp://username:password@hostname/folder\".",
+    "deprecated": false,
+    "untested": false,
+    "options": [
+      {
+        "name": "aftp-data-connection-type",
+        "type": "Enumeration",
+        "secret": false,
+        "summary": "Configure the FTP data connection type",
+        "values": [
+          "AutoActive",
+          "AutoPassive",
+          "PASV",
+          "EPSV",
+          "PORT",
+          "EPRT",
+          "PASVEX",
+          "PassiveExtended",
+          "PASVUSE",
+          "PassiveAllowUnroutable"
+        ],
+        "defaultValue": "AutoPassive"
+      },
+      {
+        "name": "aftp-encryption-mode",
+        "type": "Enumeration",
+        "secret": false,
+        "summary": "Configure the FTP encryption mode",
+        "values": [
+          "None",
+          "Implicit",
+          "Explicit",
+          "Auto"
+        ],
+        "defaultValue": "None"
+      },
+      {
+        "name": "aftp-log-privateinfo-to-console",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Log FTP PRIVATE info to console",
+        "defaultValue": "false"
+      },
+      {
+        "name": "aftp-log-to-console",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Log FTP dialog to terminal console",
+        "defaultValue": "false"
+      },
+      {
+        "name": "aftp-relative-path",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Treat the url path as absolute",
+        "defaultValue": "false"
+      },
+      {
+        "name": "aftp-ssl-protocols",
+        "type": "Flags",
+        "secret": false,
+        "summary": "Configure the SSL policy to use when encryption is enabled",
+        "values": [
+          "None",
+          "Ssl2",
+          "Ssl3",
+          "Tls",
+          "Default",
+          "Tls11",
+          "Tls12",
+          "Tls13"
+        ],
+        "defaultValue": "None"
+      },
+      {
+        "name": "aftp-upload-delay",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Add a delay after uploading a file",
+        "defaultValue": "0s"
+      },
+      {
+        "name": "aftp-use-cwd-names",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Use CWD instead of absolute paths",
+        "defaultValue": "false"
+      },
+      {
+        "name": "auth-password",
+        "type": "Password",
+        "secret": true,
+        "summary": "Supply the password used to connect to the server"
+      },
+      {
+        "name": "auth-username",
+        "type": "String",
+        "secret": false,
+        "summary": "Supply the username used to connect to the server"
+      },
+      {
+        "name": "disable-upload-verify",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Disable upload verification",
+        "defaultValue": "false"
+      },
+      {
+        "name": "ignore-pureftpd-limit-issue",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Ignore PureFTPd limit warnings",
+        "defaultValue": "false"
+      },
+      {
+        "name": "list-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "List operation timeout",
+        "defaultValue": "10m"
+      },
+      {
+        "name": "read-write-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Read/write operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "short-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Short operation timeout",
+        "defaultValue": "30s"
+      }
+    ]
+  },
+  {
+    "key": "azure",
+    "name": "Azure blob",
+    "description": "This backend can read and write data to Azure blob storage. Allowed format is \"azure://bucketname/folder\".",
+    "deprecated": false,
+    "untested": false,
+    "options": [
+      {
+        "name": "azure-access-key",
+        "type": "Password",
+        "secret": true,
+        "summary": "The access key"
+      },
+      {
+        "name": "azure-access-sas-token",
+        "type": "Password",
+        "secret": true,
+        "summary": "The SAS token"
+      },
+      {
+        "name": "azure-access-tier",
+        "type": "String",
+        "secret": false,
+        "summary": "Specify the access tier",
+        "values": [
+          "P4",
+          "P6",
+          "P10",
+          "P15",
+          "P20",
+          "P30",
+          "P40",
+          "P50",
+          "P60",
+          "P70",
+          "P80",
+          "Hot",
+          "Cool",
+          "Archive",
+          "Premium",
+          "Cold",
+          "Smart"
+        ]
+      },
+      {
+        "name": "azure-account-name",
+        "type": "String",
+        "secret": false,
+        "summary": "The storage account name"
+      },
+      {
+        "name": "azure-archive-classes",
+        "type": "Flags",
+        "secret": false,
+        "summary": "The storage classes that are considered archive classes",
+        "values": [
+          "P4",
+          "P6",
+          "P10",
+          "P15",
+          "P20",
+          "P30",
+          "P40",
+          "P50",
+          "P60",
+          "P70",
+          "P80",
+          "Hot",
+          "Cool",
+          "Archive",
+          "Premium",
+          "Cold",
+          "Smart"
+        ],
+        "defaultValue": "Cold,Archive"
+      },
+      {
+        "name": "azure-blob-immutability-policy-mode",
+        "type": "Enumeration",
+        "secret": false,
+        "summary": "The immutability policy mode",
+        "values": [
+          "Mutable",
+          "Unlocked",
+          "Locked"
+        ],
+        "defaultValue": "Unlocked"
+      },
+      {
+        "name": "azure-internal-retries",
+        "type": "Integer",
+        "secret": false,
+        "summary": "The number of retries for Azure operations",
+        "defaultValue": "3"
+      },
+      {
+        "name": "list-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "List operation timeout",
+        "defaultValue": "10m"
+      },
+      {
+        "name": "read-write-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Read/write operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "short-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Short operation timeout",
+        "defaultValue": "30s"
+      }
+    ]
+  },
+  {
+    "key": "b2",
+    "name": "B2 Cloud Storage",
+    "description": "This backend can read and write data to the Backblaze B2 Cloud Storage. Allowed format is \"b2://bucketname/prefix\".",
+    "deprecated": false,
+    "untested": false,
+    "options": [
+      {
+        "name": "b2-accountid",
+        "type": "String",
+        "secret": false,
+        "summary": "B2 Cloud Storage Account ID"
+      },
+      {
+        "name": "b2-applicationkey",
+        "type": "Password",
+        "secret": true,
+        "summary": "B2 Cloud Storage Application Key"
+      },
+      {
+        "name": "b2-create-bucket-type",
+        "type": "String",
+        "secret": false,
+        "summary": "The bucket type used when creating a bucket",
+        "defaultValue": "allPrivate"
+      },
+      {
+        "name": "b2-download-url",
+        "type": "String",
+        "secret": false,
+        "summary": "The base URL to use for downloading files"
+      },
+      {
+        "name": "b2-lock-mode",
+        "type": "Enumeration",
+        "secret": false,
+        "summary": "The lock mode for B2 object retention (Governance or Compliance)",
+        "values": [
+          "Governance",
+          "Compliance"
+        ],
+        "defaultValue": "Governance"
+      },
+      {
+        "name": "b2-page-size",
+        "type": "Integer",
+        "secret": false,
+        "summary": "The size of file-listing pages",
+        "defaultValue": "500"
+      },
+      {
+        "name": "list-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "List operation timeout",
+        "defaultValue": "10m"
+      },
+      {
+        "name": "read-write-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Read/write operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "short-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Short operation timeout",
+        "defaultValue": "30s"
+      }
+    ]
+  },
+  {
+    "key": "box",
+    "name": "Box.com",
+    "description": "This backend can read and write data to Box.com. Allowed format is \"box://folder/subfolder\".",
+    "deprecated": false,
+    "untested": false,
+    "options": [
+      {
+        "name": "authid",
+        "type": "Password",
+        "secret": true,
+        "summary": "The authorization code"
+      },
+      {
+        "name": "box-delete-from-trash",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Force delete files",
+        "defaultValue": "false"
+      },
+      {
+        "name": "list-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "List operation timeout",
+        "defaultValue": "10m"
+      },
+      {
+        "name": "read-write-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Read/write operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "short-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Short operation timeout",
+        "defaultValue": "30s"
+      }
+    ]
+  },
+  {
+    "key": "smb",
+    "name": "CIFS/SMB",
+    "description": "This backend can read and write data to CIFS/SMB destinations. Allowed format is \"cifs://server/share\".",
+    "deprecated": false,
+    "untested": false,
+    "options": [
+      {
+        "name": "auth-domain",
+        "type": "String",
+        "secret": false,
+        "summary": "Supply the domain used to connect to the server"
+      },
+      {
+        "name": "auth-password",
+        "type": "Password",
+        "secret": true,
+        "summary": "Supply the password used to connect to the server"
+      },
+      {
+        "name": "auth-username",
+        "type": "String",
+        "secret": false,
+        "summary": "Supply the username used to connect to the server"
+      },
+      {
+        "name": "list-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "List operation timeout",
+        "defaultValue": "10m"
+      },
+      {
+        "name": "read-buffer-size",
+        "type": "String",
+        "secret": false,
+        "summary": "Read buffer size for SMB operations."
+      },
+      {
+        "name": "read-write-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Read/write operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "short-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Short operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "transport",
+        "type": "Enumeration",
+        "secret": false,
+        "summary": "Defines the transport to be used in CIFS connection",
+        "values": [
+          "directtcp",
+          "netbios"
+        ],
+        "defaultValue": "directtcp"
+      },
+      {
+        "name": "write-buffer-size",
+        "type": "String",
+        "secret": false,
+        "summary": "Write buffer size for SMB operations."
+      }
+    ]
+  },
+  {
+    "key": "drimecloud",
+    "name": "Drime Cloud",
+    "description": "This backend can read and write data to Drime Cloud. Allowed formats are \"drimecloud://folder\" and \"drimecloud://username:password@folder\".",
+    "deprecated": false,
+    "untested": false,
+    "options": [
+      {
+        "name": "api-token",
+        "type": "Password",
+        "secret": true,
+        "summary": "Drime Cloud API token"
+      },
+      {
+        "name": "api-url",
+        "type": "String",
+        "secret": false,
+        "summary": "Drime Cloud API URL",
+        "defaultValue": "https://app.drime.cloud/api/v1"
+      },
+      {
+        "name": "auth-password",
+        "type": "Password",
+        "secret": true,
+        "summary": "Supply the password used to connect to the server"
+      },
+      {
+        "name": "auth-username",
+        "type": "String",
+        "secret": false,
+        "summary": "Supply the username used to connect to the server"
+      },
+      {
+        "name": "list-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "List operation timeout",
+        "defaultValue": "10m"
+      },
+      {
+        "name": "page-size",
+        "type": "Integer",
+        "secret": false,
+        "summary": "Drime Cloud page size",
+        "defaultValue": "50"
+      },
+      {
+        "name": "read-write-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Read/write operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "short-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Short operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "soft-delete",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Use soft delete",
+        "defaultValue": "false"
+      },
+      {
+        "name": "workspace-id",
+        "type": "Integer",
+        "secret": false,
+        "summary": "Drime Cloud workspace ID",
+        "defaultValue": "0"
+      }
+    ]
+  },
+  {
+    "key": "dropbox",
+    "name": "Dropbox",
+    "description": "This backend can read and write data to Dropbox. Allowed format is \"dropbox://folder/subfolder\".",
+    "deprecated": false,
+    "untested": false,
+    "options": [
+      {
+        "name": "authid",
+        "type": "Password",
+        "secret": true,
+        "summary": "The authorization code"
+      },
+      {
+        "name": "list-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "List operation timeout",
+        "defaultValue": "10m"
+      },
+      {
+        "name": "read-write-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Read/write operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "short-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Short operation timeout",
+        "defaultValue": "30s"
+      }
+    ]
+  },
+  {
+    "key": "filejump",
+    "name": "Filejump",
+    "description": "This backend can read and write data to filejump. Allowed formats are \"filejump://hostname/folder\" and \"filejump://username:password@hostname/folder\".",
+    "deprecated": true,
+    "untested": false,
+    "options": [
+      {
+        "name": "api-token",
+        "type": "Password",
+        "secret": true,
+        "summary": "The filejump API token"
+      },
+      {
+        "name": "api-url",
+        "type": "String",
+        "secret": false,
+        "summary": "The filejump API URL",
+        "defaultValue": "https://drive.filejump.com/api/v1/"
+      },
+      {
+        "name": "auth-password",
+        "type": "Password",
+        "secret": true,
+        "summary": "Supply the password used to connect to the server"
+      },
+      {
+        "name": "auth-username",
+        "type": "String",
+        "secret": false,
+        "summary": "Supply the username used to connect to the server"
+      },
+      {
+        "name": "list-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "List operation timeout",
+        "defaultValue": "10m"
+      },
+      {
+        "name": "page-size",
+        "type": "Integer",
+        "secret": false,
+        "summary": "The filejump page size",
+        "defaultValue": "1000"
+      },
+      {
+        "name": "read-write-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Read/write operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "short-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Short operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "soft-delete",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Use soft delete",
+        "defaultValue": "false"
+      }
+    ]
+  },
+  {
+    "key": "filen",
+    "name": "Filen.io",
+    "description": "This backend can read and write data to Filen.io using its REST protocol. Supported format is \"filen://folder/subfolder\".",
+    "deprecated": false,
+    "untested": false,
+    "options": [
+      {
+        "name": "api-key",
+        "type": "Password",
+        "secret": true,
+        "summary": "Optional API key"
+      },
+      {
+        "name": "auth-password",
+        "type": "Password",
+        "secret": true,
+        "summary": "Supply the password used to connect to the server"
+      },
+      {
+        "name": "auth-username",
+        "type": "String",
+        "secret": false,
+        "summary": "Supply the username used to connect to the server"
+      },
+      {
+        "name": "list-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "List operation timeout",
+        "defaultValue": "10m"
+      },
+      {
+        "name": "move-to-trash",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Move to trash",
+        "defaultValue": "false"
+      },
+      {
+        "name": "read-write-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Read/write operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "short-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Short operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "two-factor-code",
+        "type": "String",
+        "secret": false,
+        "summary": "Optional 2-factor code"
+      }
+    ]
+  },
+  {
+    "key": "ftp",
+    "name": "FTP",
+    "description": "This backend can read and write data to an FTP based backend. Allowed formats are \"ftp://hostname/folder\" and \"ftp://username:password@hostname/folder\".",
+    "deprecated": false,
+    "untested": false,
+    "options": [
+      {
+        "name": "auth-password",
+        "type": "Password",
+        "secret": true,
+        "summary": "Supply the password used to connect to the server"
+      },
+      {
+        "name": "auth-username",
+        "type": "String",
+        "secret": false,
+        "summary": "Supply the username used to connect to the server"
+      },
+      {
+        "name": "disable-upload-verify",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Disable upload verification",
+        "defaultValue": "false"
+      },
+      {
+        "name": "ftp-absolute-path",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Treat the url path as absolute",
+        "defaultValue": "false"
+      },
+      {
+        "name": "ftp-data-connection-type",
+        "type": "Enumeration",
+        "secret": false,
+        "summary": "Configure the FTP data connection type",
+        "values": [
+          "AutoActive",
+          "AutoPassive",
+          "PASV",
+          "EPSV",
+          "PORT",
+          "EPRT",
+          "PASVEX",
+          "PassiveExtended",
+          "PASVUSE",
+          "PassiveAllowUnroutable"
+        ],
+        "defaultValue": "AutoPassive"
+      },
+      {
+        "name": "ftp-encryption-mode",
+        "type": "Enumeration",
+        "secret": false,
+        "summary": "Configure the FTP encryption mode",
+        "values": [
+          "None",
+          "Implicit",
+          "Explicit",
+          "Auto"
+        ],
+        "defaultValue": "None"
+      },
+      {
+        "name": "ftp-ssl-protocols",
+        "type": "Flags",
+        "secret": false,
+        "summary": "Configure the SSL policy to use when encryption is enabled",
+        "values": [
+          "None",
+          "Ssl2",
+          "Ssl3",
+          "Tls",
+          "Default",
+          "Tls11",
+          "Tls12",
+          "Tls13"
+        ],
+        "defaultValue": "None"
+      },
+      {
+        "name": "ftp-upload-delay",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Add a delay after uploading a file",
+        "defaultValue": "0s"
+      },
+      {
+        "name": "ftp-use-cwd-names",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Use CWD instead of absolute paths",
+        "defaultValue": "false"
+      },
+      {
+        "name": "ignore-pureftpd-limit-issue",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Ignore PureFTPd limit warnings",
+        "defaultValue": "false"
+      },
+      {
+        "name": "list-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "List operation timeout",
+        "defaultValue": "10m"
+      },
+      {
+        "name": "read-write-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Read/write operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "short-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Short operation timeout",
+        "defaultValue": "30s"
+      }
+    ]
+  },
+  {
+    "key": "gcs",
+    "name": "Google Cloud Storage",
+    "description": "This backend can read and write data to Google Cloud Storage. Allowed format is \"gcs://bucket/folder\".",
+    "deprecated": false,
+    "untested": false,
+    "options": [
+      {
+        "name": "authid",
+        "type": "Password",
+        "secret": true,
+        "summary": "The authorization code"
+      },
+      {
+        "name": "gcs-location",
+        "type": "String",
+        "secret": false,
+        "summary": "Specify location option for creating a bucket"
+      },
+      {
+        "name": "gcs-project",
+        "type": "String",
+        "secret": false,
+        "summary": "Specify project for creating a bucket"
+      },
+      {
+        "name": "gcs-retention-policy-mode",
+        "type": "Enumeration",
+        "secret": false,
+        "summary": "Specify retention policy mode",
+        "values": [
+          "Locked",
+          "Unlocked"
+        ],
+        "defaultValue": "Unlocked"
+      },
+      {
+        "name": "gcs-service-account-json",
+        "type": "Password",
+        "secret": true,
+        "summary": "Service account JSON"
+      },
+      {
+        "name": "gcs-storage-class",
+        "type": "String",
+        "secret": false,
+        "summary": "Specify storage class for creating a bucket"
+      },
+      {
+        "name": "list-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "List operation timeout",
+        "defaultValue": "10m"
+      },
+      {
+        "name": "read-write-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Read/write operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "short-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Short operation timeout",
+        "defaultValue": "30s"
+      }
+    ]
+  },
+  {
+    "key": "googledrive",
+    "name": "Google Drive",
+    "description": "This backend can read and write data to Google Drive. Allowed format is \"googledrive://folder/subfolder\".",
+    "deprecated": false,
+    "untested": false,
+    "options": [
+      {
+        "name": "authid",
+        "type": "Password",
+        "secret": true,
+        "summary": "The authorization code"
+      },
+      {
+        "name": "googledrive-teamdrive-id",
+        "type": "String",
+        "secret": false,
+        "summary": "Team drive ID"
+      },
+      {
+        "name": "list-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "List operation timeout",
+        "defaultValue": "10m"
+      },
+      {
+        "name": "read-write-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Read/write operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "short-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Short operation timeout",
+        "defaultValue": "30s"
+      }
+    ]
+  },
+  {
+    "key": "e2",
+    "name": "IDrive e2",
+    "description": "This backend can read and write data to IDrive e2. Allowed format is \"e2://bucket/folder\".",
+    "deprecated": false,
+    "untested": false,
+    "options": [
+      {
+        "name": "access_key_id",
+        "type": "String",
+        "secret": false,
+        "summary": "Access Key ID"
+      },
+      {
+        "name": "access_key_secret",
+        "type": "Password",
+        "secret": true,
+        "summary": "Access Key Secret"
+      },
+      {
+        "name": "list-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "List operation timeout",
+        "defaultValue": "10m"
+      },
+      {
+        "name": "read-write-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Read/write operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "s3-ext-accountidendpointmode",
+        "type": "String",
+        "secret": false,
+        "summary": "AccountIdEndpointMode",
+        "values": [
+          "PREFERRED",
+          "REQUIRED",
+          "DISABLED"
+        ],
+        "defaultValue": "PREFERRED"
+      },
+      {
+        "name": "s3-ext-allowautoredirect",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "AllowAutoRedirect",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-authenticationregion",
+        "type": "String",
+        "secret": false,
+        "summary": "AuthenticationRegion"
+      },
+      {
+        "name": "s3-ext-authenticationservicename",
+        "type": "String",
+        "secret": false,
+        "summary": "AuthenticationServiceName",
+        "defaultValue": "s3"
+      },
+      {
+        "name": "s3-ext-buffersize",
+        "type": "Integer",
+        "secret": false,
+        "summary": "BufferSize",
+        "defaultValue": "65536"
+      },
+      {
+        "name": "s3-ext-cachehttpclient",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "CacheHttpClient",
+        "defaultValue": "True"
+      },
+      {
+        "name": "s3-ext-clientappid",
+        "type": "String",
+        "secret": false,
+        "summary": "ClientAppId"
+      },
+      {
+        "name": "s3-ext-connecttimeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "ConnectTimeout"
+      },
+      {
+        "name": "s3-ext-defaultconfigurationmode",
+        "type": "String",
+        "secret": false,
+        "summary": "DefaultConfigurationMode",
+        "values": [
+          "Standard",
+          "InRegion",
+          "CrossRegion",
+          "Mobile",
+          "Auto"
+        ]
+      },
+      {
+        "name": "s3-ext-disablehostprefixinjection",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "DisableHostPrefixInjection",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-disablelogging",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "DisableLogging",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-disablemultiregionaccesspoints",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "DisableMultiregionAccessPoints",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-disablerequestcompression",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "DisableRequestCompression",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-disables3expresssessionauth",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "DisableS3ExpressSessionAuth",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-endpointdiscoverycachelimit",
+        "type": "Integer",
+        "secret": false,
+        "summary": "EndpointDiscoveryCacheLimit",
+        "defaultValue": "1000"
+      },
+      {
+        "name": "s3-ext-endpointdiscoveryenabled",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "EndpointDiscoveryEnabled",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-fastfailrequests",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "FastFailRequests",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-forcepathstyle",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "ForcePathStyle",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-httpclientcachesize",
+        "type": "Integer",
+        "secret": false,
+        "summary": "HttpClientCacheSize",
+        "defaultValue": "1"
+      },
+      {
+        "name": "s3-ext-ignoreconfiguredendpointurls",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "IgnoreConfiguredEndpointUrls",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-jsonmaxdepth",
+        "type": "Integer",
+        "secret": false,
+        "summary": "JsonMaxDepth",
+        "defaultValue": "256"
+      },
+      {
+        "name": "s3-ext-logmetrics",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "LogMetrics",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-logresponse",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "LogResponse",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-maxconnectionsperserver",
+        "type": "Integer",
+        "secret": false,
+        "summary": "MaxConnectionsPerServer"
+      },
+      {
+        "name": "s3-ext-maxerrorretry",
+        "type": "Integer",
+        "secret": false,
+        "summary": "MaxErrorRetry"
+      },
+      {
+        "name": "s3-ext-maxstaleconnectionretries",
+        "type": "Integer",
+        "secret": false,
+        "summary": "MaxStaleConnectionRetries",
+        "defaultValue": "10"
+      },
+      {
+        "name": "s3-ext-requestchecksumcalculation",
+        "type": "String",
+        "secret": false,
+        "summary": "RequestChecksumCalculation",
+        "values": [
+          "WHEN_SUPPORTED",
+          "WHEN_REQUIRED"
+        ],
+        "defaultValue": "WHEN_SUPPORTED"
+      },
+      {
+        "name": "s3-ext-resignretries",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "ResignRetries",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-responsechecksumvalidation",
+        "type": "String",
+        "secret": false,
+        "summary": "ResponseChecksumValidation",
+        "values": [
+          "WHEN_SUPPORTED",
+          "WHEN_REQUIRED"
+        ],
+        "defaultValue": "WHEN_SUPPORTED"
+      },
+      {
+        "name": "s3-ext-retrymode",
+        "type": "String",
+        "secret": false,
+        "summary": "RetryMode",
+        "values": [
+          "Standard",
+          "Adaptive"
+        ]
+      },
+      {
+        "name": "s3-ext-serviceid",
+        "type": "String",
+        "secret": false,
+        "summary": "ServiceId",
+        "defaultValue": "S3"
+      },
+      {
+        "name": "s3-ext-signaturemethod",
+        "type": "String",
+        "secret": false,
+        "summary": "SignatureMethod",
+        "values": [
+          "HmacSHA1",
+          "HmacSHA256",
+          "HmacSHA512"
+        ],
+        "defaultValue": "HmacSHA256"
+      },
+      {
+        "name": "s3-ext-throttleretries",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "ThrottleRetries",
+        "defaultValue": "True"
+      },
+      {
+        "name": "s3-ext-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Timeout"
+      },
+      {
+        "name": "s3-ext-useaccelerateendpoint",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "UseAccelerateEndpoint",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-usealternateuseragentheader",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "UseAlternateUserAgentHeader",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-usearnregion",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "UseArnRegion",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-usedualstackendpoint",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "UseDualstackEndpoint",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-usefipsendpoint",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "UseFIPSEndpoint",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-lock-mode",
+        "type": "Enumeration",
+        "secret": false,
+        "summary": "Specify the S3 object lock mode",
+        "values": [
+          "governance",
+          "compliance"
+        ],
+        "defaultValue": "governance"
+      },
+      {
+        "name": "short-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Short operation timeout",
+        "defaultValue": "30s"
+      }
+    ]
+  },
+  {
+    "key": "jottacloud",
+    "name": "Jottacloud",
+    "description": "This backend can read and write data to Jottacloud using its REST protocol. Allowed format is \"jottacloud://folder/subfolder\".",
+    "deprecated": false,
+    "untested": false,
+    "options": [
+      {
+        "name": "authid",
+        "type": "Password",
+        "secret": true,
+        "summary": "The authorization code"
+      },
+      {
+        "name": "jottacloud-chunksize",
+        "type": "Size",
+        "secret": false,
+        "summary": "The chunk size for simultaneous downloading",
+        "defaultValue": "5mb"
+      },
+      {
+        "name": "jottacloud-device",
+        "type": "String",
+        "secret": false,
+        "summary": "Supply the backup device to use"
+      },
+      {
+        "name": "jottacloud-mountpoint",
+        "type": "String",
+        "secret": false,
+        "summary": "Supply the mount point to use on the server"
+      },
+      {
+        "name": "jottacloud-threads",
+        "type": "Integer",
+        "secret": false,
+        "summary": "Number of threads for restore operations",
+        "defaultValue": "4"
+      },
+      {
+        "name": "list-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "List operation timeout",
+        "defaultValue": "10m"
+      },
+      {
+        "name": "read-write-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Read/write operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "short-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Short operation timeout",
+        "defaultValue": "30s"
+      }
+    ]
+  },
+  {
+    "key": "file",
+    "name": "Local folder or drive",
+    "description": "This backend can read and write data to an file based backend. Allowed formats are \"file://hostname/folder\" and \"file://username:password@hostname/folder\". You may supply UNC paths (e.g.: \"file://\\\\server\\folder\") or local paths (e.g.: (win) \"file://c:\\folder\", (linux) \"file:///usr/pub/files\")",
+    "deprecated": false,
+    "untested": false,
+    "options": [
+      {
+        "name": "alternate-destination-marker",
+        "type": "String",
+        "secret": false,
+        "summary": "Look for a file in the destination folder"
+      },
+      {
+        "name": "alternate-target-paths",
+        "type": "Path",
+        "secret": false,
+        "summary": "A list of secondary target paths"
+      },
+      {
+        "name": "disable-filename-sanitation",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Disable filename sanitization",
+        "defaultValue": "false"
+      },
+      {
+        "name": "disable-length-verification",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Disable length verification",
+        "defaultValue": "false"
+      },
+      {
+        "name": "list-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "List operation timeout",
+        "defaultValue": "10m"
+      },
+      {
+        "name": "read-write-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Read/write operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "short-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Short operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "use-move-for-put",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Move the file instead of copying it",
+        "defaultValue": "false"
+      }
+    ]
+  },
+  {
+    "key": "mega",
+    "name": "mega.nz",
+    "description": "This backend can read and write data to Mega.co.nz. Allowed format is \"mega://folder/subfolder\".",
+    "deprecated": true,
+    "untested": false,
+    "options": [
+      {
+        "name": "auth-password",
+        "type": "Password",
+        "secret": true,
+        "summary": "Supply the password used to connect to the server"
+      },
+      {
+        "name": "auth-two-factor-key",
+        "type": "Password",
+        "secret": true,
+        "summary": "The shared secret used to generate two-factor TOTP codes"
+      },
+      {
+        "name": "auth-username",
+        "type": "String",
+        "secret": false,
+        "summary": "Supply the username used to connect to the server"
+      },
+      {
+        "name": "list-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "List operation timeout",
+        "defaultValue": "10m"
+      },
+      {
+        "name": "read-write-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Read/write operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "short-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Short operation timeout",
+        "defaultValue": "30s"
+      }
+    ]
+  },
+  {
+    "key": "msgroup",
+    "name": "Microsoft Office 365 Group",
+    "description": "Store files in a Microsoft Office 365 Group via the Microsoft Graph API. Allowed formats are \"sharepoint://tenant.sharepoint.com/{PathToWeb}//{Documents}/subfolder\" (with \"//\" being optionally used to indicate the root document folder) and \"sharepoint://subfolder\" (in which case you must also explicitly specify the SharePoint site's ID via --site-id). Usage of this backend requires that you agree to the terms in Microsoft Service Agreement (https://www.microsoft.com/en-us/servicesagreement) and Microsoft Online Privacy Statement (https://privacy.microsoft.com/en-us/privacystatement).",
+    "deprecated": false,
+    "untested": false,
+    "options": [
+      {
+        "name": "authid",
+        "type": "Password",
+        "secret": true,
+        "summary": "The authorization code"
+      },
+      {
+        "name": "fragment-retry-count",
+        "type": "Integer",
+        "secret": false,
+        "summary": "Number of retries for each fragment",
+        "defaultValue": "5"
+      },
+      {
+        "name": "fragment-retry-delay",
+        "type": "Integer",
+        "secret": false,
+        "summary": "Millisecond delay between fragment errors",
+        "defaultValue": "1000"
+      },
+      {
+        "name": "fragment-size",
+        "type": "Integer",
+        "secret": false,
+        "summary": "Fragment size for large uploads",
+        "defaultValue": "10.00 MiB"
+      },
+      {
+        "name": "group-email",
+        "type": "String",
+        "secret": false,
+        "summary": "Email address of the group"
+      },
+      {
+        "name": "group-id",
+        "type": "String",
+        "secret": false,
+        "summary": "ID of the group"
+      },
+      {
+        "name": "list-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "List operation timeout",
+        "defaultValue": "10m"
+      },
+      {
+        "name": "read-write-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Read/write operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "short-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Short operation timeout",
+        "defaultValue": "30s"
+      }
+    ]
+  },
+  {
+    "key": "onedrivev2",
+    "name": "Microsoft OneDrive",
+    "description": "Store files in Microsoft OneDrive or Microsoft OneDrive for Business via the Microsoft Graph API. Usage of this backend requires that you agree to the terms in Microsoft Service Agreement (https://www.microsoft.com/en-us/servicesagreement) and Microsoft Online Privacy Statement (https://privacy.microsoft.com/en-us/privacystatement).",
+    "deprecated": false,
+    "untested": false,
+    "options": [
+      {
+        "name": "authid",
+        "type": "Password",
+        "secret": true,
+        "summary": "The authorization code"
+      },
+      {
+        "name": "drive-id",
+        "type": "String",
+        "secret": false,
+        "summary": "Optional ID of the drive"
+      },
+      {
+        "name": "fragment-retry-count",
+        "type": "Integer",
+        "secret": false,
+        "summary": "Number of retries for each fragment",
+        "defaultValue": "5"
+      },
+      {
+        "name": "fragment-retry-delay",
+        "type": "Integer",
+        "secret": false,
+        "summary": "Millisecond delay between fragment errors",
+        "defaultValue": "1000"
+      },
+      {
+        "name": "fragment-size",
+        "type": "Integer",
+        "secret": false,
+        "summary": "Fragment size for large uploads",
+        "defaultValue": "10.00 MiB"
+      },
+      {
+        "name": "list-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "List operation timeout",
+        "defaultValue": "10m"
+      },
+      {
+        "name": "read-write-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Read/write operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "short-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Short operation timeout",
+        "defaultValue": "30s"
+      }
+    ]
+  },
+  {
+    "key": "od4b",
+    "name": "Microsoft OneDrive for Business (deprecated)",
+    "description": "This backend is deprecated. Please use the SharePoint backend instead. This backend can read and write data to Microsoft OneDrive for Business. Allowed formats are \"od4b://tennant.sharepoint.com/personal/username_domain/Documents/subfolder\" and \"od4b://username:password@tennant.sharepoint.com/personal/username_domain/Documents/folder\". You can use a double slash '//' in the path to denote the base path from the documents folder.",
+    "deprecated": true,
+    "untested": false,
+    "options": [
+      {
+        "name": "auth-password",
+        "type": "Password",
+        "secret": true,
+        "summary": "Supply the password used to connect to the server"
+      },
+      {
+        "name": "auth-username",
+        "type": "String",
+        "secret": false,
+        "summary": "Supply the username used to connect to the server"
+      },
+      {
+        "name": "binary-direct-mode",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Upload files using binary direct mode",
+        "defaultValue": "false"
+      },
+      {
+        "name": "chunk-size",
+        "type": "Size",
+        "secret": false,
+        "summary": "Set block size for chunked uploads to SharePoint",
+        "defaultValue": "4mb"
+      },
+      {
+        "name": "delete-to-recycler",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Move deleted files to the recycle bin",
+        "defaultValue": "false"
+      },
+      {
+        "name": "integrated-authentication",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Use windows integrated authentication to connect to the server",
+        "defaultValue": "false"
+      },
+      {
+        "name": "list-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "List operation timeout",
+        "defaultValue": "10m"
+      },
+      {
+        "name": "read-write-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Read/write operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "short-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Short operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "web-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Set timeout for SharePoint web operations"
+      }
+    ]
+  },
+  {
+    "key": "sharepoint",
+    "name": "Microsoft SharePoint",
+    "description": "Store files in a Microsoft SharePoint site via the Microsoft Graph API. Usage of this backend requires that you agree to the terms in Microsoft Service Agreement (https://www.microsoft.com/en-us/servicesagreement) and Microsoft Online Privacy Statement (https://privacy.microsoft.com/en-us/privacystatement).",
+    "deprecated": false,
+    "untested": false,
+    "options": [
+      {
+        "name": "authid",
+        "type": "Password",
+        "secret": true,
+        "summary": "The authorization code"
+      },
+      {
+        "name": "fragment-retry-count",
+        "type": "Integer",
+        "secret": false,
+        "summary": "Number of retries for each fragment",
+        "defaultValue": "5"
+      },
+      {
+        "name": "fragment-retry-delay",
+        "type": "Integer",
+        "secret": false,
+        "summary": "Millisecond delay between fragment errors",
+        "defaultValue": "1000"
+      },
+      {
+        "name": "fragment-size",
+        "type": "Integer",
+        "secret": false,
+        "summary": "Fragment size for large uploads",
+        "defaultValue": "10.00 MiB"
+      },
+      {
+        "name": "list-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "List operation timeout",
+        "defaultValue": "10m"
+      },
+      {
+        "name": "read-write-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Read/write operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "short-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Short operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "site-id",
+        "type": "String",
+        "secret": false,
+        "summary": "ID of the site"
+      }
+    ]
+  },
+  {
+    "key": "mssp",
+    "name": "Microsoft SharePoint using legacy API",
+    "description": "This backend is deprecated. Please use the SharePoint backend instead. This backend can read and write data to a SharePoint server (including OneDrive for Business). Allowed formats are \"mssp://tennant.sharepoint.com/PathToWeb//BaseDocLibrary/subfolder\" and \"mssp://username:password@tennant.sharepoint.com/PathToWeb//BaseDocLibrary/subfolder\". Use a double slash '//' in the path to denote the web from the documents library.",
+    "deprecated": true,
+    "untested": false,
+    "options": [
+      {
+        "name": "auth-password",
+        "type": "Password",
+        "secret": true,
+        "summary": "Supply the password used to connect to the server"
+      },
+      {
+        "name": "auth-username",
+        "type": "String",
+        "secret": false,
+        "summary": "Supply the username used to connect to the server"
+      },
+      {
+        "name": "binary-direct-mode",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Upload files using binary direct mode",
+        "defaultValue": "false"
+      },
+      {
+        "name": "chunk-size",
+        "type": "Size",
+        "secret": false,
+        "summary": "Set block size for chunked uploads to SharePoint",
+        "defaultValue": "4mb"
+      },
+      {
+        "name": "delete-to-recycler",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Move deleted files to the recycle bin",
+        "defaultValue": "false"
+      },
+      {
+        "name": "integrated-authentication",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Use windows integrated authentication to connect to the server",
+        "defaultValue": "false"
+      },
+      {
+        "name": "list-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "List operation timeout",
+        "defaultValue": "10m"
+      },
+      {
+        "name": "read-write-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Read/write operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "short-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Short operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "web-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Set timeout for SharePoint web operations"
+      }
+    ]
+  },
+  {
+    "key": "movistarcloud",
+    "name": "Movistar Cloud (Unofficial)",
+    "description": "This backend can read and write data to Movistar Cloud (MiCloud/Zefiro) using its REST protocol. Supported format is \"movistarcloud://folder/subfolder\".",
+    "deprecated": false,
+    "untested": true,
+    "options": [
+      {
+        "name": "deviceID",
+        "type": "String",
+        "secret": false,
+        "summary": "MiCloud Device ID"
+      },
+      {
+        "name": "diagnostics",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Enable diagnostics",
+        "defaultValue": "False"
+      },
+      {
+        "name": "diagnostics-level",
+        "type": "Enumeration",
+        "secret": false,
+        "summary": "Diagnostics level",
+        "values": [
+          "basic",
+          "trash"
+        ],
+        "defaultValue": "basic"
+      },
+      {
+        "name": "email",
+        "type": "String",
+        "secret": false,
+        "summary": "MiCloud account email"
+      },
+      {
+        "name": "ignore-validation-result",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Ignore validation result",
+        "defaultValue": "False"
+      },
+      {
+        "name": "list-limit",
+        "type": "Integer",
+        "secret": false,
+        "summary": "List limit",
+        "defaultValue": "2000"
+      },
+      {
+        "name": "list-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "List operation timeout",
+        "defaultValue": "10m"
+      },
+      {
+        "name": "password",
+        "type": "Password",
+        "secret": true,
+        "summary": "MiCloud account password"
+      },
+      {
+        "name": "read-write-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Read/write operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "short-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Short operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "trash-page-size",
+        "type": "Integer",
+        "secret": false,
+        "summary": "Trash page size",
+        "defaultValue": "50"
+      },
+      {
+        "name": "validation-poll-interval",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Validation poll interval",
+        "defaultValue": "2s"
+      },
+      {
+        "name": "validation-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Validation timeout",
+        "defaultValue": "10m"
+      }
+    ]
+  },
+  {
+    "key": "openstack",
+    "name": "OpenStack Simple Storage",
+    "description": "This backend can read and write data to Swift (OpenStack Object Storage). Allowed format is \"openstack://container/folder\".",
+    "deprecated": false,
+    "untested": false,
+    "options": [
+      {
+        "name": "auth-password",
+        "type": "Password",
+        "secret": true,
+        "summary": "Supply the password used to connect to the server"
+      },
+      {
+        "name": "auth-username",
+        "type": "String",
+        "secret": false,
+        "summary": "Supply the username used to connect to the server"
+      },
+      {
+        "name": "list-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "List operation timeout",
+        "defaultValue": "10m"
+      },
+      {
+        "name": "openstack-apikey",
+        "type": "Password",
+        "secret": true,
+        "summary": "Supply the API key used to connect to the server"
+      },
+      {
+        "name": "openstack-authuri",
+        "type": "String",
+        "secret": false,
+        "summary": "Supply the authentication URL"
+      },
+      {
+        "name": "openstack-domain-name",
+        "type": "String",
+        "secret": false,
+        "summary": "Supply the domain used to connect to the server"
+      },
+      {
+        "name": "openstack-region",
+        "type": "String",
+        "secret": false,
+        "summary": "Supply the prefered region for endpoints"
+      },
+      {
+        "name": "openstack-tenant-name",
+        "type": "String",
+        "secret": false,
+        "summary": "Supply the Tenant Name used to connect to the server"
+      },
+      {
+        "name": "openstack-version",
+        "type": "String",
+        "secret": false,
+        "summary": "The keystone API version to use"
+      },
+      {
+        "name": "read-write-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Read/write operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "short-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Short operation timeout",
+        "defaultValue": "30s"
+      }
+    ]
+  },
+  {
+    "key": "pcloud",
+    "name": "pCloud (Native API)",
+    "description": "This backend can read and write data to pCloud with native API. Allowed format is \"pcloud://api.pcloud.com/folder\".",
+    "deprecated": false,
+    "untested": false,
+    "options": [
+      {
+        "name": "authid",
+        "type": "Password",
+        "secret": true,
+        "summary": "Supply the oAuth token used to connect to the server"
+      },
+      {
+        "name": "list-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "List operation timeout",
+        "defaultValue": "10m"
+      },
+      {
+        "name": "read-write-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Read/write operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "short-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Short operation timeout",
+        "defaultValue": "30s"
+      }
+    ]
+  },
+  {
+    "key": "s3",
+    "name": "S3 compatible",
+    "description": "This backend can read and write data to an S3 compatible server. Allowed format is \"s3://bucketname/prefix\".",
+    "deprecated": false,
+    "untested": false,
+    "options": [
+      {
+        "name": "aws-access-key-id",
+        "type": "String",
+        "secret": false,
+        "summary": "Access Key ID"
+      },
+      {
+        "name": "aws-secret-access-key",
+        "type": "Password",
+        "secret": true,
+        "summary": "Secret Access Key"
+      },
+      {
+        "name": "list-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "List operation timeout",
+        "defaultValue": "10m"
+      },
+      {
+        "name": "read-write-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Read/write operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "s3-archive-classes",
+        "type": "Flags",
+        "secret": false,
+        "summary": "Specify archive storage class",
+        "values": [
+          "STANDARD",
+          "STANDARD_IA",
+          "ONEZONE_IA",
+          "GLACIER",
+          "DEEP_ARCHIVE",
+          "REDUCED_REDUNDANCY",
+          "EXPRESS_ONEZONE",
+          "FSX_ONTAP",
+          "FSX_OPENZFS",
+          "GLACIER_IR",
+          "INTELLIGENT_TIERING",
+          "OUTPOSTS",
+          "SNOW"
+        ],
+        "defaultValue": "DEEP_ARCHIVE,GLACIER,GLACIER_IR,SNOW"
+      },
+      {
+        "name": "s3-authentication-region",
+        "type": "String",
+        "secret": false,
+        "summary": "Specify the authentication region"
+      },
+      {
+        "name": "s3-client",
+        "type": "Enumeration",
+        "secret": false,
+        "summary": "Specify the S3 client library to use",
+        "values": [
+          "aws",
+          "minio"
+        ],
+        "defaultValue": "aws"
+      },
+      {
+        "name": "s3-disable-chunk-encoding",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Disable chunk encoding (aws client only)",
+        "defaultValue": "false"
+      },
+      {
+        "name": "s3-disable-payload-signing",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Disable payload signing (aws client only)",
+        "defaultValue": "false"
+      },
+      {
+        "name": "s3-ext-accountidendpointmode",
+        "type": "String",
+        "secret": false,
+        "summary": "AccountIdEndpointMode",
+        "values": [
+          "PREFERRED",
+          "REQUIRED",
+          "DISABLED"
+        ],
+        "defaultValue": "PREFERRED"
+      },
+      {
+        "name": "s3-ext-allowautoredirect",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "AllowAutoRedirect",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-authenticationregion",
+        "type": "String",
+        "secret": false,
+        "summary": "AuthenticationRegion"
+      },
+      {
+        "name": "s3-ext-authenticationservicename",
+        "type": "String",
+        "secret": false,
+        "summary": "AuthenticationServiceName",
+        "defaultValue": "s3"
+      },
+      {
+        "name": "s3-ext-buffersize",
+        "type": "Integer",
+        "secret": false,
+        "summary": "BufferSize",
+        "defaultValue": "65536"
+      },
+      {
+        "name": "s3-ext-cachehttpclient",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "CacheHttpClient",
+        "defaultValue": "True"
+      },
+      {
+        "name": "s3-ext-clientappid",
+        "type": "String",
+        "secret": false,
+        "summary": "ClientAppId"
+      },
+      {
+        "name": "s3-ext-connecttimeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "ConnectTimeout"
+      },
+      {
+        "name": "s3-ext-defaultconfigurationmode",
+        "type": "String",
+        "secret": false,
+        "summary": "DefaultConfigurationMode",
+        "values": [
+          "Standard",
+          "InRegion",
+          "CrossRegion",
+          "Mobile",
+          "Auto"
+        ]
+      },
+      {
+        "name": "s3-ext-disablehostprefixinjection",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "DisableHostPrefixInjection",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-disablelogging",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "DisableLogging",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-disablemultiregionaccesspoints",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "DisableMultiregionAccessPoints",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-disablerequestcompression",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "DisableRequestCompression",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-disables3expresssessionauth",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "DisableS3ExpressSessionAuth",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-endpointdiscoverycachelimit",
+        "type": "Integer",
+        "secret": false,
+        "summary": "EndpointDiscoveryCacheLimit",
+        "defaultValue": "1000"
+      },
+      {
+        "name": "s3-ext-endpointdiscoveryenabled",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "EndpointDiscoveryEnabled",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-fastfailrequests",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "FastFailRequests",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-forcepathstyle",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "ForcePathStyle",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-httpclientcachesize",
+        "type": "Integer",
+        "secret": false,
+        "summary": "HttpClientCacheSize",
+        "defaultValue": "1"
+      },
+      {
+        "name": "s3-ext-ignoreconfiguredendpointurls",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "IgnoreConfiguredEndpointUrls",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-jsonmaxdepth",
+        "type": "Integer",
+        "secret": false,
+        "summary": "JsonMaxDepth",
+        "defaultValue": "256"
+      },
+      {
+        "name": "s3-ext-logmetrics",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "LogMetrics",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-logresponse",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "LogResponse",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-maxconnectionsperserver",
+        "type": "Integer",
+        "secret": false,
+        "summary": "MaxConnectionsPerServer"
+      },
+      {
+        "name": "s3-ext-maxerrorretry",
+        "type": "Integer",
+        "secret": false,
+        "summary": "MaxErrorRetry"
+      },
+      {
+        "name": "s3-ext-maxstaleconnectionretries",
+        "type": "Integer",
+        "secret": false,
+        "summary": "MaxStaleConnectionRetries",
+        "defaultValue": "10"
+      },
+      {
+        "name": "s3-ext-requestchecksumcalculation",
+        "type": "String",
+        "secret": false,
+        "summary": "RequestChecksumCalculation",
+        "values": [
+          "WHEN_SUPPORTED",
+          "WHEN_REQUIRED"
+        ],
+        "defaultValue": "WHEN_SUPPORTED"
+      },
+      {
+        "name": "s3-ext-resignretries",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "ResignRetries",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-responsechecksumvalidation",
+        "type": "String",
+        "secret": false,
+        "summary": "ResponseChecksumValidation",
+        "values": [
+          "WHEN_SUPPORTED",
+          "WHEN_REQUIRED"
+        ],
+        "defaultValue": "WHEN_SUPPORTED"
+      },
+      {
+        "name": "s3-ext-retrymode",
+        "type": "String",
+        "secret": false,
+        "summary": "RetryMode",
+        "values": [
+          "Standard",
+          "Adaptive"
+        ]
+      },
+      {
+        "name": "s3-ext-serviceid",
+        "type": "String",
+        "secret": false,
+        "summary": "ServiceId",
+        "defaultValue": "S3"
+      },
+      {
+        "name": "s3-ext-signaturemethod",
+        "type": "String",
+        "secret": false,
+        "summary": "SignatureMethod",
+        "values": [
+          "HmacSHA1",
+          "HmacSHA256",
+          "HmacSHA512"
+        ],
+        "defaultValue": "HmacSHA256"
+      },
+      {
+        "name": "s3-ext-throttleretries",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "ThrottleRetries",
+        "defaultValue": "True"
+      },
+      {
+        "name": "s3-ext-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Timeout"
+      },
+      {
+        "name": "s3-ext-useaccelerateendpoint",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "UseAccelerateEndpoint",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-usealternateuseragentheader",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "UseAlternateUserAgentHeader",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-usearnregion",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "UseArnRegion",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-usedualstackendpoint",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "UseDualstackEndpoint",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-ext-usefipsendpoint",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "UseFIPSEndpoint",
+        "defaultValue": "False"
+      },
+      {
+        "name": "s3-list-api-version",
+        "type": "Enumeration",
+        "secret": false,
+        "summary": "Specify the S3 list API version to use",
+        "values": [
+          "v1",
+          "v2"
+        ],
+        "defaultValue": "v1"
+      },
+      {
+        "name": "s3-location-constraint",
+        "type": "String",
+        "secret": false,
+        "summary": "Specify S3 location constraints"
+      },
+      {
+        "name": "s3-lock-mode",
+        "type": "Enumeration",
+        "secret": false,
+        "summary": "Specify the S3 object lock mode",
+        "values": [
+          "Compliance",
+          "Governance"
+        ],
+        "defaultValue": "Governance"
+      },
+      {
+        "name": "s3-recursive-list",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Use this option to list all files in the bucket",
+        "defaultValue": "false"
+      },
+      {
+        "name": "s3-server-name",
+        "type": "String",
+        "secret": false,
+        "summary": "Specify an alternate S3 server name",
+        "defaultValue": "s3.amazonaws.com"
+      },
+      {
+        "name": "s3-storage-class",
+        "type": "String",
+        "secret": false,
+        "summary": "Specify storage class",
+        "values": [
+          "STANDARD",
+          "STANDARD_IA",
+          "ONEZONE_IA",
+          "GLACIER",
+          "DEEP_ARCHIVE",
+          "REDUCED_REDUNDANCY",
+          "EXPRESS_ONEZONE",
+          "FSX_ONTAP",
+          "FSX_OPENZFS",
+          "GLACIER_IR",
+          "INTELLIGENT_TIERING",
+          "OUTPOSTS",
+          "SNOW"
+        ]
+      },
+      {
+        "name": "short-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Short operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "use-ssl",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Instruct Duplicati to use an SSL (https) connection",
+        "defaultValue": "false"
+      }
+    ]
+  },
+  {
+    "key": "ssh",
+    "name": "SFTP (SSH)",
+    "description": "This backend can read and write data to an SSH based backend, using SFTP. Allowed formats are \"ssh://hostname/folder\" and \"ssh://username:password@hostname/folder\".",
+    "deprecated": false,
+    "untested": false,
+    "options": [
+      {
+        "name": "auth-password",
+        "type": "Password",
+        "secret": true,
+        "summary": "Supply the password used to connect to the server"
+      },
+      {
+        "name": "auth-username",
+        "type": "String",
+        "secret": false,
+        "summary": "Supply the username used to connect to the server"
+      },
+      {
+        "name": "list-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "List operation timeout",
+        "defaultValue": "10m"
+      },
+      {
+        "name": "read-write-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Read/write operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "short-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Short operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "ssh-disable-agent",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Disable ssh-agent authentication",
+        "defaultValue": "false"
+      },
+      {
+        "name": "ssh-fingerprint",
+        "type": "String",
+        "secret": false,
+        "summary": "Supply server fingerprint used for validation of server identity"
+      },
+      {
+        "name": "ssh-keepalive",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Set a keepalive value",
+        "defaultValue": "0"
+      },
+      {
+        "name": "ssh-key",
+        "type": "Password",
+        "secret": true,
+        "summary": "Use a SSH private key to authenticate"
+      },
+      {
+        "name": "ssh-relative-path",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Treat source path as relative to the initial path",
+        "defaultValue": "false"
+      }
+    ]
+  },
+  {
+    "key": "storj",
+    "name": "Storj DCS (Decentralized Cloud Storage)",
+    "description": "This backend can read and write data to the Storj DCS.",
+    "deprecated": false,
+    "untested": false,
+    "options": [
+      {
+        "name": "list-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "List operation timeout",
+        "defaultValue": "10m"
+      },
+      {
+        "name": "read-write-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Read/write operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "short-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Short operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "storj-api-key",
+        "type": "String",
+        "secret": false,
+        "summary": "API key"
+      },
+      {
+        "name": "storj-auth-method",
+        "type": "String",
+        "secret": false,
+        "summary": "Authentication method",
+        "values": [
+          "API key",
+          "Access grant"
+        ],
+        "defaultValue": "API key"
+      },
+      {
+        "name": "storj-bucket",
+        "type": "String",
+        "secret": false,
+        "summary": "Bucket",
+        "defaultValue": "duplicati"
+      },
+      {
+        "name": "storj-folder",
+        "type": "String",
+        "secret": false,
+        "summary": "Folder"
+      },
+      {
+        "name": "storj-satellite",
+        "type": "String",
+        "secret": false,
+        "summary": "Satellite",
+        "defaultValue": "us1.storj.io:7777"
+      },
+      {
+        "name": "storj-secret",
+        "type": "Password",
+        "secret": true,
+        "summary": "Encryption passphrase"
+      },
+      {
+        "name": "storj-shared-access",
+        "type": "String",
+        "secret": false,
+        "summary": "Access grant"
+      }
+    ]
+  },
+  {
+    "key": "tahoe",
+    "name": "Tahoe-LAFS",
+    "description": "This backend can read and write data to a Tahoe-LAFS based backend. Allowed format is \"tahoe://hostname:port/uri/$DIRCAP\".",
+    "deprecated": false,
+    "untested": false,
+    "options": [
+      {
+        "name": "list-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "List operation timeout",
+        "defaultValue": "10m"
+      },
+      {
+        "name": "read-write-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Read/write operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "short-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Short operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "use-ssl",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Instruct Duplicati to use an SSL (https) connection",
+        "defaultValue": "false"
+      }
+    ]
+  },
+  {
+    "key": "cos",
+    "name": "Tencent COS (Cloud Object Storage)",
+    "description": "This backend can read and write data to the Tencent COS.",
+    "deprecated": false,
+    "untested": true,
+    "options": [
+      {
+        "name": "cos-app-id",
+        "type": "String",
+        "secret": false,
+        "summary": "Account ID"
+      },
+      {
+        "name": "cos-bucket",
+        "type": "String",
+        "secret": false,
+        "summary": "Bucket name"
+      },
+      {
+        "name": "cos-region",
+        "type": "String",
+        "secret": false,
+        "summary": "Specify COS location constraints"
+      },
+      {
+        "name": "cos-secret-id",
+        "type": "String",
+        "secret": false,
+        "summary": "Secret ID"
+      },
+      {
+        "name": "cos-secret-key",
+        "type": "Password",
+        "secret": true,
+        "summary": "Secret Key"
+      },
+      {
+        "name": "cos-storage-class",
+        "type": "String",
+        "secret": false,
+        "summary": "Storage class of the object"
+      },
+      {
+        "name": "list-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "List operation timeout",
+        "defaultValue": "10m"
+      },
+      {
+        "name": "short-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Short operation timeout",
+        "defaultValue": "30s"
+      }
+    ]
+  },
+  {
+    "key": "webdav",
+    "name": "WebDAV",
+    "description": "This backend can read and write data to a WEBDAV enabled web server, using the HTTP protocol. Allowed formats are \"webdav://hostname/folder\" and \"webdav://username:password@hostname/folder\".",
+    "deprecated": false,
+    "untested": false,
+    "options": [
+      {
+        "name": "auth-password",
+        "type": "Password",
+        "secret": true,
+        "summary": "Supply the password used to connect to the server"
+      },
+      {
+        "name": "auth-username",
+        "type": "String",
+        "secret": false,
+        "summary": "Supply the username used to connect to the server"
+      },
+      {
+        "name": "force-digest-authentication",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Force the use of the HTTP Digest authentication method",
+        "defaultValue": "false"
+      },
+      {
+        "name": "integrated-authentication",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Use windows integrated authentication to connect to the server",
+        "defaultValue": "false"
+      },
+      {
+        "name": "list-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "List operation timeout",
+        "defaultValue": "10m"
+      },
+      {
+        "name": "read-write-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Read/write operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "short-timeout",
+        "type": "Timespan",
+        "secret": false,
+        "summary": "Short operation timeout",
+        "defaultValue": "30s"
+      },
+      {
+        "name": "use-extended-propfind",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Use extended PROPFIND body",
+        "defaultValue": "false"
+      },
+      {
+        "name": "use-legacy-parsing",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Use legacy PROPFIND parsing",
+        "defaultValue": "false"
+      },
+      {
+        "name": "use-ssl",
+        "type": "Boolean",
+        "secret": false,
+        "summary": "Instruct Duplicati to use an SSL (https) connection",
+        "defaultValue": "false"
+      }
+    ]
+  }
+]

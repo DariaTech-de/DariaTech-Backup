@@ -6,7 +6,7 @@ public static class RestoreRootSecurity
 {
  public static void Validate(string root)
  {
-  if(!OperatingSystem.IsWindows())return;
+  if(!OperatingSystem.IsWindows()){UnixPrivatePaths.Directory(root,false);return;}
   var trusted=new HashSet<string>{"S-1-5-18","S-1-5-32-544",((SecurityIdentifier)new NTAccount("NT SERVICE","TrustedInstaller").Translate(typeof(SecurityIdentifier))).Value};
   var first=true;
   for(DirectoryInfo? directory=new(root);directory is not null;directory=directory.Parent)

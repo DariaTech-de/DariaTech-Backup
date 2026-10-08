@@ -77,7 +77,7 @@
    <h2 id="backup-jobs">Backup-Jobs</h2>
    @if(Model.Jobs.Count==0){<p class="card-empty">@Ui.Icon("info")Noch keine Jobs eingerichtet.</p>}
    <ul class="job-list">@foreach(var j in Model.Jobs){<li><span class="dot @(j.Active?"healthy":"offline")"></span><span><strong>@j.Name</strong><span class="sub">@Ui.Ownership(j.Ownership) · Nächster Lauf @Ui.In(j.NextRun)</span></span>@if(User.IsInRole("SuperAdmin")||User.IsInRole("Administrator")||User.IsInRole("Technician")){<a asp-page="/JobActions" asp-route-id="@j.Id">Aktionen / Restore</a>}</li>}</ul>
-   @if(User.IsInRole("SuperAdmin")||User.IsInRole("Administrator")){@foreach(var managed in Model.Managed){<p class="sub">@managed.Name · @managed.Status · Revision @managed.AppliedRevision / @managed.LatestRevision · <a asp-page="/BackupEdit" asp-route-deviceId="@d.Id" asp-route-id="@managed.Id">Konfiguration ändern</a></p>}}
+   @if(User.IsInRole("SuperAdmin")||User.IsInRole("Administrator")){@foreach(var managed in Model.Managed){<div class="managed-job"><strong>@managed.Name</strong><span class="dest-line">@Ui.Icon("cloud")Ziel: @(Model.Destinations.GetValueOrDefault(managed.Id)??"unbekannt")</span><span class="sub">@managed.Status · Revision @managed.AppliedRevision / @managed.LatestRevision · <a asp-page="/BackupEdit" asp-route-deviceId="@d.Id" asp-route-id="@managed.Id">Konfiguration ändern</a></span></div>}}
    <p class="sub">Lokal verwaltete Jobs werden in der Backup-Engine gepflegt. Zentrale Jobs verwenden versionierte, verschlüsselte Konfigurationen.</p>
   </article>
   <article class="card">

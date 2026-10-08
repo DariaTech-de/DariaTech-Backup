@@ -27,7 +27,7 @@ public sealed class Device : TenantEntity
 }
 public sealed class Agent : TenantEntity
 {
- public Guid DeviceId { get; set; } public string Version { get; set; } = "";
+ public Guid DeviceId { get; set; } public string Version { get; set; } = ""; public string Platform {get;set;}="";
  public string CredentialHash { get; set; } = ""; public bool Revoked { get; set; }
  public DateTimeOffset Registered { get; set; } = DateTimeOffset.UtcNow;
 }
@@ -103,12 +103,12 @@ public sealed class ConfigurationRevision : TenantEntity
 
 public sealed class RemoteCommand : TenantEntity
 {
- public Guid DeviceId { get; set; } public Guid JobId { get; set; }
+ public Guid DeviceId { get; set; } public Guid? JobId { get; set; } // null for device-level commands (folder browse, destination test)
  public string RequestedBy { get; set; } = ""; public string? ApprovedBy { get; set; }
  public string EncryptedPayload { get; set; } = ""; public string Signature { get; set; } = ""; public string? EncryptedCatalog {get;set;}
  public RemoteAction Action { get; set; } public DateTimeOffset Expires { get; set; }
  public string Status { get; set; } = "Pending"; public long? TaskId { get; set; }
- public string? ErrorCode { get; set; }
+ public string? ErrorCode { get; set; } public string? Detail { get; set; }
 }
 
 public sealed class NotificationDelivery : TenantEntity
@@ -124,7 +124,7 @@ public sealed class NotificationDelivery : TenantEntity
 
 public sealed class ApprovedAgentRelease
 {
- public Guid Id {get;set;} public long Sequence {get;set;} public string Version {get;set;}="";
+ public Guid Id {get;set;} public long Sequence {get;set;} public string Version {get;set;}=""; public string Platform {get;set;}="win-x64";
  public string Payload {get;set;}=""; public string Signature {get;set;}="";
  public DateTimeOffset Expires {get;set;}
 }
@@ -133,4 +133,12 @@ public sealed class UpdateDeployment : TenantEntity
  public Guid DeviceId {get;set;} public Guid ReleaseId {get;set;}
  public string Status {get;set;}="Approved"; public string? ErrorCode {get;set;}
  public DateTimeOffset Approved {get;set;}=DateTimeOffset.UtcNow;
+}
+// Operator-level saved destination (e.g. the DariaTech storage server). Not tenant data: customer
+// users never see it. Jobs copy URL and options at creation and get their own sub-folder.
+public sealed class DestinationTemplate
+{
+ public Guid Id { get; set; } = Guid.NewGuid(); public string Name { get; set; } = "";
+ public string TargetUrl { get; set; } = ""; public string EncryptedOptions { get; set; } = "";
+ public bool IsDefault { get; set; } public DateTimeOffset Created { get; set; } = DateTimeOffset.UtcNow;
 }

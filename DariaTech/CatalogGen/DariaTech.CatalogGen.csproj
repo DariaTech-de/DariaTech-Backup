@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+ <!-- Generates DariaTech/Contracts/Destinations.json from the OSS engine's backend modules.
+      Not part of DariaTech.slnx: run scripts/generate-destinations.sh after an engine update. -->
+ <PropertyGroup><OutputType>Exe</OutputType><TreatWarningsAsErrors>false</TreatWarningsAsErrors><Nullable>disable</Nullable></PropertyGroup>
+ <ItemGroup><ProjectReference Include="../../Duplicati/Library/Backends/Duplicati.Library.Backends.csproj" /></ItemGroup>
+</Project>

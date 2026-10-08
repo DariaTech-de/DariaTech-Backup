@@ -11,6 +11,7 @@ public sealed partial class DuplicatiAdapter
   var jobs=await ReadJobs(ct);if(jobs.All(x=>x.LocalId!=command.LocalJobId))throw new InvalidOperationException("Backup job no longer exists");
   var cloudBindings=state.Read<Dictionary<string,SaasJobBinding>>("saas-bindings.bin")??[];
   if(command.Action==RemoteAction.RunBackup&&cloudBindings.TryGetValue(command.LocalJobId,out var cloud))await RequireSaasProvider(cloud.Source,false,ct);
+  if(command.Action==RemoteAction.RestoreProxmox)return await RestoreProxmox(command,ct);
   if(command.Action==RemoteAction.RestoreSaas)return await RestoreSaas(command,ct);
   HttpResponseMessage response;
   if(command.Action==RemoteAction.StopBackup)
@@ -28,7 +29,7 @@ public sealed partial class DuplicatiAdapter
   {
    response.EnsureSuccessStatusCode();using var result=JsonDocument.Parse(await response.Content.ReadAsStreamAsync(ct));
    if(!long.TryParse(Get(result.RootElement,"ID").ToString(),out var id)||id<1)throw new HttpRequestException("Invalid engine task receipt");
-   if(command.Action==RemoteAction.RunBackup&&cloudBindings.ContainsKey(command.LocalJobId))
+   if(command.Action==RemoteAction.RunBackup&&(cloudBindings.ContainsKey(command.LocalJobId)||(state.Read<Dictionary<string,string>>("source-jobs.bin")??[]).ContainsKey(command.LocalJobId)))
    {
     var tasks=state.Read<Dictionary<long,CloudTaskBinding>>("cloud-tasks.bin")??[];
     foreach(var expired in tasks.Where(x=>x.Value.Dispatched<DateTimeOffset.UtcNow.AddDays(-1)).Select(x=>x.Key).ToArray())tasks.Remove(expired);
@@ -96,9 +97,10 @@ public static class RemoteCommands
    var receipt=entry.Receipt??new CommandReceipt("Indeterminate",null,"DispatchIndeterminate");
    if(receipt.Status=="Accepted"&&receipt.TaskId is {} task)
    {
-    if(state.Read<Guid>("engine-instance.bin")!=entry.EngineInstance)receipt=new("Indeterminate",task,"DispatchIndeterminate");
+    if(entry.Command.Action==RemoteAction.RestoreProxmox&&ProxmoxRestore.IndependentReceipt(state,id) is {} independent)receipt=independent;
+    else if(state.Read<Guid>("engine-instance.bin")!=entry.EngineInstance)receipt=new("Indeterminate",task,"DispatchIndeterminate");
     else
-    try{receipt=await adapter.TaskReceipt(task,ct);if(state.Read<Guid>("engine-instance.bin")!=entry.EngineInstance)receipt=new("Indeterminate",task,"DispatchIndeterminate");}
+    try{receipt=entry.Command.Action==RemoteAction.RestoreProxmox?await adapter.ProxmoxReceipt(id,task,ct):await adapter.TaskReceipt(task,ct);if(state.Read<Guid>("engine-instance.bin")!=entry.EngineInstance)receipt=new("Indeterminate",task,"DispatchIndeterminate");}
     catch(HttpRequestException){continue;} // Preserve accepted task; do not mistake missing history for success.
    }
    journal[id]=entry with{Receipt=receipt};state.Write("commands.bin",journal);
@@ -116,7 +118,16 @@ public static class RemoteCommands
    var instance=state.Read<Guid>("engine-instance.bin");if(instance==Guid.Empty)throw new InvalidOperationException("Engine instance identity is required");
    journal[command.Id]=new(command,digest,instance,null,false);state.Write("commands.bin",journal);
    CommandReceipt receipt;
-   try{receipt=command.Action is RemoteAction.ListRestorePoints or RemoteAction.ListRestoreFiles?new("Completed",null,null,await adapter.ReadCatalog(command,ct)):new("Accepted",await adapter.Dispatch(command,options,ct),null);}
+   try
+   {
+    receipt=command.Action switch
+    {
+     RemoteAction.ListRestorePoints or RemoteAction.ListRestoreFiles=>new("Completed",null,null,await adapter.ReadCatalog(command,ct)),
+     RemoteAction.BrowseFolders=>new("Completed",null,null,await adapter.BrowseFolders(command,ct)),
+     RemoteAction.TestDestination=>await adapter.TestDestination(command,ct),
+     _=>new("Accepted",await adapter.Dispatch(command,options,ct),null),
+    };
+   }
    catch(InvalidOperationException){receipt=new("Rejected",null,"PolicyRejected");}
    catch(HttpRequestException){receipt=new("Indeterminate",null,"DispatchIndeterminate");}
    if(state.Read<Guid>("engine-instance.bin")!=instance)receipt=new("Indeterminate",receipt.TaskId,"DispatchIndeterminate");

@@ -36,6 +36,11 @@ namespace DariaTech.Console.Data.Migrations
                     b.Property<Guid>("DeviceId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.Property<DateTimeOffset>("Registered")
                         .HasColumnType("timestamp with time zone");
 
@@ -125,6 +130,11 @@ namespace DariaTech.Console.Data.Migrations
                         .HasMaxLength(120000)
                         .HasColumnType("character varying(120000)");
 
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.Property<long>("Sequence")
                         .HasColumnType("bigint");
 
@@ -140,7 +150,7 @@ namespace DariaTech.Console.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Sequence")
+                    b.HasIndex("Platform", "Sequence")
                         .IsUnique();
 
                     b.ToTable("AgentReleases");
@@ -392,6 +402,45 @@ namespace DariaTech.Console.Data.Migrations
                     b.ToTable("Customers");
                 });
 
+            modelBuilder.Entity("DariaTech.Console.Data.DestinationTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("Created")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EncryptedOptions")
+                        .IsRequired()
+                        .HasMaxLength(120000)
+                        .HasColumnType("character varying(120000)");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("TargetUrl")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsDefault")
+                        .IsUnique()
+                        .HasFilter("\"IsDefault\"");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("DestinationTemplates");
+                });
+
             modelBuilder.Entity("DariaTech.Console.Data.Device", b =>
                 {
                     b.Property<Guid>("Id")
@@ -637,6 +686,10 @@ namespace DariaTech.Console.Data.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
+                    b.Property<string>("Detail")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.Property<Guid>("DeviceId")
                         .HasColumnType("uuid");
 
@@ -656,7 +709,7 @@ namespace DariaTech.Console.Data.Migrations
                     b.Property<DateTimeOffset>("Expires")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid>("JobId")
+                    b.Property<Guid?>("JobId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("RequestedBy")
@@ -1109,8 +1162,7 @@ namespace DariaTech.Console.Data.Migrations
                         .WithMany()
                         .HasForeignKey("TenantId", "JobId")
                         .HasPrincipalKey("TenantId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("DariaTech.Console.Data.Site", b =>

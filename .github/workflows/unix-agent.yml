@@ -1,0 +1,81 @@
+name: Unix agent integration
+on:
+  workflow_call:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'DariaTech/Agent/**'
+      - 'DariaTech/Contracts/**'
+      - 'DariaTech/Tests/**'
+      - 'deploy/unix/**'
+      - 'scripts/build-unix-agent.py'
+      - '.github/workflows/unix-agent.yml'
+  pull_request:
+    paths:
+      - 'DariaTech/**'
+      - 'deploy/unix/**'
+      - 'scripts/build-unix-agent.py'
+concurrency:
+  group: unix-agent-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+permissions:
+  contents: read
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: ubuntu-24.04, rid: linux-x64}
+          - {runner: ubuntu-24.04-arm, rid: linux-arm64}
+          - {runner: macos-15-intel, rid: osx-x64}
+          - {runner: macos-15, rid: osx-arm64}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DO_NOT_TRACK: '1'
+      AUTOUPDATER_Duplicati_SKIP_UPDATE: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - name: Build self-contained OSS package
+        run: python3 scripts/build-unix-agent.py --rid "${{ matrix.rid }}"
+      - name: Build integration tests
+        run: |
+          dotnet restore DariaTech.slnx --locked-mode
+          dotnet build DariaTech.slnx -c Release --no-restore
+      - name: Check Unix security and actual managed native backup/restore
+        env:
+          DARIATECH_AGENT_NATIVE: ${{ github.workspace }}/artifacts/unix/${{ matrix.rid }}/payload/agent/DariaTech.Agent
+          DARIATECH_ENGINE_NATIVE: ${{ github.workspace }}/artifacts/unix/${{ matrix.rid }}/payload/agent/engine/Duplicati.Server
+        run: dotnet test DariaTech/Tests/DariaTech.Tests.csproj -c Release --no-build --filter "FullyQualifiedName~UnixSecurityTests|Category=UnixNative"
+      - name: Check real SMB3 source backup and restore
+        if: startsWith(matrix.rid, 'linux-')
+        env:
+          DARIATECH_ENGINE_NATIVE: ${{ github.workspace }}/artifacts/unix/${{ matrix.rid }}/payload/agent/engine/Duplicati.Server
+          DARIATECH_AGENT_NATIVE: ${{ github.workspace }}/artifacts/unix/${{ matrix.rid }}/payload/agent/DariaTech.Agent
+          DARIATECH_NAS_SOURCE: /mnt/dariatech-ci-smb
+        run: |
+          sudo bash deploy/unix/tests/NasFixture.sh start "$(id -u)"
+          trap 'sudo bash deploy/unix/tests/NasFixture.sh stop' EXIT
+          dotnet test DariaTech/Tests/DariaTech.Tests.csproj -c Release --no-build --filter "Category=UnixNas"
+      - name: Check package and real service installation
+        run: sudo --preserve-env=PATH bash deploy/unix/tests/Smoke.sh "${{ matrix.rid }}" "$(command -v node)"
+      - name: Build distinct candidate version for signed update
+        run: |
+          mkdir -p "artifacts/update/${{ matrix.rid }}"
+          mv "artifacts/unix/${{ matrix.rid }}" "artifacts/unix/${{ matrix.rid }}-original"
+          python3 scripts/build-unix-agent.py --rid "${{ matrix.rid }}" --version 0.3.0
+          mv artifacts/unix/${{ matrix.rid }}/*.tar.gz "artifacts/update/${{ matrix.rid }}/"
+          rm -rf "artifacts/unix/${{ matrix.rid }}"
+          mv "artifacts/unix/${{ matrix.rid }}-original" "artifacts/unix/${{ matrix.rid }}"
+      - name: Test actual signed update with independent native supervisor
+        run: sudo --preserve-env=PATH bash deploy/unix/tests/ApprovedUpdate.sh "${{ matrix.rid }}" "$(command -v node)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DariaTechBackupAgent-${{ matrix.rid }}-pilot
+          path: artifacts/unix/${{ matrix.rid }}/*.tar.gz*
+          if-no-files-found: error

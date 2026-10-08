@@ -20,6 +20,10 @@ public sealed class JobActionsModel(ManagementDb db,CommandSigning signer,ISecre
  [BindProperty]public string? DestinationFolder {get;set;}="";
  [BindProperty]public string? ProviderTarget {get;set;}="";
  [BindProperty]public bool ConfirmProviderWrites {get;set;}
+ [BindProperty]public int TargetGuestId {get;set;}
+ [BindProperty]public string? ProxmoxStorage {get;set;}
+ [BindProperty]public bool ConfirmGuestImport {get;set;}
+ public bool Proxmox {get;private set;}
  [BindProperty]public string? Prefix {get;set;}
  public BackupJob Job {get;private set;}=null!;
  public Device Device {get;private set;}=null!;
@@ -52,9 +56,10 @@ public sealed class JobActionsModel(ManagementDb db,CommandSigning signer,ISecre
   var paths=(Paths??"").Split(['\r','\n'],StringSplitOptions.RemoveEmptyEntries|StringSplitOptions.TrimEntries);
   RestoreSelection? file=Action==RemoteAction.Restore?new(Snapshot.ToUniversalTime(),paths,DestinationFolder??""):null;
   SaasRestoreSelection? cloud=Action==RemoteAction.RestoreSaas?new(Managed?.AppliedRevision??0,Snapshot.ToUniversalTime(),paths,ProviderTarget??"",ConfirmProviderWrites):null;
+  ProxmoxRestoreSelection? guest=Action==RemoteAction.RestoreProxmox?new(Managed?.AppliedRevision??0,Snapshot.ToUniversalTime(),paths.Length==1?paths[0]:"",TargetGuestId,ProxmoxStorage??"",ConfirmGuestImport):null;
   CatalogRequest? catalog=Action==RemoteAction.ListRestoreFiles?new(Snapshot.ToUniversalTime(),string.IsNullOrWhiteSpace(Prefix)?null:Prefix):null;
   if(!ModelState.IsValid){Error="Bitte Eingaben prüfen.";return Page();}
-  var result=await CommandApi.Request(new(JobId,Action,file,15,catalog,cloud),db,signer,secrets,HttpContext);
+  var result=await CommandApi.Request(new(JobId,Action,file,15,catalog,cloud,guest),db,signer,secrets,HttpContext);
   if(result is IStatusCodeHttpResult {StatusCode:>=400}){Error="Die Aktion wurde abgelehnt. Berechtigungen, Signierung, Auswahl und angewendete Konfigurationsrevision prüfen.";return Page();}
   return RedirectToPage(new{id=JobId});
  }
@@ -73,7 +78,8 @@ public sealed class JobActionsModel(ManagementDb db,CommandSigning signer,ISecre
   if(Managed is {} managed)
   {
    var revision=await db.ConfigurationRevisions.SingleAsync(x=>x.ManagedJobId==managed.Id&&x.Revision==managed.LatestRevision);
-   var source=ConfigurationApi.Read(secrets,revision).Saas;Provider=source?.Provider;DirectoryTenant=source?.DirectoryTenant;
+   var definition=ConfigurationApi.Read(secrets,revision);Proxmox=definition.Proxmox is not null;
+   var source=definition.Saas;Provider=source?.Provider;DirectoryTenant=source?.DirectoryTenant;
   }
   Commands=await db.Commands.Where(x=>x.JobId==JobId).OrderByDescending(x=>x.Expires).Take(50).ToListAsync();
   return true;

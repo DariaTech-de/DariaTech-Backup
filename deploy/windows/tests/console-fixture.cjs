@@ -13,7 +13,7 @@ const server = https.createServer({pfx:fs.readFileSync(process.env.FIXTURE_PFX),
   if(req.url==='/health'){res.end('{}');return;}
   let body;try{body=JSON.parse(text);}catch{res.writeHead(400);res.end('{}');return;}
   if(req.url==='/api/v1/agent/enroll'&&req.method==='POST'&&!enrolled&&body.token===process.env.FIXTURE_TOKEN){
-   if(Object.keys(body).sort().join(',')!=='agentVersion,hostname,operatingSystem,token'){res.writeHead(400);res.end('{}');return;}
+   if(Object.keys(body).sort().join(',')!=='agentVersion,hostname,operatingSystem,platform,token'||body.platform!=='win-x64'){res.writeHead(400);res.end('{}');return;}
    enrolled=true;res.end(JSON.stringify({deviceId:id,credential}));return;
   }
   if(req.url==='/api/v1/agent/heartbeat'&&req.method==='POST'&&req.headers.authorization===`Bearer ${credential}`&&req.headers['x-device-id']===id){

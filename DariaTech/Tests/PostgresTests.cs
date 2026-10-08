@@ -1,3 +1,4 @@
+using DariaTech.Console.Api;
 using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
@@ -128,6 +129,68 @@ public sealed class PostgresTests
   var number=Guid.NewGuid().ToString();using var response=await admin.PostAsync("/Customers",new FormUrlEncodedContent(new Dictionary<string,string>{{"Input.Name","Form customer"},{"Input.Number",number},{"__RequestVerificationToken",WebUtility.HtmlDecode(match.Groups[1].Value)}}));
   Assert.That(response.StatusCode,Is.EqualTo(HttpStatusCode.Redirect));await using var db=Db();Assert.That(await db.Customers.AnyAsync(x=>x.Number==number),Is.True);
  }
+ [Test]public async Task DestinationPickerStoresEngineDestinationAndKeepsSecretsOnEdit()
+ {
+  var(t,site)=await Customer();await using var db=Db();var device=new Device{TenantId=t.Id,SiteId=site.Id,Name="Picker worker"};db.Devices.Add(device);await db.SaveChangesAsync();
+  using var admin=await Login(UserRole.SuperAdmin);
+  string Token(string html){var m=Regex.Match(html,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");Assert.That(m.Success,Is.True);return WebUtility.HtmlDecode(m.Groups[1].Value);}
+  var form=await admin.GetStringAsync($"/BackupEdit?deviceId={device.Id}");
+  Assert.That(form,Does.Contain("value=\"b2\"").And.Contain("value=\"smb\"").And.Contain("value=\"onedrivev2\""),"destination picker lists engine destinations");
+  using var created=await admin.PostAsync("/BackupEdit",new FormUrlEncodedContent(new Dictionary<string,string>{
+   {"DeviceId",device.Id.ToString()},{"Name","B2 job"},{"Provider","Files"},{"Sources","C:\\Daten"},{"DestinationKey","b2"},
+   {"dest.b2.host","kunde-backup"},{"dest.b2.path","geraet 1"},{"dest.b2.opt.b2-accountid","key-id-123"},{"dest.b2.opt.b2-applicationkey","b2-secret-value-456"},
+   {"Passphrase","picker-passphrase-123456"},{"KeepVersions","30"},{"RepeatHours","24"},{"__RequestVerificationToken",Token(form)}}));
+  Assert.That(created.StatusCode,Is.EqualTo(HttpStatusCode.Redirect),System.Text.RegularExpressions.Regex.Match(await created.Content.ReadAsStringAsync(),"form-error[^<]*<").Value);
+  var managed=await db.ManagedJobs.SingleAsync(x=>x.DeviceId==device.Id);
+  var secrets=factory.Services.GetRequiredService<ISecretStore>();
+  ManagedBackupDefinition Latest(){var r=db.ConfigurationRevisions.AsNoTracking().Where(x=>x.ManagedJobId==managed.Id).OrderByDescending(x=>x.Revision).First();return DariaTech.Console.Api.ConfigurationApi.Read(secrets,r);}
+  var stored=Latest();
+  Assert.That(stored.TargetUrl,Is.EqualTo("b2://kunde-backup/geraet%201"));
+  Assert.That(stored.BackendOptions["b2-applicationkey"],Is.EqualTo("b2-secret-value-456"));
+  var device_page=WebUtility.HtmlDecode(await admin.GetStringAsync($"/Device?id={device.Id}"));Assert.That(device_page,Does.Contain("Ziel: Backblaze B2 · kunde-backup/geraet 1"));
+  var edit=await admin.GetStringAsync($"/BackupEdit?deviceId={device.Id}&id={managed.Id}");
+  Assert.That(edit,Does.Not.Contain("b2-secret-value-456").And.Not.Contain("picker-passphrase-123456").And.Contain("key-id-123"));
+  using var changed=await admin.PostAsync("/BackupEdit",new FormUrlEncodedContent(new Dictionary<string,string>{
+   {"DeviceId",device.Id.ToString()},{"ManagedJobId",managed.Id.ToString()},{"Revision","1"},{"Name","B2 job renamed"},{"Provider","Files"},{"Sources","C:\\Daten"},
+   {"DestinationKey","s3"},{"dest.b2.opt.b2-accountid","key-id-789"},{"KeepVersions","60"},{"RepeatHours","24"},{"__RequestVerificationToken",Token(edit)}}));
+  Assert.That(changed.StatusCode,Is.EqualTo(HttpStatusCode.Redirect));
+  stored=Latest();
+  Assert.That(stored.TargetUrl,Is.EqualTo("b2://kunde-backup/geraet%201"),"destination of an existing chain is fixed even if another key is posted");
+  Assert.That(stored.BackendOptions["b2-applicationkey"],Is.EqualTo("b2-secret-value-456"),"blank secret keeps the stored value");
+  Assert.That(stored.BackendOptions["b2-accountid"],Is.EqualTo("key-id-789"));Assert.That(stored.KeepVersions,Is.EqualTo(60));
+  using var plain=await admin.PostAsync("/BackupEdit",new FormUrlEncodedContent(new Dictionary<string,string>{
+   {"DeviceId",device.Id.ToString()},{"Name","Plain FTP"},{"Provider","Files"},{"Sources","C:\\Daten"},{"DestinationKey","ftp"},
+   {"dest.ftp.host","ftp.example"},{"dest.ftp.path","backup"},{"Passphrase","picker-passphrase-123456"},{"KeepVersions","30"},{"RepeatHours","24"},{"__RequestVerificationToken",Token(form)}}));
+  Assert.That(plain.StatusCode,Is.EqualTo(HttpStatusCode.OK));Assert.That(await plain.Content.ReadAsStringAsync(),Does.Contain("ohne gesicherte Verbindung"));
+ }
+ [Test]public async Task SavedDestinationGivesEachJobItsOwnFolderAndStaysOperatorOnly()
+ {
+  var(t,site)=await Customer();await using var db=Db();var device=new Device{TenantId=t.Id,SiteId=site.Id,Name="Template worker"};db.Devices.Add(device);await db.SaveChangesAsync();
+  var number=await db.Customers.Where(x=>x.TenantId==t.Id).Select(x=>x.Number).SingleAsync();
+  using var admin=await Login(UserRole.SuperAdmin);
+  string Token(string html){var m=Regex.Match(html,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");Assert.That(m.Success,Is.True);return WebUtility.HtmlDecode(m.Groups[1].Value);}
+  var name="DariaTech-Speicher "+Guid.NewGuid().ToString("N")[..8];
+  var page=await admin.GetStringAsync("/Targets");
+  using var saved=await admin.PostAsync("/Targets?handler=Save",new FormUrlEncodedContent(new Dictionary<string,string>{
+   {"Name",name},{"IsDefault","true"},{"DestinationKey","ssh"},{"dest.ssh.host","storage.dariatech.example"},{"dest.ssh.port","2222"},{"dest.ssh.path","backups"},
+   {"dest.ssh.opt.auth-username","backup"},{"dest.ssh.opt.auth-password","template-secret-321"},{"dest.ssh.opt.ssh-fingerprint","ssh-ed25519 256 11:22:33"},{"__RequestVerificationToken",Token(page)}}));
+  Assert.That(saved.StatusCode,Is.EqualTo(HttpStatusCode.Redirect));
+  var template=await db.DestinationTemplates.AsNoTracking().SingleAsync(x=>x.Name==name);
+  Assert.That(template.IsDefault,Is.True);Assert.That(template.EncryptedOptions,Does.Not.Contain("template-secret-321"));
+  var list=await admin.GetStringAsync("/Targets");Assert.That(list,Does.Not.Contain("template-secret-321"));
+  var form=await admin.GetStringAsync($"/BackupEdit?deviceId={device.Id}");Assert.That(form,Does.Contain(template.Id.ToString()));
+  using var created=await admin.PostAsync("/BackupEdit",new FormUrlEncodedContent(new Dictionary<string,string>{
+   {"DeviceId",device.Id.ToString()},{"Name","Server täglich"},{"Provider","Files"},{"Sources","/srv/daten"},{"DestinationMode","template"},{"TemplateId",template.Id.ToString()},
+   {"Passphrase","template-passphrase-123456"},{"KeepVersions","30"},{"RepeatHours","24"},{"__RequestVerificationToken",Token(form)}}));
+  Assert.That(created.StatusCode,Is.EqualTo(HttpStatusCode.Redirect));
+  var managed=await db.ManagedJobs.SingleAsync(x=>x.DeviceId==device.Id);
+  var r=await db.ConfigurationRevisions.AsNoTracking().SingleAsync(x=>x.ManagedJobId==managed.Id);
+  var stored=DariaTech.Console.Api.ConfigurationApi.Read(factory.Services.GetRequiredService<ISecretStore>(),r);
+  Assert.That(stored.TargetUrl,Does.Match($"^ssh://storage\\.dariatech\\.example:2222/backups/{Regex.Escape(number)}/Template-worker/Server-t-glich-[0-9a-f]{{6}}$"));
+  Assert.That(stored.BackendOptions["auth-password"],Is.EqualTo("template-secret-321"));Assert.That(stored.BackendOptions["ssh-fingerprint"],Is.EqualTo("ssh-ed25519 256 11:22:33"));
+  using var customer=await Login(UserRole.CustomerAdmin,t.Id);using var denied=await customer.GetAsync("/Targets");Assert.That(denied.StatusCode,Is.EqualTo(HttpStatusCode.Forbidden));
+  db.DestinationTemplates.Remove(await db.DestinationTemplates.SingleAsync(x=>x.Id==template.Id));await db.SaveChangesAsync();
+ }
  [Test]public async Task RealConsoleFormsCreateJobsAndQueueSignedActionsWithoutExposingSecrets()
  {
   var(t,site)=await Customer();await using var db=Db();var device=new Device{TenantId=t.Id,SiteId=site.Id,Name="Form-managed worker"};db.Devices.Add(device);await db.SaveChangesAsync();
@@ -213,6 +276,66 @@ public sealed class PostgresTests
   using var foreignMutation=await admin.PutAsJsonAsync($"/api/v1/management/managed-jobs/{managed.Id}",new ConfigurationInput(1,definition with{Saas=source with{DirectoryTenant="44444444-4444-4444-4444-444444444444"}}));Assert.That(foreignMutation.StatusCode,Is.EqualTo(HttpStatusCode.Conflict));
  }
 
+ [Test]public async Task GuestImageRestoreIsRevisionBoundSignedAndRequiresAnotherAdministrator()
+ {
+  var(t,site)=await Customer();using var agent=factory.CreateClient(new(){BaseAddress=new Uri("https://localhost")});
+  using var enrolled=await agent.PostAsJsonAsync("/api/v1/agent/enroll",new EnrollmentRequest(await Token(t,site),"Proxmox","Linux","0.2.0","linux-x64"));
+  var identity=(await enrolled.Content.ReadFromJsonAsync<EnrollmentResponse>())!;
+  agent.DefaultRequestHeaders.Authorization=new("Bearer",identity.Credential);agent.DefaultRequestHeaders.Add("X-Device-Id",identity.DeviceId.ToString());
+  using var admin=await Login(UserRole.SuperAdmin);using var csrf=System.Text.Json.JsonDocument.Parse(await admin.GetStringAsync("/api/v1/management/csrf"));admin.DefaultRequestHeaders.Add("X-CSRF-Token",csrf.RootElement.GetProperty("token").GetString());
+  var definition=new ManagedBackupDefinition("Proxmox guests",[],"file:///backup/","test-guest-passphrase",new(),30,[],null,Proxmox:new([101,102]));
+  using var created=await admin.PostAsJsonAsync($"/api/v1/management/devices/{identity.DeviceId}/managed-jobs",new ConfigurationInput(0,definition));
+  Assert.That(created.StatusCode,Is.EqualTo(HttpStatusCode.Created));var managed=(await created.Content.ReadFromJsonAsync<ManagedJob>())!;
+  using var received=await agent.PostAsJsonAsync($"/api/v1/agent/configurations/{managed.Id}/receipt",new ConfigurationReceipt(1,"31","Applied"));Assert.That(received.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  await using var db=Db();var job=await db.Jobs.SingleAsync(x=>x.DeviceId==identity.DeviceId);
+  var selection=new ProxmoxRestoreSelection(1,DateTimeOffset.UtcNow.AddDays(-1),"/staging/latest/vzdump-qemu-101-2026_10_07-08_00_00.vma.zst",901,"customer-storage",true);
+  using var wrong=await admin.PostAsJsonAsync("/api/v1/management/commands",new CommandInput(job.Id,RemoteAction.RestoreProxmox,null,15,ProxmoxRestore:selection with{ConfigurationRevision=2}));Assert.That(wrong.StatusCode,Is.EqualTo(HttpStatusCode.Conflict));
+  using var unconfirmed=await admin.PostAsJsonAsync("/api/v1/management/commands",new CommandInput(job.Id,RemoteAction.RestoreProxmox,null,15,ProxmoxRestore:selection with{ConfirmImport=false}));Assert.That(unconfirmed.StatusCode,Is.EqualTo(HttpStatusCode.BadRequest));
+  using var queued=await admin.PostAsJsonAsync("/api/v1/management/commands",new CommandInput(job.Id,RemoteAction.RestoreProxmox,null,15,ProxmoxRestore:selection));Assert.That(queued.StatusCode,Is.EqualTo(HttpStatusCode.Created));
+  using var response=System.Text.Json.JsonDocument.Parse(await queued.Content.ReadAsStringAsync());var id=response.RootElement.GetProperty("id").GetGuid();
+  Assert.That(await agent.GetFromJsonAsync<SignedCommand[]>("/api/v1/agent/commands"),Is.Empty);
+  using var self=await admin.PostAsync($"/api/v1/management/commands/{id}/approve",null);Assert.That(self.StatusCode,Is.EqualTo(HttpStatusCode.Conflict));
+  using var second=await Login(UserRole.Administrator);using var secondCsrf=System.Text.Json.JsonDocument.Parse(await second.GetStringAsync("/api/v1/management/csrf"));second.DefaultRequestHeaders.Add("X-CSRF-Token",secondCsrf.RootElement.GetProperty("token").GetString());
+  using var approved=await second.PostAsync($"/api/v1/management/commands/{id}/approve",null);Assert.That(approved.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  var envelopes=await agent.GetFromJsonAsync<SignedCommand[]>("/api/v1/agent/commands");using var key=System.Security.Cryptography.ECDsa.Create();key.ImportFromPem(File.ReadAllText(Path.Combine(directory,"commands.pem")));
+  var command=CommandProtocol.Verify(envelopes!.Single(),key,identity.DeviceId,DateTimeOffset.UtcNow);
+  Assert.That(command.Action,Is.EqualTo(RemoteAction.RestoreProxmox));Assert.That(command.ProxmoxRestore,Is.EqualTo(selection));
+  Assert.That(await db.Audit.CountAsync(x=>x.Resource==id.ToString()),Is.EqualTo(2));
+ }
+
+ [Test]public async Task FolderBrowseAndDestinationTestAreSignedDeviceQueries()
+ {
+  var(t,site)=await Customer();using var agent=factory.CreateClient(new(){BaseAddress=new Uri("https://localhost")});
+  using var enrolled=await agent.PostAsJsonAsync("/api/v1/agent/enroll",new EnrollmentRequest(await Token(t,site),"Query","Windows","0.1.0"));var identity=(await enrolled.Content.ReadFromJsonAsync<EnrollmentResponse>())!;
+  agent.DefaultRequestHeaders.Authorization=new("Bearer",identity.Credential);agent.DefaultRequestHeaders.Add("X-Device-Id",identity.DeviceId.ToString());
+  using var admin=await Login(UserRole.SuperAdmin);
+  var form=await admin.GetStringAsync($"/BackupEdit?deviceId={identity.DeviceId}");var token=WebUtility.HtmlDecode(Regex.Match(form,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"").Groups[1].Value);
+  async Task<Guid> Start(string handler,Dictionary<string,string> values)
+  {
+   values["__RequestVerificationToken"]=token;using var r=await admin.PostAsync($"/BackupEdit?handler={handler}",new FormUrlEncodedContent(values));Assert.That(r.StatusCode,Is.EqualTo(HttpStatusCode.OK));
+   using var d=System.Text.Json.JsonDocument.Parse(await r.Content.ReadAsStringAsync());Assert.That(d.RootElement.TryGetProperty("id",out var id),Is.True,d.RootElement.ToString());return id.GetGuid();
+  }
+  async Task<System.Text.Json.JsonElement> Query(Guid id)=>System.Text.Json.JsonDocument.Parse(await admin.GetStringAsync($"/BackupEdit?handler=Query&deviceId={identity.DeviceId}&id={id}")).RootElement.Clone();
+  using var key=System.Security.Cryptography.ECDsa.Create();key.ImportFromPem(File.ReadAllText(Path.Combine(directory,"commands.pem")));
+  var browse=await Start("Browse",new(){{"deviceId",identity.DeviceId.ToString()},{"path","D:\\"}});
+  Assert.That((await Query(browse)).GetProperty("done").GetBoolean(),Is.False);
+  var command=CommandProtocol.Verify((await agent.GetFromJsonAsync<SignedCommand[]>("/api/v1/agent/commands"))!.Single(),key,identity.DeviceId,DateTimeOffset.UtcNow);
+  Assert.That(command.Action,Is.EqualTo(RemoteAction.BrowseFolders));Assert.That(command.LocalJobId,Is.EqualTo("0"));Assert.That(command.Catalog!.Prefix,Is.EqualTo("D:\\"));
+  using var withFile=await agent.PostAsJsonAsync($"/api/v1/agent/commands/{browse}/receipt",new CommandReceipt("Completed",null,null,new RestoreCatalog([],[new("D:\\secret.txt",5,false)],false)));Assert.That(withFile.StatusCode,Is.EqualTo(HttpStatusCode.BadRequest),"browse returns folders only");
+  using var folders=await agent.PostAsJsonAsync($"/api/v1/agent/commands/{browse}/receipt",new CommandReceipt("Completed",null,null,new RestoreCatalog([],[new("D:\\Daten\\",null,true),new("D:\\Fotos\\",null,true)],false)));Assert.That(folders.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  var listed=await Query(browse);Assert.That(listed.GetProperty("ok").GetBoolean(),Is.True);Assert.That(listed.GetProperty("folders").EnumerateArray().Select(x=>x.GetString()),Is.EqualTo(new[]{"D:\\Daten\\","D:\\Fotos\\"}));
+  var test=await Start("TestDestination",new(){{"DeviceId",identity.DeviceId.ToString()},{"Name","x"},{"Provider","Files"},{"DestinationKey","ssh"},{"dest.ssh.host","sftp.example"},{"dest.ssh.path","backup"},
+   {"dest.ssh.opt.auth-username","u"},{"dest.ssh.opt.auth-password","test-secret-555"},{"dest.ssh.opt.ssh-fingerprint","ssh-ed25519 256 00:11"},{"createFolder","false"}});
+  var testCommand=CommandProtocol.Verify((await agent.GetFromJsonAsync<SignedCommand[]>("/api/v1/agent/commands"))!.Single(),key,identity.DeviceId,DateTimeOffset.UtcNow);
+  Assert.That(testCommand.Test!.TargetUrl,Is.EqualTo("ssh://sftp.example/backup"));Assert.That(testCommand.Test.Options["auth-password"],Is.EqualTo("test-secret-555"));
+  await using(var store=Db())Assert.That((await store.Commands.SingleAsync(x=>x.Id==test)).EncryptedPayload,Does.Not.Contain("test-secret-555"));
+  using var wrongDetail=await agent.PostAsJsonAsync($"/api/v1/agent/commands/{test}/receipt",new CommandReceipt("Failed",null,"DestinationTestFailed",null,"raw engine text"));Assert.That(wrongDetail.StatusCode,Is.EqualTo(HttpStatusCode.BadRequest),"only fingerprints may be reported");
+  using var mismatch=await agent.PostAsJsonAsync($"/api/v1/agent/commands/{test}/receipt",new CommandReceipt("Failed",null,"DestinationHostKeyMismatch",null,"ssh-ed25519 256 aa:bb:cc"));Assert.That(mismatch.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  var tested=await Query(test);Assert.That(tested.GetProperty("ok").GetBoolean(),Is.False);Assert.That(tested.GetProperty("code").GetString(),Is.EqualTo("DestinationHostKeyMismatch"));Assert.That(tested.GetProperty("detail").GetString(),Is.EqualTo("ssh-ed25519 256 aa:bb:cc"));
+  var plain=new FormUrlEncodedContent(new Dictionary<string,string>{{"DeviceId",identity.DeviceId.ToString()},{"Provider","Files"},{"DestinationKey","ftp"},{"dest.ftp.host","ftp.example"},{"dest.ftp.path","b"},{"__RequestVerificationToken",token}});
+  using var rejected=await admin.PostAsync("/BackupEdit?handler=TestDestination",plain);Assert.That(await rejected.Content.ReadAsStringAsync(),Does.Contain("error"),"plain FTP is not even sent to the device");
+  using var reader=await Login(UserRole.ReadOnly);using var denied=await reader.GetAsync($"/BackupEdit?handler=Query&deviceId={identity.DeviceId}&id={browse}");Assert.That(denied.StatusCode,Is.EqualTo(HttpStatusCode.Forbidden));
+ }
  [Test]public async Task RestoreRequiresIndependentApprovalAndCommandsAreDeviceBound()
  {
   var(t,site)=await Customer();using var agent=factory.CreateClient(new(){BaseAddress=new Uri("https://localhost")});
@@ -278,6 +401,17 @@ public sealed class PostgresTests
   using var applying=await agent.PostAsJsonAsync($"/api/v1/agent/updates/{assignment.DeploymentId}/receipt",new UpdateReceipt("Applying",null));Assert.That(applying.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
   using var installed=await agent.PostAsJsonAsync($"/api/v1/agent/updates/{assignment.DeploymentId}/receipt",new UpdateReceipt("Installed",null));Assert.That(installed.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
   using var rollback=await agent.PostAsJsonAsync($"/api/v1/agent/updates/{assignment.DeploymentId}/receipt",new UpdateReceipt("Applying",null));Assert.That(rollback.StatusCode,Is.EqualTo(HttpStatusCode.Conflict));
+  var linux=m with{ReleaseId=Guid.NewGuid(),Platform="linux-x64",ArtifactUrl="https://github.com/DariaTech-de/DariaTech-Backup/releases/download/test/agent.tar.gz"};
+  using var linuxApproved=await admin.PostAsJsonAsync("/api/v1/management/agent-releases",UpdateProtocol.Sign(linux,key));Assert.That(linuxApproved.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  using var wrongPackage=await admin.PostAsJsonAsync("/api/v1/management/update-deployments",new DeploymentInput(identity.DeviceId,linux.ReleaseId));Assert.That(wrongPackage.StatusCode,Is.EqualTo(HttpStatusCode.Conflict));
+  using var linuxAgent=factory.CreateClient(new(){BaseAddress=new Uri("https://localhost")});
+  using var linuxEnrollment=await linuxAgent.PostAsJsonAsync("/api/v1/agent/enroll",new EnrollmentRequest(await Token(t,site),"LinuxUpdater","Linux","0.2.0","linux-x64"));var linuxIdentity=(await linuxEnrollment.Content.ReadFromJsonAsync<EnrollmentResponse>())!;
+  linuxAgent.DefaultRequestHeaders.Authorization=new("Bearer",linuxIdentity.Credential);linuxAgent.DefaultRequestHeaders.Add("X-Device-Id",linuxIdentity.DeviceId.ToString());
+  using var wrongPlatform=await admin.PostAsJsonAsync("/api/v1/management/update-deployments",new DeploymentInput(linuxIdentity.DeviceId,m.ReleaseId));Assert.That(wrongPlatform.StatusCode,Is.EqualTo(HttpStatusCode.Conflict));
+  using var linuxDeploy=await admin.PostAsJsonAsync("/api/v1/management/update-deployments",new DeploymentInput(linuxIdentity.DeviceId,linux.ReleaseId));Assert.That(linuxDeploy.StatusCode,Is.EqualTo(HttpStatusCode.OK));
+  var linuxAssignment=await linuxAgent.GetFromJsonAsync<UpdateAssignment>("/api/v1/agent/update");Assert.That(UpdateProtocol.Verify(linuxAssignment!.Manifest,key,now).Platform,Is.EqualTo("linux-x64"));
+  using var platformMutation=await linuxAgent.PostAsJsonAsync("/api/v1/agent/heartbeat",new HeartbeatRequest("0.2.0","Linux",true,[],Platform:"osx-x64"));Assert.That(platformMutation.StatusCode,Is.EqualTo(HttpStatusCode.BadRequest));
+
   var(otherTenant,otherSite)=await Customer();using var foreign=factory.CreateClient(new(){BaseAddress=new Uri("https://localhost")});using var otherEnroll=await foreign.PostAsJsonAsync("/api/v1/agent/enroll",new EnrollmentRequest(await Token(otherTenant,otherSite),"OtherUpdater","Windows","0.1.0"));var other=(await otherEnroll.Content.ReadFromJsonAsync<EnrollmentResponse>())!;
   foreign.DefaultRequestHeaders.Authorization=new("Bearer",other.Credential);foreign.DefaultRequestHeaders.Add("X-Device-Id",other.DeviceId.ToString());using var none=await foreign.GetAsync("/api/v1/agent/update");Assert.That(none.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
   using var denied=await foreign.PostAsJsonAsync($"/api/v1/agent/updates/{assignment.DeploymentId}/receipt",new UpdateReceipt("Installed",null));Assert.That(denied.StatusCode,Is.EqualTo(HttpStatusCode.NotFound));
@@ -355,11 +489,43 @@ public sealed class PostgresTests
   db.Runs.Add(new BackupRun{TenantId=t.Id,JobId=job.Id,LocalRunId="recovered",Started=now,Completed=now.AddMinutes(1),Status=RunStatus.Success,QuotaTotalBytes=100,QuotaFreeBytes=90,QuotaError=false,RetentionError=false});db.Commands.Add(new RemoteCommand{TenantId=t.Id,DeviceId=d.Id,JobId=job.Id,Action=RemoteAction.VerifyBackup,Expires=now.AddMinutes(1),Status="Completed"});await db.SaveChangesAsync();await Monitoring.Evaluate(db,new(),now.AddMinutes(2));
   Assert.That(await db.Alerts.CountAsync(x=>x.DeviceId==d.Id&&x.Resolved==null),Is.EqualTo(0));
  }
+ [Test]public async Task AddDeviceWizardShowsPlatformPackageAndInstallCommandWithOneTimeToken()
+ {
+  var(t,site)=await Customer();await using var db=Db();var customer=await db.Customers.IgnoreQueryFilters().SingleAsync(x=>x.TenantId==t.Id);
+  using var admin=await Login(UserRole.SuperAdmin);
+  string Token(string html){var m=Regex.Match(html,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");Assert.That(m.Success,Is.True);return WebUtility.HtmlDecode(m.Groups[1].Value);}
+  async Task<HttpResponseMessage> Enroll(string platform)=>await admin.PostAsync($"/Customer?id={customer.Id}&handler=Enroll",new FormUrlEncodedContent(new Dictionary<string,string>{
+   {"id",customer.Id.ToString()},{"siteId",site.Id.ToString()},{"validMinutes","30"},{"platform",platform},{"allowManaged","true"},{"__RequestVerificationToken",Token(await admin.GetStringAsync($"/Customer?id={customer.Id}"))}}));
+  var page=await admin.GetStringAsync($"/Customer?id={customer.Id}");
+  Assert.That(page,Does.Contain("value=\"osx-arm64\"").And.Contain("value=\"linux-arm64\"").And.Contain("Betriebssystem des Geräts"));
+  // No published release reachable: the token is still issued and the page points to the releases page.
+  using(var fallback=await Enroll("linux-x64"))
+  {
+   var html=WebUtility.HtmlDecode(await fallback.Content.ReadAsStringAsync());Assert.That(fallback.StatusCode,Is.EqualTo(HttpStatusCode.OK));
+   Assert.That(html,Does.Contain("Kein veröffentlichtes Agent-Paket").And.Contain("/releases"));
+   Assert.That(fallback.Headers.CacheControl?.NoStore,Is.True);
+  }
+  var sha=new string('a',64);var url="https://github.com/DariaTech-de/DariaTech-Backup/releases/download/agent-v0.2.0/DariaTechBackupSetup-win-x64.exe";
+  factory.Services.GetRequiredService<AgentReleases>().Use(new("0.2.0","agent-v0.2.0",DateTimeOffset.UtcNow,[new("win-x64","Windows","DariaTechBackupSetup-win-x64.exe",sha,42_000_000,url)],true,"https://github.com/DariaTech-de/DariaTech-Backup/releases/tag/agent-v0.2.0"));
+  using(var windows=await Enroll("win-x64"))
+  {
+   var html=WebUtility.HtmlDecode(await windows.Content.ReadAsStringAsync());
+   var token=Regex.Match(html,"<code class=\"token\">([0-9A-F]{64})</code>").Groups[1].Value;Assert.That(token,Has.Length.EqualTo(64));
+   Assert.That(await db.EnrollmentTokens.IgnoreQueryFilters().CountAsync(x=>x.TenantId==t.Id&&x.TokenHash==Tokens.Hash(token)),Is.EqualTo(1));
+Assert.That(html,Does.Contain("Agent 0.2.0 · Pilot").And.Contain(url).And.Contain(sha.ToUpperInvariant()).And.Contain($"-Value \"{token}\"").And.Contain("\"/console=https://localhost\",\"/tokenfile=$t\",\"/allowmanaged=1\"").And.Contain("Backup-Jobs aus der Konsole zulassen"));
+  }
+  // A platform without a published package falls back instead of showing another platform's file.
+  using(var mac=await Enroll("osx-arm64")){var html=WebUtility.HtmlDecode(await mac.Content.ReadAsStringAsync());Assert.That(html,Does.Contain("Kein veröffentlichtes Agent-Paket").And.Not.Contain(url));}
+  using(var invalid=await Enroll("freebsd-x64"))Assert.That(invalid.StatusCode,Is.EqualTo(HttpStatusCode.BadRequest));
+  using var customerAdmin=await Login(UserRole.CustomerAdmin,t.Id);
+  using var denied=await customerAdmin.PostAsync($"/Customer?id={customer.Id}&handler=Enroll",new FormUrlEncodedContent(new Dictionary<string,string>{{"id",customer.Id.ToString()},{"siteId",site.Id.ToString()},{"validMinutes","30"},{"platform","win-x64"},{"__RequestVerificationToken",Token(await customerAdmin.GetStringAsync($"/Customer?id={customer.Id}"))}}));
+  Assert.That(denied.StatusCode,Is.Not.EqualTo(HttpStatusCode.OK));
+ }
  private sealed class TestFactory(string cs,string dir):WebApplicationFactory<Program>
  {
   protected override void ConfigureWebHost(IWebHostBuilder b)
   {
-   b.UseEnvironment("Development");b.ConfigureAppConfiguration((_,c)=>c.AddInMemoryCollection(new Dictionary<string,string?>{{"ConnectionStrings:Management",cs},{"Security:MasterKeyFile",Path.Combine(dir,"master.key")},{"Security:KeyDirectory",Path.Combine(dir,"keys")},{"Monitoring:PollSeconds","3600"},{"Commands:SigningKeyFile",Path.Combine(dir,"commands.pem")},{"Updates:PublicKeyFile",Path.Combine(dir,"commands.pem")}}));
+   b.UseEnvironment("Development");b.ConfigureAppConfiguration((_,c)=>c.AddInMemoryCollection(new Dictionary<string,string?>{{"ConnectionStrings:Management",cs},{"Security:MasterKeyFile",Path.Combine(dir,"master.key")},{"Security:KeyDirectory",Path.Combine(dir,"keys")},{"Monitoring:PollSeconds","3600"},{"Commands:SigningKeyFile",Path.Combine(dir,"commands.pem")},{"Updates:PublicKeyFile",Path.Combine(dir,"commands.pem")},{"Agents:ApiBase","http://127.0.0.1:9"}}));
   }
  }
 }

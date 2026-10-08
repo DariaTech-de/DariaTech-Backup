@@ -1,0 +1,22 @@
+@using DariaTech.Contracts
+@using DariaTech.Console.Services
+@model (DestinationType Type, DestinationOption Option, string Value, bool Stored)
+@{
+ var o = Model.Option; var id = $"d-{Model.Type.Key}-{o.Name}"; var name = $"dest.{Model.Type.Key}.opt.{o.Name}";
+ var multiline = o.Secret && (o.Name.Contains("json") || o.Name == "ssh-key");
+}
+<div class="field @(multiline?"span-2":"")">
+ <label for="@id"><span>@DestinationForm.OptionLabel(o)</span>@if(Model.Stored){<span class="label-hint">gespeichert · leer lassen zum Behalten</span>}else if(o.DefaultValue is {} d){<span class="label-hint">Standard: @d</span>}</label>
+ @if(o.Type=="Boolean"){
+  <select id="@id" name="@name"><option value="">Standard</option><option value="true" selected="@(Model.Value=="true"?"selected":null)">Ja</option><option value="false" selected="@(Model.Value=="false"?"selected":null)">Nein</option></select>
+ } else if(o.Values is {Length:>0} values){
+  <select id="@id" name="@name"><option value="">Standard</option>@foreach(var v in values){<option value="@v" selected="@(string.Equals(v,Model.Value,StringComparison.OrdinalIgnoreCase)?"selected":null)">@v</option>}</select>
+ } else if(multiline){
+  <textarea id="@id" name="@name" rows="3" autocomplete="off" spellcheck="false"></textarea>
+ } else if(o.Secret){
+  <input id="@id" name="@name" type="password" autocomplete="new-password" />
+ } else {
+  <input id="@id" name="@name" value="@Model.Value" inputmode="@(o.Type is "Integer" ? "numeric" : null)" />
+ }
+ @if(!string.IsNullOrWhiteSpace(o.Summary)&&DestinationForm.OptionLabel(o)==o.Name){<span class="sub">@o.Summary</span>}
+</div>

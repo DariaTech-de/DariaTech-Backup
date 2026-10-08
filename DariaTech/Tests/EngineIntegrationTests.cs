@@ -41,9 +41,22 @@ public sealed class EngineIntegrationTests
    using var run=await client.PostAsync($"/api/v1/backup/{id}/run",null,ct.Token);run.EnsureSuccessStatusCode();using var task=JsonDocument.Parse(await run.Content.ReadAsStringAsync(ct.Token));var taskId=DuplicatiAdapter.Get(task.RootElement,"ID").ToString();
    await WaitTask(client,taskId,ct.Token,password,passphrase);
    var key=Path.Combine(dir,"agent.key");await File.WriteAllTextAsync(key,Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),ct.Token);
+   if(!OperatingSystem.IsWindows())File.SetUnixFileMode(key,UnixFileMode.UserRead|UnixFileMode.UserWrite);
    var options=new AgentOptions{EngineUrl=client.BaseAddress!.ToString(),StateDirectory=Path.Combine(dir,"agent"),LinuxKeyFile=key};var state=new ProtectedState(options);state.Write("engine-credential.bin",password);
    using var adapter=new DuplicatiAdapter(options,state);var jobs=await adapter.ReadJobs(ct.Token);Assert.That(jobs,Has.Length.EqualTo(1));Assert.That(jobs[0].LastRun?.Status,Is.EqualTo(RunStatus.Success));Assert.That(jobs[0].LastRun?.Files,Is.EqualTo(1));Assert.That(jobs[0].LastRun?.Bytes,Is.EqualTo(bytes.Length));
    Assert.That(Directory.GetFiles(destination),Is.Not.Empty);Assert.That(Directory.GetFiles(destination).All(x=>x.EndsWith(".aes")),Is.True);
+   // Device queries against the real engine: folder browse returns folders only; the destination test
+   // reports a missing folder, creates it on request and then succeeds.
+   Directory.CreateDirectory(Path.Combine(source,"Unterordner"));
+   var now=DateTimeOffset.UtcNow;var device=Guid.NewGuid();
+   var browse=await adapter.BrowseFolders(new DeviceCommand(Guid.NewGuid(),Guid.NewGuid(),device,"0",RemoteAction.BrowseFolders,null,now,now.AddMinutes(5),new(null,source+Path.DirectorySeparatorChar)),ct.Token);
+   Assert.That(browse.Files.Select(x=>x.Path.TrimEnd('/','\\')),Does.Contain(Path.Combine(source,"Unterordner")));Assert.That(browse.Files.All(x=>x.Directory),Is.True);
+   Assert.That(browse.Files.Any(x=>x.Path.EndsWith("restore-check.bin")),Is.False,"files are never listed");
+   var missing=new Uri(Path.Combine(dir,"not-yet")+Path.DirectorySeparatorChar).AbsoluteUri;
+   DeviceCommand Test(bool create)=>new(Guid.NewGuid(),Guid.NewGuid(),device,"0",RemoteAction.TestDestination,null,now,now.AddMinutes(5),null,Test:new(missing,new(),create));
+   Assert.That((await adapter.TestDestination(Test(false),ct.Token)).ErrorCode,Is.EqualTo("DestinationFolderMissing"));
+   var createdFolder=await adapter.TestDestination(Test(true),ct.Token);Assert.That(createdFolder.Status,Is.EqualTo("Completed"),createdFolder.ErrorCode);
+   Assert.That(Directory.Exists(Path.Combine(dir,"not-yet")),Is.True);
    var managedDestination=Path.Combine(dir,"managed-storage");Directory.CreateDirectory(managedDestination);
    var definition=new ManagedBackupDefinition("Managed integration",[source+Path.DirectorySeparatorChar],new Uri(managedDestination+Path.DirectorySeparatorChar).AbsoluteUri,passphrase,new(),30,[],new(DateTimeOffset.UtcNow.AddDays(1),24,[DayOfWeek.Monday]));
    var assignment=new ConfigurationAssignment(Guid.NewGuid(),1,definition);

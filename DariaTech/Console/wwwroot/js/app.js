@@ -18,3 +18,107 @@ document.addEventListener('keydown', e => {
 });
 // Keep the one-time code field numeric while typing or pasting.
 document.querySelectorAll('input.otp').forEach(input => input.addEventListener('input', () => { input.value = input.value.replace(/\D/g, '').slice(0, 6); }));
+// Destination picker: show and enable only the panel of the selected storage destination.
+document.querySelectorAll('[data-dest-picker]').forEach(picker => {
+ const show = () => document.querySelectorAll('.dest-panel').forEach(panel => {
+  const active = panel.dataset.dest === picker.value;
+  panel.classList.toggle('active', active);
+  panel.disabled = !active;
+ });
+ picker.addEventListener('change', show);
+});
+// Backup editor: saved destination or a custom one; the hidden custom picker must not block submission.
+document.querySelectorAll('[data-destination-mode]').forEach(radio => radio.addEventListener('change', () => {
+ const custom = document.querySelector('[data-custom-destination]');
+ if (!custom) return;
+ const on = document.querySelector('[data-destination-mode][value=custom]').checked;
+ custom.hidden = !on; custom.disabled = !on;
+}));
+// Remote helpers in the backup editor: signed device queries, polled until the agent answers.
+(() => {
+ const form = document.querySelector('[data-backup-form]');
+ const token = () => form?.querySelector('input[name=__RequestVerificationToken]')?.value ?? '';
+ const deviceId = () => form?.querySelector('input[name=DeviceId]')?.value ?? '';
+ const poll = async (id, onDone, onWait) => {
+  for (let i = 0; i < 200; i++) {
+   const r = await fetch(`/BackupEdit?handler=Query&deviceId=${encodeURIComponent(deviceId())}&id=${encodeURIComponent(id)}`, { headers: { Accept: 'application/json' } });
+   if (!r.ok) { onDone({ done: true, ok: false, message: 'Abfrage fehlgeschlagen.' }); return; }
+   const result = await r.json();
+   if (result.done) { onDone(result); return; }
+   onWait?.(i);
+   await new Promise(res => setTimeout(res, 1500));
+  }
+  onDone({ done: true, ok: false, message: 'Zeitüberschreitung.' });
+ };
+ const post = async (handler, data) => {
+  data.set('__RequestVerificationToken', token());
+  const r = await fetch(`/BackupEdit?handler=${handler}`, { method: 'POST', body: data, headers: { Accept: 'application/json' } });
+  return r.ok ? r.json() : { error: 'Anfrage abgelehnt.' };
+ };
+ const waitText = i => 'Warte auf das Gerät' + '.'.repeat(1 + i % 3);
+
+ const browser = document.querySelector('[data-browser]');
+ if (browser) {
+  const panel = browser.querySelector('[data-browser-panel]'), list = browser.querySelector('[data-browser-list]');
+  const status = browser.querySelector('[data-browser-status]'), current = browser.querySelector('[data-browser-path]');
+  const sources = document.querySelector('[data-source-list]');
+  const add = path => {
+   const lines = sources.value.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+   const clean = path.length > 3 ? path.replace(/[\\/]+$/, '') : path;
+   if (!lines.includes(clean)) lines.push(clean);
+   sources.value = lines.join('\n');
+  };
+  const open = async path => {
+   panel.hidden = false; list.replaceChildren(); current.textContent = path ?? ''; status.textContent = waitText(0);
+   const data = new FormData(); data.set('deviceId', deviceId()); if (path) data.set('path', path);
+   const started = await post('Browse', data);
+   if (started.error) { status.textContent = started.error; return; }
+   await poll(started.id, result => {
+    if (!result.ok) { status.textContent = result.message; return; }
+    status.textContent = result.folders.length === 0 ? 'Keine Unterordner.' : (result.truncated ? 'Nur die ersten Ordner werden angezeigt.' : '');
+    for (const folder of result.folders) {
+     const li = document.createElement('li');
+     const name = folder.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || folder;
+     const openButton = document.createElement('button'); openButton.type = 'button'; openButton.className = 'link-button'; openButton.textContent = name; openButton.title = folder;
+     openButton.addEventListener('click', () => open(folder));
+     const addButton = document.createElement('button'); addButton.type = 'button'; addButton.className = 'button secondary small'; addButton.textContent = 'Hinzufügen';
+     addButton.addEventListener('click', () => { add(folder); addButton.textContent = 'Hinzugefügt'; addButton.disabled = true; });
+     li.append(openButton, addButton); list.append(li);
+    }
+   }, i => { status.textContent = waitText(i); });
+  };
+  browser.querySelectorAll('[data-browse-root]').forEach(b => b.addEventListener('click', () => open(null)));
+ }
+
+ const test = document.querySelector('[data-dest-test]');
+ if (test) {
+  const status = test.querySelector('[data-test-status]'), create = test.querySelector('[data-test-create]'), hostKey = test.querySelector('[data-use-hostkey]');
+  let reportedKey = null;
+  const run = async createFolder => {
+   create.hidden = true; hostKey.hidden = true; status.className = 'dest-test-status'; status.textContent = waitText(0);
+   const data = new FormData(form); data.set('createFolder', createFolder ? 'true' : 'false');
+   const started = await post('TestDestination', data);
+   if (started.error) { status.textContent = started.error; status.classList.add('bad'); return; }
+   await poll(started.id, result => {
+    status.textContent = result.message + (result.detail ? ` (${result.detail})` : '');
+    status.classList.add(result.ok ? 'good' : 'bad');
+    create.hidden = result.code !== 'DestinationFolderMissing';
+    reportedKey = result.code === 'DestinationHostKeyMismatch' ? result.detail : null;
+    hostKey.hidden = !reportedKey;
+   }, i => { status.textContent = waitText(i); });
+  };
+  test.querySelector('[data-test-destination]').addEventListener('click', () => run(false));
+  create.addEventListener('click', () => run(true));
+  hostKey.addEventListener('click', () => {
+   const field = document.querySelector('.dest-panel.active input[name$=".opt.ssh-fingerprint"]');
+   if (field && reportedKey) { field.value = reportedKey; hostKey.hidden = true; status.textContent = 'Host-Key übernommen. Bitte erneut testen.'; }
+  });
+ }
+})();
+// Copy the generated install command.
+document.querySelectorAll('[data-copy]').forEach(button => button.addEventListener('click', async () => {
+ const source = button.parentElement?.querySelector('[data-copy-source]');
+ if (!source) return;
+ try { await navigator.clipboard.writeText(source.textContent ?? ''); button.textContent = 'Kopiert'; }
+ catch { getSelection()?.selectAllChildren(source); button.textContent = 'Markiert – mit Strg+C kopieren'; }
+}));

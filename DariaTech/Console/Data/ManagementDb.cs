@@ -11,6 +11,7 @@ public sealed class ManagementDb(DbContextOptions<ManagementDb> options, TenantS
  public DbSet<User> Users => Set<User>(); public DbSet<Role> Roles => Set<Role>();
  public DbSet<Alert> Alerts => Set<Alert>(); public DbSet<AuditEvent> Audit => Set<AuditEvent>();
  public DbSet<StorageTarget> StorageTargets => Set<StorageTarget>();
+ public DbSet<DestinationTemplate> DestinationTemplates => Set<DestinationTemplate>();
  public DbSet<NotificationRule> NotificationRules => Set<NotificationRule>();
  public DbSet<ManagedJob> ManagedJobs => Set<ManagedJob>();
  public DbSet<ConfigurationRevision> ConfigurationRevisions => Set<ConfigurationRevision>();
@@ -32,6 +33,7 @@ public sealed class ManagementDb(DbContextOptions<ManagementDb> options, TenantS
    e.HasQueryFilter(Expression.Lambda(Expression.OrElse(global.Body,
     Expression.Equal(Expression.Convert(Expression.Property(p,"TenantId"),typeof(Guid?)),tenant.Body)),p));
   }
+  b.Entity<DestinationTemplate>(e=>{e.HasQueryFilter(x=>scope.Global);e.HasIndex(x=>x.Name).IsUnique();e.HasIndex(x=>x.IsDefault).IsUnique().HasFilter("\"IsDefault\"");});
   b.Entity<Customer>().HasIndex(x => x.TenantId).IsUnique();
   b.Entity<Customer>().HasIndex(x => x.Number).IsUnique();
   b.Entity<Site>().HasIndex(x => new {x.TenantId, x.Name}).IsUnique();
@@ -57,7 +59,7 @@ public sealed class ManagementDb(DbContextOptions<ManagementDb> options, TenantS
   b.Entity<NotificationDelivery>().HasOne<Alert>().WithMany().HasForeignKey(x=>new{x.TenantId,x.AlertId}).HasPrincipalKey(x=>new{x.TenantId,x.Id}).OnDelete(DeleteBehavior.Restrict);
   b.Entity<NotificationDelivery>().HasIndex(x=>new{x.RuleId,x.AlertId,x.Occurrence,x.Kind,x.Sequence}).IsUnique();
   b.Entity<NotificationDelivery>().HasIndex(x=>new{x.Status,x.Due});
-  b.Entity<ApprovedAgentRelease>().HasIndex(x=>x.Sequence).IsUnique();
+  b.Entity<ApprovedAgentRelease>().HasIndex(x=>new{x.Platform,x.Sequence}).IsUnique();
   b.Entity<ApprovedAgentRelease>().Property(x=>x.Payload).HasMaxLength(16000);
   b.Entity<UpdateDeployment>().HasOne<Device>().WithMany().HasForeignKey(x=>new{x.TenantId,x.DeviceId}).HasPrincipalKey(x=>new{x.TenantId,x.Id}).OnDelete(DeleteBehavior.Restrict);
   b.Entity<UpdateDeployment>().HasOne<ApprovedAgentRelease>().WithMany().HasForeignKey(x=>x.ReleaseId).OnDelete(DeleteBehavior.Restrict);
@@ -74,7 +76,7 @@ public sealed class ManagementDb(DbContextOptions<ManagementDb> options, TenantS
    """));
   b.Entity<AuditEvent>().HasQueryFilter(x=>scope.Global || (scope.TenantId != null && x.TenantId == scope.TenantId));
   foreach(var entity in b.Model.GetEntityTypes())
-   foreach(var property in entity.GetProperties().Where(p=>p.ClrType==typeof(string))) property.SetMaxLength(property.Name is "EncryptedConfiguration" or "EncryptedPayload" or "Payload" or "EncryptedCatalog" ? 120000 : property.Name.Contains("Secret") || property.Name.Contains("Credential") ? 4096 : 1000);
+   foreach(var property in entity.GetProperties().Where(p=>p.ClrType==typeof(string))) property.SetMaxLength(property.Name is "EncryptedConfiguration" or "EncryptedPayload" or "Payload" or "EncryptedCatalog" or "EncryptedOptions" ? 120000 : property.Name=="TargetUrl" ? 2000 : property.Name.Contains("Secret") || property.Name.Contains("Credential") ? 4096 : 1000);
  }
  public override int SaveChanges(bool acceptAllChangesOnSuccess) {ValidateScope();return base.SaveChanges(acceptAllChangesOnSuccess);}
  public override Task<int> SaveChangesAsync(CancellationToken ct=default)

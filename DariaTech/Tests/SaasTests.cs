@@ -42,6 +42,7 @@ public sealed class SaasTests
  {
   var dir=Path.Combine(Path.GetTempPath(),"dt-saas-"+Guid.NewGuid());Directory.CreateDirectory(dir);
   var key=Path.Combine(dir,"agent.key");File.WriteAllText(key,Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
+  if(!OperatingSystem.IsWindows())File.SetUnixFileMode(key,UnixFileMode.UserRead|UnixFileMode.UserWrite);
   try
   {
    var source=Office();var options=new AgentOptions{StateDirectory=Path.Combine(dir,"state"),LinuxKeyFile=key,ManageEngine=true,AllowSaasWorkloads=true,AllowSaasRestore=true,AllowedSaasTenants=[source.DirectoryTenant]};

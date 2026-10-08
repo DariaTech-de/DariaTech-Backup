@@ -438,3 +438,70 @@ main>*:nth-child(2){animation-delay:.04s}main>*:nth-child(3){animation-delay:.08
  .story-steps span:nth-child(2),.story-steps span:nth-child(3){display:none}
 }
 body.dark .hero{background:linear-gradient(160deg,#0f4a3b,#0b3329);box-shadow:inset 0 0 0 1px rgb(1 196 166/.25),0 20px 40px -24px rgb(0 0 0/.8)}
+
+/* ---------- Backup job editor ---------- */
+.seg{display:flex;flex-wrap:wrap;gap:6px;padding:6px;border-radius:16px;background:var(--panel);border:1px solid var(--line);width:fit-content;max-width:100%}
+.seg a{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 14px;border-radius:11px;color:var(--muted)!important;font-weight:500;font-size:14px;text-decoration:none!important}
+.seg a:hover{background:var(--sunken);color:var(--ink)!important}
+.seg a[aria-current=page]{background:var(--deep);color:#fff!important}
+body.dark .seg a[aria-current=page]{background:var(--primary)}
+.seg .icon{width:16px;height:16px}
+.step{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:8px;background:var(--ok-bg);color:var(--ok-fg);font-size:13px;font-weight:600;margin-right:10px;vertical-align:1px}
+.dest-panel{border:0;margin:0;padding:0;min-width:0;display:none;flex-direction:column;gap:16px}
+.dest-panel.active{display:flex}
+.advanced{border:1px solid var(--line);border-radius:14px;padding:0 16px}
+.advanced summary{cursor:pointer;padding:14px 0;font-weight:500;font-size:14px;display:flex;align-items:center;gap:8px;list-style:none}
+.advanced summary::-webkit-details-marker{display:none}
+.advanced summary::before{content:"";width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(-45deg);transition:transform .15s;margin-right:4px}
+.advanced[open] summary::before{transform:rotate(45deg)}
+.advanced[open]{padding-bottom:16px}
+.form-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px}
+.dest-line{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.dest-line .icon{width:15px;height:15px;color:var(--primary)}
+input[readonly]{background:var(--sunken);color:var(--muted)}
+.managed-job{display:flex;flex-direction:column;gap:4px;padding:12px 14px;border-radius:12px;background:var(--panel-2);border:1px solid var(--line)}
+.row-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.row-actions form{margin:0}
+.check-field{justify-content:flex-end}
+.check{display:flex;align-items:center;gap:10px;min-height:44px;font-weight:500;cursor:pointer}
+.check input{width:20px;height:20px;min-height:0;accent-color:var(--primary);margin:0}
+.choice{display:flex;flex-direction:column;gap:12px}
+.choice-option{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border:1px solid var(--line-strong);border-radius:14px;cursor:pointer}
+.choice-option:has(input:checked){border-color:var(--primary);background:color-mix(in srgb,var(--ok-bg) 45%,var(--panel));box-shadow:var(--focus)}
+.choice-option input{width:18px;height:18px;min-height:0;margin:2px 0 0;accent-color:var(--primary)}
+.choice-option strong{display:block;font-size:14px;font-weight:600}
+.custom-destination[hidden]{display:none}
+.dest-panel-group{border:0;margin:0;padding:0;min-width:0;display:flex;flex-direction:column;gap:16px}
+.choice-option select{margin-top:10px}
+.browser{display:flex;flex-direction:column;gap:12px;align-items:flex-start}
+.browser-panel{align-self:stretch;border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;background:var(--panel-2)}
+.browser-panel[hidden]{display:none}
+.browser-head{display:flex;flex-wrap:wrap;align-items:center;gap:10px;font-size:13px}
+.browser-status{font-size:13px;color:var(--muted);min-height:1em}
+.browser-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;max-height:320px;overflow:auto}
+.browser-list li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--line)}
+.browser-list li:last-child{border-bottom:0}
+.link-button{background:none!important;border:0;box-shadow:none!important;color:var(--primary)!important;min-height:36px;padding:0 4px;font-weight:500;cursor:pointer;text-align:left;white-space:normal}
+body.dark .link-button{color:var(--accent)!important}
+.link-button:hover{text-decoration:underline;filter:none}
+.button.small{min-height:34px;padding:0 12px;font-size:13px;border-radius:9px}
+.dest-test{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding-top:14px;border-top:1px solid var(--line)}
+.dest-test-status{flex-basis:100%;font-size:13.5px;color:var(--muted);min-height:1em}
+.dest-test-status.good{color:var(--ok-fg)}
+.dest-test-status.bad{color:var(--crit-fg)}
+.button[hidden],button[hidden]{display:none!important}
+.enroll-form{display:flex;flex-direction:column;gap:16px}
+.platforms{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;border:0;padding:0;margin:0}
+.platforms legend{font-size:13px;font-weight:600;color:var(--muted);margin-bottom:8px;padding:0}
+.platform{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border:1px solid var(--line-strong);border-radius:14px;cursor:pointer}
+.platform:has(input:checked){border-color:var(--primary);background:color-mix(in srgb,var(--ok-bg) 45%,var(--panel));box-shadow:var(--focus)}
+.platform input{width:18px;height:18px;min-height:0;margin:2px 0 0;accent-color:var(--primary)}
+.platform strong{display:block;font-size:14px;font-weight:600}
+.install-box{display:flex;flex-direction:column;gap:12px;margin-top:14px;padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--sunken)}
+.install-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.install-steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;font-size:14px}
+.command{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.command pre{margin:0;width:100%;max-width:100%;overflow-x:auto;padding:12px 14px;border-radius:10px;background:var(--panel);border:1px solid var(--line)}
+.command code{font:500 12.5px/1.55 var(--mono);white-space:pre;color:var(--ink)}
+.hash{overflow-wrap:anywhere}
+.managed-optin{max-width:640px}
