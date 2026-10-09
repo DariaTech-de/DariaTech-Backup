@@ -1,53 +1,129 @@
 @page
 @model JobActionsModel
 @using DariaTech.Console.Services
-<h1>@Model.Job.Name · Aktionen und Restore</h1>
-<p><a asp-page="/Device" asp-route-id="@Model.Device.Id">@Model.Device.Name</a> · @Model.Job.Ownership</p>
-@if(Model.Provider is not null){<p>@Model.Provider · @Model.DirectoryTenant · angewendete Revision @Model.Managed?.AppliedRevision</p>}
+@{ ViewData["Title"] = Model.Job.Name; var restoreOnly = Model.Managed?.RestoreOnly == true; var pointValue = Model.Point?.ToString("O"); }
+<nav class="breadcrumb" aria-label="Brotkrümel"><a asp-page="/Device" asp-route-id="@Model.Device.Id">@Model.Device.Name</a><span aria-hidden="true">/</span><span aria-current="page">@Model.Job.Name</span></nav>
+<div class="page-heading">
+ <div><span class="eyebrow">@(restoreOnly?"Wiederherstellungs-Verbindung":"Backup-Job")</span><h1>@Model.Job.Name</h1>
+  <p class="lead">Gerät @Model.Device.Name@(Model.LastCheck is {} check?$" · letzte Prüfung ({check.Expires.ToLocalTime():dd.MM.yyyy}): {JobActionsModel.StatusLabel(check).Text}":" · noch nicht geprüft – die Prüfung läuft automatisch einmal im Monat")</p></div>
+ @if(!restoreOnly){
+ <div class="actions">
+  <form method="post" asp-page-handler="Guide"><input type="hidden" name="JobId" value="@Model.JobId" /><input type="hidden" name="step" value="run" /><button class="button" type="submit">@Ui.Icon("backups")Backup jetzt starten</button></form>
+  <form method="post" asp-page-handler="Guide"><input type="hidden" name="JobId" value="@Model.JobId" /><input type="hidden" name="step" value="verify" /><button class="button secondary" type="submit">@Ui.Icon("shield")Backup prüfen</button></form>
+  <form method="post" asp-page-handler="Guide"><input type="hidden" name="JobId" value="@Model.JobId" /><input type="hidden" name="step" value="stop" /><button class="button secondary" type="submit">Lauf stoppen</button></form>
+ </div>}
+</div>
 @if(Model.Error is not null){<p role="alert">@Model.Error</p>}
-@if(Model.Managed?.RestoreOnly==true){<p class="card-empty">@Ui.Icon("info")Wiederherstellungs-Verbindung: Dieses Gerät liest das Backup eines anderen Geräts direkt aus dem Speicherziel. Zuerst „Restore-Zeitpunkte laden“, dann Dateien wählen und in ein neues lokales Verzeichnis wiederherstellen. Backups laufen hierüber nicht.</p>}
-@if(!Model.SigningEnabled){<p>Die Console benötigt einen eingerichteten Befehlssignaturschlüssel. Aktionen sind bis dahin gesperrt.</p>}
-else{
-<form method="post" asp-page-handler="Request">
- <input type="hidden" asp-for="JobId" />
- <label asp-for="Action">Aktion</label><select asp-for="Action">
- @if(Model.Managed?.RestoreOnly!=true){<option value="RunBackup">Backup starten</option><option value="StopBackup">Lauf stoppen</option>}<option value="VerifyBackup">Backup prüfen</option>
- <option value="ListRestorePoints">Restore-Zeitpunkte laden</option><option value="ListRestoreFiles">Dateien / Objekte laden</option>
- @if(Model.Administrator){<option value="Restore">Dateien in neues lokales Restore-Verzeichnis wiederherstellen</option>}
- @if(Model.Administrator&&Model.Proxmox){<option value="RestoreProxmox">Proxmox-Gast aus ausgewähltem Archiv wiederherstellen</option>}
- @if(Model.Administrator&&Model.Provider is not null){<option value="RestoreSaas">Objekte im SaaS-Tenant wiederherstellen</option>}
- </select>
- <label asp-for="Snapshot">Sicherungszeitpunkt · UTC</label><input asp-for="Snapshot" type="datetime-local" asp-format="{0:yyyy-MM-ddTHH:mm}" />
- <label asp-for="Prefix">Optionaler Katalogfilter</label><input asp-for="Prefix" />
- <label asp-for="Paths">Ausgewählte Dateipfade / Objektpfade · einer je Zeile</label><textarea asp-for="Paths"></textarea>
- <label asp-for="DestinationFolder">Lokaler Restore · neuer Ordnername unter dem freigegebenen Restore-Verzeichnis</label><input asp-for="DestinationFolder" />
- @if(Model.Provider is not null){
- <label asp-for="ProviderTarget">SaaS-Restore · relativer Zielpfad im selben Tenant</label><input asp-for="ProviderTarget" />
- <label><input asp-for="ConfirmProviderWrites" /> Ich bestätige Schreibzugriffe durch den SaaS-Restore auf diesen Tenant.</label>
- }
- @if(Model.Proxmox){
- <label asp-for="TargetGuestId">Neue Proxmox-Gast-ID</label><input asp-for="TargetGuestId" type="number" min="100" max="999999999" />
- <label asp-for="ProxmoxStorage">Lokal freigegebener Proxmox-Storage</label><input asp-for="ProxmoxStorage" />
- <label><input asp-for="ConfirmGuestImport" /> Ich bestätige den Import genau eines ausgewählten VM-/LXC-Archivs. Der Gast bleibt ausgeschaltet und bestehende Gast-IDs werden abgelehnt.</label>
- }
- <p>Restore benötigt die Freigabe eines zweiten Administrators. Befehle sind signiert, gerätegebunden und laufen nach 15 Minuten ab. Der Agent benötigt seine lokale Freigabe für die jeweilige Aktion.</p>
- <button type="submit">Aktion anfordern</button>
-</form>
-}
+@if(Model.Waiting){<p class="notice-inline" data-auto-refresh role="status">@Ui.Icon("activity")Warte auf Antwort des Geräts … die Seite aktualisiert sich automatisch.</p>}
+@if(restoreOnly){<p class="notice-inline">@Ui.Icon("info")Dieses Gerät liest das Backup eines anderen Geräts direkt aus dem Speicherziel. Es sichert darüber nichts.</p>}
+
+<section class="card restore-guide" id="restore">
+ <div class="card-head"><div><h2>Wiederherstellen</h2><span class="sub">In drei Schritten: Version wählen, Dateien wählen, Ziel wählen.</span></div></div>
+
+ <div class="guide-step @(Model.Versions is null?"current":"done")">
+  <h3><span class="step-no">1</span>Version wählen</h3>
+  @if(Model.Versions is {Points.Length:>0} versions){
+  <form method="get" class="version-list">
+   <input type="hidden" name="id" value="@Model.JobId" />
+   @foreach(var v in versions.Points.OrderByDescending(x=>x.Time)){
+   var value=v.Time.ToUniversalTime().ToString("O");
+   <label class="choice-option compact"><input type="radio" name="point" value="@value" checked="@(Model.Point is {} p&&Math.Abs((p-v.Time).TotalSeconds)<1?"checked":null)" required />
+    <span><strong>@v.Time.ToLocalTime().ToString("dddd, dd.MM.yyyy HH:mm", new System.Globalization.CultureInfo("de-DE")) Uhr</strong>
+     <span class="sub">@(v.Files is >0?$"{v.Files} Dateien · {Ui.Size(v.Bytes??0)}":"Größe wird beim Laden der Dateien ermittelt")</span></span></label>}
+   <div class="form-actions"><button class="button" type="submit">Weiter: Dateien dieser Version</button></div>
+  </form>
+  }else if(Model.Versions is not null){<p class="card-empty">@Ui.Icon("info")Im Speicherziel wurde noch keine Version gefunden. Lief schon ein Backup?</p>}
+  <form method="post" asp-page-handler="Guide" class="inline-actions">
+   <input type="hidden" name="JobId" value="@Model.JobId" /><input type="hidden" name="step" value="versions" />
+   <button class="button @(Model.Versions is null?"":"secondary")" type="submit">@(Model.Versions is null?"Versionen vom Gerät laden":"Versionen neu laden")</button>
+  </form>
+ </div>
+
+ @if(Model.Point is {} point){
+ <div class="guide-step @(Model.Files is null?"current":"done")">
+  <h3><span class="step-no">2</span>Dateien wählen <span class="sub inline">Version vom @point.ToLocalTime().ToString("dd.MM.yyyy HH:mm") Uhr</span></h3>
+  <form method="post" asp-page-handler="Guide" class="inline-form">
+   <input type="hidden" name="JobId" value="@Model.JobId" /><input type="hidden" name="step" value="files" /><input type="hidden" name="point" value="@pointValue" />
+   <div class="field"><label for="filter">@(restoreOnly?"Suchen (Duplicati-Filter, z. B. *Rechnung* oder C:\\Daten\\*)":"Ordner öffnen (leer = oberste Ebene)")</label><input id="filter" name="filter" value="@Model.FilesFilter" placeholder="@(restoreOnly?"*":"z. B. C:\\Users\\Name\\Documents\\")" /></div>
+   <button class="button @(Model.Files is null?"":"secondary")" type="submit">Dateien laden</button>
+  </form>
+  @if(Model.Files is {} files){
+  <form method="post" asp-page-handler="Guide" id="restore-form">
+   <input type="hidden" name="JobId" value="@Model.JobId" /><input type="hidden" name="step" value="restore" /><input type="hidden" name="point" value="@pointValue" />
+   @if(files.Files.Length==0){<p class="card-empty">@Ui.Icon("info")Keine Dateien gefunden. Anderen Ordner oder Filter versuchen.</p>}
+   else{
+   <div class="file-list">
+    <label class="file-row head"><input type="checkbox" data-select-all /><span>Alle auswählen</span></label>
+    @foreach(var f in files.Files){
+    <div class="file-row">
+     <label><input type="checkbox" name="paths" value="@f.Path" data-file />@Ui.Icon(f.Directory?"server":"backups")<span class="file-path">@f.Path</span></label>
+     <span class="file-size">@(f.Directory?"Ordner":Ui.Size(f.Bytes??0))</span>
+     @if(f.Directory&&!restoreOnly){<button class="link-button" type="submit" form="open-@f.Path.GetHashCode()">Öffnen</button>}
+    </div>}
+   </div>
+   @if(files.Truncated){<p class="sub">Es werden nur die ersten Einträge angezeigt. Ordner öffnen oder Filter eingrenzen.</p>}
+   }
+   <h3><span class="step-no">3</span>Wohin wiederherstellen?</h3>
+   <div class="choice">
+    <label class="choice-option"><input type="radio" name="target" value="folder" checked />
+     <span><strong>In einen neuen Wiederherstellungsordner (empfohlen)</strong><span class="sub">Nichts Vorhandenes wird verändert. Ort auf dem Gerät: <span class="code">@Model.RestoreRootHint</span></span>
+      <input class="folder-input" type="text" name="folder" value="@Model.DefaultFolder" maxlength="100" aria-label="Name des Wiederherstellungsordners" pattern="[A-Za-z0-9_-]+" /></span></label>
+    <label class="choice-option"><input type="radio" name="target" value="original" />
+     <span><strong>An den ursprünglichen Ort</strong><span class="sub">Fehlende Dateien werden zurückgeschrieben. Vorhandene Dateien werden nicht überschrieben – die wiederhergestellte Fassung wird mit Zeitstempel daneben abgelegt.</span></span></label>
+   </div>
+   <div class="form-actions"><button class="button" type="submit">@Ui.Icon("check")Wiederherstellung starten</button></div>
+   <p class="sub">@(Model.FourEyes?"Ein zweiter Administrator muss die Wiederherstellung unten unter „Verlauf“ freigeben.":"Es gibt nur einen Administrator; die Wiederherstellung startet ohne zweite Freigabe und wird protokolliert.")</p>
+  </form>
+  @foreach(var f in files.Files.Where(x=>x.Directory&&!restoreOnly)){
+  <form method="post" asp-page-handler="Guide" id="open-@f.Path.GetHashCode()" hidden><input type="hidden" name="JobId" value="@Model.JobId" /><input type="hidden" name="step" value="files" /><input type="hidden" name="point" value="@pointValue" /><input type="hidden" name="filter" value="@f.Path" /></form>}
+  }
+ </div>}
+</section>
+
+<section class="card card-flush" id="history">
+ <div class="card-head padded"><h2>Verlauf</h2></div>
+ @if(Model.Commands.Count==0){<p class="card-empty padded">@Ui.Icon("info")Noch keine Aktionen.</p>}
+ else{
+ <div class="table-wrap"><table class="table">
+  <thead><tr><th scope="col">Aktion</th><th scope="col">Status</th><th scope="col">Angefordert von</th><th scope="col"><span class="sr-only">Details</span></th></tr></thead>
+  <tbody>@foreach(var command in Model.Commands){var st=JobActionsModel.StatusLabel(command);<tr>
+   <td><strong>@JobActionsModel.ActionLabel(command.Action)</strong><span class="sub">gültig bis @command.Expires.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span></td>
+   <td><span class="status @st.Css">@st.Text</span>@if(!string.IsNullOrEmpty(command.ErrorCode)){<span class="sub error-text">@JobActionsModel.ErrorText(command.ErrorCode)</span>}</td>
+   <td>@(command.RequestedBy==DariaTech.Console.Api.CommandApi.Scheduler?"Monatliche Prüfung (automatisch)":command.RequestedBy==Model.Actor?"Sie":"Kollege")</td>
+   <td class="row-actions">
+    @if(command.EncryptedCatalog is not null&&command.Action is not (DariaTech.Contracts.RemoteAction.ListRestorePoints or DariaTech.Contracts.RemoteAction.ListRestoreFiles)){<a class="button secondary" asp-route-id="@Model.JobId" asp-route-catalogId="@command.Id">Katalog</a>}
+    @if(Model.Administrator&&command.Status=="AwaitingApproval"&&command.Expires>DateTimeOffset.UtcNow&&command.RequestedBy!=Model.Actor){
+    <form method="post" asp-page-handler="Approve"><input type="hidden" name="JobId" value="@Model.JobId" /><input type="hidden" name="commandId" value="@command.Id" /><button class="button" type="submit">Wiederherstellung freigeben</button></form>}
+   </td></tr>}</tbody>
+ </table></div>}
+</section>
+
 @if(Model.Catalog is {} catalog){
- <section class="panel"><h2>Restore-Katalog</h2>
- @if(catalog.Truncated){<p>Der Katalog wurde begrenzt. Den Filter eingrenzen, um weitere Objekte zu laden.</p>}
- @foreach(var point in catalog.Points){<p>@point.Time.ToUniversalTime().ToString("u") · @point.Files Dateien · @point.Bytes Bytes</p>}
- @foreach(var file in catalog.Files){<p><code>@file.Path</code> · @file.Bytes Bytes</p>}
- </section>
-}
-<section class="panel"><h2>Angeforderte Aktionen</h2><table><thead><tr><th>Aktion</th><th>Status</th><th>Ablaufzeit</th><th>Ergebnis</th><th>Freigabe / Katalog</th></tr></thead><tbody>
-@foreach(var command in Model.Commands){
- <tr><td>@command.Action</td><td>@command.Status</td><td>@command.Expires.ToUniversalTime().ToString("u")</td><td>@command.ErrorCode</td><td>
- @if(command.EncryptedCatalog is not null){<a asp-route-id="@Model.JobId" asp-route-catalogId="@command.Id">Katalog öffnen</a>}
- @if(Model.Administrator&&command.Status=="AwaitingApproval"&&command.RequestedBy!=Model.Actor){
- <form method="post" asp-page-handler="Approve"><input type="hidden" name="JobId" value="@Model.JobId" /><input type="hidden" name="commandId" value="@command.Id" /><button type="submit">Restore freigeben</button></form>
- }
- </td></tr>
-}
-</tbody></table></section>
+<section class="card"><h2>Katalog</h2>
+ @foreach(var cp in catalog.Points){<p>@cp.Time.ToLocalTime().ToString("dd.MM.yyyy HH:mm") · @cp.Files Dateien</p>}
+ @foreach(var file in catalog.Files){<p><code>@file.Path</code></p>}
+</section>}
+
+@if(Model.Provider is not null||Model.Proxmox){
+<details class="card advanced-actions">
+ <summary><strong>Cloud- bzw. Proxmox-Wiederherstellung</strong> <span class="sub">@(Model.Provider is not null?$"{Model.Provider} · {Model.DirectoryTenant}":"Proxmox-Gast")</span></summary>
+ <form method="post" asp-page-handler="Request" class="stack">
+  <input type="hidden" asp-for="JobId" />
+  <div class="field"><label asp-for="Action">Aktion</label><select asp-for="Action">
+   <option value="ListRestoreFiles">Objekte laden</option>
+   @if(Model.Administrator&&Model.Proxmox){<option value="RestoreProxmox">Proxmox-Gast aus ausgewähltem Archiv wiederherstellen</option>}
+   @if(Model.Administrator&&Model.Provider is not null){<option value="RestoreSaas">Objekte im Tenant wiederherstellen</option>}
+  </select></div>
+  <div class="field"><label asp-for="Snapshot">Version (UTC)</label><input asp-for="Snapshot" type="datetime-local" asp-format="{0:yyyy-MM-ddTHH:mm}" /></div>
+  <div class="field"><label asp-for="Prefix">Filter</label><input asp-for="Prefix" /></div>
+  <div class="field"><label asp-for="Paths">Objektpfade, einer je Zeile</label><textarea asp-for="Paths"></textarea></div>
+  @if(Model.Provider is not null){
+  <div class="field"><label asp-for="ProviderTarget">Relativer Zielpfad im selben Tenant</label><input asp-for="ProviderTarget" /></div>
+  <label class="check"><input asp-for="ConfirmProviderWrites" /><span>Ich bestätige Schreibzugriffe auf diesen Tenant.</span></label>}
+  @if(Model.Proxmox){
+  <div class="field"><label asp-for="TargetGuestId">Neue Proxmox-Gast-ID</label><input asp-for="TargetGuestId" type="number" min="100" max="999999999" /></div>
+  <div class="field"><label asp-for="ProxmoxStorage">Freigegebener Proxmox-Storage</label><input asp-for="ProxmoxStorage" /></div>
+  <label class="check"><input asp-for="ConfirmGuestImport" /><span>Ich bestätige den Import genau eines VM-/LXC-Archivs; der Gast bleibt ausgeschaltet.</span></label>}
+  <div class="form-actions"><button class="button" type="submit">Aktion anfordern</button></div>
+ </form>
+</details>}

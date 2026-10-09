@@ -99,6 +99,16 @@ public sealed class EngineIntegrationTests
    {restoredCopy.EnsureSuccessStatusCode();using var copyTask=JsonDocument.Parse(await restoredCopy.Content.ReadAsStringAsync(ct.Token));await WaitTask(client,DuplicatiAdapter.Get(copyTask.RootElement,"ID").ToString(),ct.Token,password,passphrase);}
    Assert.That(await File.ReadAllBytesAsync(Directory.GetFiles(recovered,"restore-check.bin",SearchOption.AllDirectories).Single(),ct.Token),Is.EqualTo(bytes));
    Assert.That(async()=>await adapter.Dispatch(recoveryCommand with{Action=RemoteAction.RunBackup},options,ct.Token),Throws.InstanceOf<InvalidOperationException>(),"a recovery copy never backs up into the original destination");
+   // Restore to the original location through the signed-command path: the deleted file comes back in place,
+   // an existing file is never overwritten.
+   Assert.That(File.Exists(Path.Combine(source,"restore-check.bin")),Is.False);
+   var original=command with{Id=Guid.NewGuid(),Action=RemoteAction.Restore,Restore=new(DateTimeOffset.UtcNow,[Path.Combine(source,"restore-check.bin")],"",true)};
+   await WaitTask(client,(await adapter.Dispatch(original,options,ct.Token)).ToString(),ct.Token,password,passphrase);
+   Assert.That(await File.ReadAllBytesAsync(Path.Combine(source,"restore-check.bin"),ct.Token),Is.EqualTo(bytes));
+   await File.WriteAllTextAsync(Path.Combine(source,"restore-check.bin"),"changed locally",ct.Token);
+   await WaitTask(client,(await adapter.Dispatch(original with{Id=Guid.NewGuid()},options,ct.Token)).ToString(),ct.Token,password,passphrase);
+   Assert.That(await File.ReadAllTextAsync(Path.Combine(source,"restore-check.bin"),ct.Token),Is.EqualTo("changed locally"),"existing files are kept");
+   Assert.That(Directory.GetFiles(source,"restore-check*.bin").Length,Is.EqualTo(2),"the restored version is placed next to it");
   }
   finally
   {

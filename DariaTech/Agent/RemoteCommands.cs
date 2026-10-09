@@ -23,8 +23,11 @@ public sealed partial class DuplicatiAdapter
   }
   if(command.Action==RemoteAction.Restore)
   {
-   var restore=command.Restore!;var destination=RestoreDestination(options.RestoreRoot,restore.DestinationFolder);
-   response=await client.PostAsJsonAsync($"/api/v1/backup/{command.LocalJobId}/restore",new{paths=restore.Paths,time=restore.Snapshot.ToUniversalTime().ToString("O"),restore_path=destination,overwrite=false,permissions=false,skip_metadata=true},ct);
+   var restore=command.Restore!;var time=restore.Snapshot.ToUniversalTime().ToString("O");
+   // Original location: the engine writes to the original paths and keeps existing files (overwrite=false
+   // stores the restored version next to them with a timestamp suffix).
+   if(restore.OriginalLocation)response=await client.PostAsJsonAsync($"/api/v1/backup/{command.LocalJobId}/restore",new{paths=restore.Paths,time,overwrite=false,permissions=false,skip_metadata=false},ct);
+   else response=await client.PostAsJsonAsync($"/api/v1/backup/{command.LocalJobId}/restore",new{paths=restore.Paths,time,restore_path=RestoreDestination(options.RestoreRoot,restore.DestinationFolder),overwrite=false,permissions=false,skip_metadata=true},ct);
   }
   else response=await client.PostAsync($"/api/v1/backup/{command.LocalJobId}/{(command.Action==RemoteAction.RunBackup?"run":"verify")}",null,ct);
   using(response)

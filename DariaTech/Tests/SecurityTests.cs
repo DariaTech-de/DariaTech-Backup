@@ -93,6 +93,17 @@ public sealed class SecurityTests
   Assert.That(DariaTech.Console.Services.DestinationForm.Split("cloud.firma.de","443","Backups"),Is.EqualTo(("cloud.firma.de","443","Backups")));
   Assert.That(DariaTech.Console.Services.DestinationForm.Parse(url).Path,Is.EqualTo("dav/spaces/2d52bc17-d0bf$0d08febf-0381"));
  }
+ [Test]public void RestoreToOriginalLocationCarriesNoFolderAndFolderRestoreNeedsASafeName()
+ {
+  var now=DateTimeOffset.UtcNow;var device=Guid.NewGuid();
+  DeviceCommand C(RestoreSelection r)=>new(Guid.NewGuid(),Guid.NewGuid(),device,"1",RemoteAction.Restore,r,now,now.AddMinutes(5));
+  Assert.That(CommandProtocol.Valid(C(new(now.AddHours(-1),["C:\\a.txt"],"",true)),device,now),Is.True);
+  Assert.That(CommandProtocol.Valid(C(new(now.AddHours(-1),["C:\\a.txt"],"Ordner",true)),device,now),Is.False);
+  Assert.That(CommandProtocol.Valid(C(new(now.AddHours(-1),["C:\\a.txt"],"Wiederherstellung-1")),device,now),Is.True);
+  Assert.That(CommandProtocol.Valid(C(new(now.AddHours(-1),["C:\\a.txt"],"")),device,now),Is.False);
+  // Older agents read the same payload: the flag is only written when set.
+  Assert.That(System.Text.Json.JsonSerializer.Serialize(new RestoreSelection(now,["/a"],"x")),Does.Not.Contain("OriginalLocation"));
+ }
  [Test]public void TotpMatchesRfc6238AndRejectsReplay()
  {
   const string secret="GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";

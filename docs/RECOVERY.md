@@ -39,3 +39,28 @@ SaaS and Proxmox jobs are recovered through their own restore actions and are no
 
 Without the Console, any backup can still be restored with stock Duplicati given the destination access and the
 passphrase.
+
+## Restoring from the Console
+
+`Backup-Job → Wiederherstellen` guides through three steps: load the versions from the device, load the files
+of one version (folder by folder; a recovery copy lists files by filter), choose the target:
+
+- **new restore folder** below the device's protected restore root (Windows
+  `C:\ProgramData\DariaTechBackup\Restores`, Linux `/var/lib/dariatech-backup-restores`, macOS
+  `/Library/Application Support/DariaTechBackup/Restores`), or
+- **original location**: missing files are written back; existing files are never overwritten, the engine
+  places the restored version next to them.
+
+With two or more MSP administrators a restore waits for a second administrator's approval; with a single
+administrator it starts immediately and is audited as `restore.single-administrator`.
+
+Remote actions require the device's local opt-in. The add-device install command sets it ("Fernaktionen aus
+der Konsole zulassen"): it pins the Console's public command key and creates the restore root. Without a
+configured `Commands:SigningKeyFile` the Console creates its key on first use, encrypted with the master key in
+the key directory.
+
+## Monthly check
+
+The Console queues a `VerifyBackup` for every job with a successful backup whose device is online, 30 days
+after the last successful check (retried daily otherwise). The engine downloads sample volumes and checks them;
+a failed check raises the `BackupVerificationFailed` alert. Set `Verifications:Enabled=false` to disable.

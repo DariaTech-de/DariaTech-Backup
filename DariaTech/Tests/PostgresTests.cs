@@ -596,7 +596,7 @@ Assert.That(html,Does.Contain("Agent 0.2.0 · Pilot").And.Contain(url).And.Conta
   using(var applied=await newPc.PostAsJsonAsync($"/api/v1/agent/configurations/{copy.Id}/receipt",new ConfigurationReceipt(1,"9","Applied")))Assert.That(applied.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
   var backup=await db.Jobs.AsNoTracking().SingleAsync(x=>x.DeviceId==newId.DeviceId&&x.LocalId=="9");
   var actions=await admin.GetStringAsync($"/JobActions?id={backup.Id}");
-  Assert.That(actions,Does.Not.Contain("value=\"RunBackup\"").And.Contain("ListRestorePoints"));
+  Assert.That(WebUtility.HtmlDecode(actions),Does.Not.Contain("name=\"step\" value=\"run\"").And.Contain("Versionen vom Gerät laden"));
   using var run=await admin.PostAsync("/JobActions?handler=Request",new FormUrlEncodedContent(new Dictionary<string,string>{{"JobId",backup.Id.ToString()},{"Action","RunBackup"},{"__RequestVerificationToken",Form(actions)}}));
   Assert.That(await db.Commands.AnyAsync(x=>x.DeviceId==newId.DeviceId&&x.Action==RemoteAction.RunBackup),Is.False,"no backup into another device's destination");
   using var list=await admin.PostAsync("/JobActions?handler=Request",new FormUrlEncodedContent(new Dictionary<string,string>{{"JobId",backup.Id.ToString()},{"Action","ListRestorePoints"},{"__RequestVerificationToken",Form(actions)}}));
@@ -606,11 +606,55 @@ Assert.That(html,Does.Contain("Agent 0.2.0 · Pilot").And.Contain(url).And.Conta
   Assert.That(edit.StatusCode,Is.EqualTo(HttpStatusCode.Conflict));
   }
  }
+ [Test]public async Task GuidedRestoreAndMonthlyCheckUseSignedCommands()
+ {
+  var(t,site)=await Customer();await using var db=Db();var now=DateTimeOffset.UtcNow;
+  var device=new Device{TenantId=t.Id,SiteId=site.Id,Name="Restore worker",EngineReachable=true,LastHeartbeat=now};db.Devices.Add(device);
+  var job=new BackupJob{TenantId=t.Id,DeviceId=device.Id,LocalId="4",Name="Dokumente"};db.Jobs.Add(job);
+  db.Runs.Add(new BackupRun{TenantId=t.Id,JobId=job.Id,LocalRunId="r1",Started=now.AddHours(-2),Completed=now.AddHours(-1),Status=RunStatus.Success});await db.SaveChangesAsync();
+  var signer=factory.Services.GetRequiredService<CommandSigning>();var store=factory.Services.GetRequiredService<ISecretStore>();
+  // Monthly check: queued once for an online device with a successful backup, then not again the same day.
+  await using(var scoped=Db()){Assert.That(await CommandApi.QueueDueVerifications(scoped,signer,store,now,30),Is.GreaterThanOrEqualTo(1));}
+  var check=await db.Commands.AsNoTracking().SingleAsync(x=>x.JobId==job.Id&&x.Action==RemoteAction.VerifyBackup);
+  Assert.That(check.RequestedBy,Is.EqualTo(CommandApi.Scheduler));Assert.That(check.Status,Is.EqualTo("Pending"));
+  await using(var scoped=Db()){await CommandApi.QueueDueVerifications(scoped,signer,store,now.AddHours(2),30);}
+  Assert.That(await db.Commands.CountAsync(x=>x.JobId==job.Id&&x.Action==RemoteAction.VerifyBackup),Is.EqualTo(1));
+  using var admin=await Login(UserRole.SuperAdmin);
+  string Form(string html){var m=Regex.Match(html,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");Assert.That(m.Success,Is.True);return WebUtility.HtmlDecode(m.Groups[1].Value);}
+  async Task<HttpResponseMessage> Guide(Dictionary<string,string> values,string query="")
+  {var page=await admin.GetStringAsync($"/JobActions?id={job.Id}{query}");values["JobId"]=job.Id.ToString();values["__RequestVerificationToken"]=Form(page);return await admin.PostAsync("/JobActions?handler=Guide",new FormUrlEncodedContent(values));}
+  async Task Answer(RemoteAction action,RestoreCatalog catalog)
+  {
+   var c=await db.Commands.Where(x=>x.JobId==job.Id&&x.Action==action).OrderByDescending(x=>x.Expires).FirstAsync();
+   c.Status="Completed";c.EncryptedCatalog=store.Protect(c.TenantId,$"catalog:{c.Id}",System.Text.Json.JsonSerializer.Serialize(catalog));await db.SaveChangesAsync();
+  }
+  var page=await admin.GetStringAsync($"/JobActions?id={job.Id}");Assert.That(WebUtility.HtmlDecode(page),Does.Contain("Versionen vom Gerät laden").And.Contain("Monatliche Prüfung (automatisch)"));
+  using(var r=await Guide(new(){{"step","versions"}}))Assert.That(r.StatusCode,Is.EqualTo(HttpStatusCode.Redirect));
+  Assert.That(WebUtility.HtmlDecode(await admin.GetStringAsync($"/JobActions?id={job.Id}")),Does.Contain("Warte auf Antwort des Geräts"));
+  var version=new DateTimeOffset(2026,10,8,20,15,0,TimeSpan.Zero);
+  await Answer(RemoteAction.ListRestorePoints,new([new(version,12,4096)],[],false));
+  page=WebUtility.HtmlDecode(await admin.GetStringAsync($"/JobActions?id={job.Id}"));Assert.That(page,Does.Contain(version.ToString("O")).And.Contain("12 Dateien"));
+  using(var r=await Guide(new(){{"step","files"},{"point",version.ToString("O")}}))Assert.That(r.StatusCode,Is.EqualTo(HttpStatusCode.Redirect));
+  await Answer(RemoteAction.ListRestoreFiles,new([],[new("C:\\Daten\\",null,true),new("C:\\Daten\\Rechnung.pdf",2048,false)],false));
+  var query=$"&point={Uri.EscapeDataString(version.ToString("O"))}";
+  page=WebUtility.HtmlDecode(await admin.GetStringAsync($"/JobActions?id={job.Id}{query}"));
+  Assert.That(page,Does.Contain("value=\"C:\\Daten\\Rechnung.pdf\"").And.Contain("Wohin wiederherstellen?"));
+  using(var bad=await Guide(new(){{"step","restore"},{"point",version.ToString("O")},{"paths","C:\\Daten\\Rechnung.pdf"},{"target","folder"},{"folder","../etc"}},query))
+   Assert.That(WebUtility.HtmlDecode(await bad.Content.ReadAsStringAsync()),Does.Contain("Der Ordnername darf nur"));
+  using(var none=await Guide(new(){{"step","restore"},{"point",version.ToString("O")},{"target","original"}},query))
+   Assert.That(WebUtility.HtmlDecode(await none.Content.ReadAsStringAsync()),Does.Contain("mindestens eine Datei"));
+  using(var ok=await Guide(new(){{"step","restore"},{"point",version.ToString("O")},{"paths","C:\\Daten\\Rechnung.pdf"},{"target","original"}},query))Assert.That(ok.StatusCode,Is.EqualTo(HttpStatusCode.Redirect));
+  var restore=await db.Commands.AsNoTracking().SingleAsync(x=>x.JobId==job.Id&&x.Action==RemoteAction.Restore);
+  var payload=System.Text.Json.JsonSerializer.Deserialize<DeviceCommand>(Convert.FromBase64String(store.Unprotect(restore.TenantId,$"command:{restore.Id}",restore.EncryptedPayload)))!;
+  Assert.That(payload.Restore!.OriginalLocation,Is.True);Assert.That(payload.Restore.DestinationFolder,Is.Empty);Assert.That(payload.Restore.Paths,Is.EqualTo(new[]{"C:\\Daten\\Rechnung.pdf"}));
+  Assert.That(payload.Restore.Snapshot,Is.EqualTo(version));Assert.That(CommandProtocol.Valid(payload,device.Id,DateTimeOffset.UtcNow),Is.True);
+  await using(var scoped=Db())Assert.That(restore.Status,Is.EqualTo(await CommandApi.SecondApprovalPossible(scoped)?"AwaitingApproval":"Pending"));
+ }
  private sealed class TestFactory(string cs,string dir):WebApplicationFactory<Program>
  {
   protected override void ConfigureWebHost(IWebHostBuilder b)
   {
-   b.UseEnvironment("Development");b.ConfigureAppConfiguration((_,c)=>c.AddInMemoryCollection(new Dictionary<string,string?>{{"ConnectionStrings:Management",cs},{"Security:MasterKeyFile",Path.Combine(dir,"master.key")},{"Security:KeyDirectory",Path.Combine(dir,"keys")},{"Monitoring:PollSeconds","3600"},{"Commands:SigningKeyFile",Path.Combine(dir,"commands.pem")},{"Updates:PublicKeyFile",Path.Combine(dir,"commands.pem")},{"Agents:ApiBase","http://127.0.0.1:9"}}));
+   b.UseEnvironment("Development");b.ConfigureAppConfiguration((_,c)=>c.AddInMemoryCollection(new Dictionary<string,string?>{{"ConnectionStrings:Management",cs},{"Security:MasterKeyFile",Path.Combine(dir,"master.key")},{"Security:KeyDirectory",Path.Combine(dir,"keys")},{"Monitoring:PollSeconds","3600"},{"Commands:SigningKeyFile",Path.Combine(dir,"commands.pem")},{"Updates:PublicKeyFile",Path.Combine(dir,"commands.pem")},{"Agents:ApiBase","http://127.0.0.1:9"},{"Verifications:Enabled","false"}}));
   }
  }
 }

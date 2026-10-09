@@ -5,7 +5,10 @@ namespace DariaTech.Contracts;
 public enum RemoteAction { RunBackup, StopBackup, VerifyBackup, Restore, ListRestorePoints, ListRestoreFiles, RestoreSaas, RestoreProxmox, BrowseFolders, TestDestination }
 // Device-level commands (no backup job yet): folder listing for source selection and a destination connection test.
 public sealed record DestinationTest(string TargetUrl,Dictionary<string,string> Options,bool CreateFolder);
-public sealed record RestoreSelection(DateTimeOffset Snapshot,string[] Paths,string DestinationFolder);
+// DestinationFolder: new folder below the device's protected restore root. OriginalLocation: restore to the
+// original paths instead; existing files are never overwritten (the engine keeps both versions).
+public sealed record RestoreSelection(DateTimeOffset Snapshot,string[] Paths,string DestinationFolder,
+ [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] bool OriginalLocation=false);
 public sealed record CommandInput(Guid JobId,RemoteAction Action,RestoreSelection? Restore,int ValidMinutes,CatalogRequest? Catalog=null,
  [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] SaasRestoreSelection? SaasRestore=null,
  [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] ProxmoxRestoreSelection? ProxmoxRestore=null);
@@ -38,7 +41,7 @@ public static class CommandProtocol
   if(c.Catalog is not null)return false;
   if(c.Action!=RemoteAction.Restore)return c.Restore is null;
   var s=c.Restore;return s is not null&&s.Paths is not null&&s.Paths.Length is >0 and <=500&&s.Paths.All(p=>!string.IsNullOrWhiteSpace(p)&&p.Length<=1000&&!p.Any(char.IsControl))
-   &&s.Snapshot.Year>=2000&&s.Snapshot<=now.AddMinutes(5)&&SafeFolder(s.DestinationFolder);
+   &&s.Snapshot.Year>=2000&&s.Snapshot<=now.AddMinutes(5)&&(s.OriginalLocation?s.DestinationFolder.Length==0:SafeFolder(s.DestinationFolder));
  }
  public static bool SafeFolder(string? value)=>!string.IsNullOrWhiteSpace(value)&&value.Length<=100&&value.All(c=>char.IsAsciiLetterOrDigit(c)||c is '-' or '_');
  public static SignedCommand Sign(DeviceCommand command,ECDsa key)
