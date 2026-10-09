@@ -595,6 +595,9 @@ Assert.That(html,Does.Contain("Agent 0.2.0 · Pilot").And.Contain(url).And.Conta
   Assert.That(ConfigurationPolicy.Valid(assignment.Definition with{Schedule=definition.Schedule}),Is.False,"a recovery copy can never be scheduled");
   using(var applied=await newPc.PostAsJsonAsync($"/api/v1/agent/configurations/{copy.Id}/receipt",new ConfigurationReceipt(1,"9","Applied")))Assert.That(applied.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
   var backup=await db.Jobs.AsNoTracking().SingleAsync(x=>x.DeviceId==newId.DeviceId&&x.LocalId=="9");
+  // A recovery copy never backs up, so it must not count as an overdue backup.
+  await using(var monitor=Db()){await Monitoring.Evaluate(monitor,new(),DateTimeOffset.UtcNow);}
+  Assert.That(await db.Alerts.AnyAsync(x=>x.DeviceId==newId.DeviceId&&x.Resolved==null&&(x.Code=="BackupOverdue"||x.Code=="BackupFailed")),Is.False);
   var actions=await admin.GetStringAsync($"/JobActions?id={backup.Id}");
   Assert.That(WebUtility.HtmlDecode(actions),Does.Not.Contain("name=\"step\" value=\"run\"").And.Contain("Versionen vom Gerät laden"));
   using var run=await admin.PostAsync("/JobActions?handler=Request",new FormUrlEncodedContent(new Dictionary<string,string>{{"JobId",backup.Id.ToString()},{"Action","RunBackup"},{"__RequestVerificationToken",Form(actions)}}));

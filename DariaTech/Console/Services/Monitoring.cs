@@ -25,6 +25,9 @@ public sealed class Monitoring(IServiceScopeFactory scopes,Microsoft.Extensions.
  {
   var releases=await db.AgentReleases.Where(x=>x.Expires>now).OrderByDescending(x=>x.Sequence).ToListAsync(ct);
   var devices=await db.Devices.Where(x=>x.Active).ToListAsync(ct);var jobs=await db.Jobs.Where(x=>x.Active).ToListAsync(ct);
+  // Recovery copies only restore; they never run backups and are not backup-health subjects.
+  var recoveryCopies=await db.ManagedJobs.Where(x=>x.RestoreOnly&&x.LocalJobId!=null).Select(x=>new{x.DeviceId,x.LocalJobId}).ToListAsync(ct);
+  jobs=jobs.Where(j=>!recoveryCopies.Any(r=>r.DeviceId==j.DeviceId&&r.LocalJobId==j.LocalId)).ToList();
   var agents=await db.Agents.ToListAsync(ct);var alerts=await db.Alerts.ToListAsync(ct);
   foreach(var d in devices)
   {

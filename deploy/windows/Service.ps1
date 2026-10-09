@@ -72,10 +72,13 @@ if ($Action -eq 'Prepare') {
   if (!$CommandKeyFile -or !(Test-Path -LiteralPath $CommandKeyFile -PathType Leaf)) { throw 'Command key file required for remote actions' }
   $pem=(Get-Content -LiteralPath $CommandKeyFile -Raw).Trim()
   if ($pem -notmatch '^-----BEGIN PUBLIC KEY-----\r?\n[A-Za-z0-9+/=\r\n]{40,1000}\r?\n-----END PUBLIC KEY-----$') { throw 'Invalid command public key' }
-  $pinned=Join-Path $state 'commands-public.pem'
-  # A pinned key only changes through deliberate local administration, never through a reinstall.
-  if ((Test-Path $pinned) -and ((Get-Content -LiteralPath $pinned -Raw).Trim() -ne $pem)) { throw 'A different Console command key is already pinned on this device' }
-  [IO.File]::WriteAllText($pinned,$pem+"`n")
+  # A pinned key only changes through deliberate local administration, never through a reinstall:
+  # an existing pin (also a manually provisioned path) must hold exactly the supplied key.
+  $pinned=if ($agentConfiguration.CommandPublicKeyFile) { [string]$agentConfiguration.CommandPublicKeyFile } else { Join-Path $state 'commands-public.pem' }
+  if (Test-Path -LiteralPath $pinned) {
+   if ((Get-Content -LiteralPath $pinned -Raw).Trim() -ne $pem) { throw 'A different Console command key is already pinned on this device' }
+  } elseif ($agentConfiguration.CommandPublicKeyFile) { throw 'The configured command key file is missing; restore it through local administration' }
+  else { [IO.File]::WriteAllText($pinned,$pem+"`n") }
   $restoreRoot=Join-Path $state 'Restores'
   if (!(Test-Path $restoreRoot)) { New-Item -ItemType Directory -Path $restoreRoot | Out-Null }
   $restoreAcl=New-Object System.Security.AccessControl.DirectorySecurity
