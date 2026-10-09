@@ -84,6 +84,8 @@
    </fieldset>
    <label class="platform managed-optin"><input type="checkbox" name="allowManaged" value="true" checked="@(Model.AllowManaged?"checked":null)" />
     <span><strong>Backup-Jobs aus der Konsole zulassen</strong><span class="sub">Lokale Freigabe auf dem Gerät: Ohne sie übernimmt der Agent keine in der Konsole angelegten Jobs. Später nur lokal durch einen Administrator änderbar.</span></span></label>
+   <label class="platform managed-optin"><input type="checkbox" name="allowRemote" value="true" checked="@(Model.AllowRemote?"checked":null)" />
+    <span><strong>Fernaktionen aus der Konsole zulassen</strong><span class="sub">Wiederherstellen, Backup prüfen und starten, Ordner durchsuchen, Verbindung testen. Jede Aktion ist von der Konsole signiert; Wiederherstellungen braucht zusätzlich die Freigabe eines zweiten Administrators.</span></span></label>
    <div class="inline-form">
     <div class="field"><label for="siteId">Standort</label><select id="siteId" name="siteId">@foreach(var site in Model.Sites){<option value="@site.Id">@site.Name</option>}</select></div>
     <div class="field"><label for="validMinutes">Gültigkeit in Minuten</label><input id="validMinutes" type="number" name="validMinutes" min="5" max="1440" value="60"></div>

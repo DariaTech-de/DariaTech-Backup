@@ -70,37 +70,41 @@ public sealed partial class AgentReleases(IConfiguration config,ILogger<AgentRel
  // Ready-to-run install commands. They stop at the first failed step (download, checksum, installer) and end
  // with the installer's status. The token never appears in a process argument list: it is written to a
  // root-only (Unix) or user-profile (Windows) file that the installer consumes and deletes. allowManaged is
- // the local administrator's opt-in for backup jobs created in the Console.
- public static string Command(string platform,AgentAsset? asset,string consoleUrl,string token,bool allowManaged)
+ // the local administrator's opt-in for backup jobs created in the Console; commandKey (the Console's public
+ // command key) opts in to signed remote actions and pins that key, with a protected local restore folder.
+ public static string Command(string platform,AgentAsset? asset,string consoleUrl,string token,bool allowManaged,string? commandKey=null)
  {
   var url=asset?.Url??"<Download-URL>";var sha=asset?.Sha256??"<SHA256>";
-  if(platform=="win-x64")return string.Join("\n",
-   "# PowerShell als Administrator",
-   "& {",
-   "$ErrorActionPreference='Stop'",
-   "$f=\"$env:TEMP\\DariaTechBackupSetup.exe\"; $t=\"$env:TEMP\\dariatech-token.txt\"",
-   "try {",
-   $" Invoke-WebRequest -UseBasicParsing \"{url}\" -OutFile $f",
-   $" if((Get-FileHash $f -Algorithm SHA256).Hash -ne \"{sha.ToUpperInvariant()}\"){{throw \"Prüfsumme stimmt nicht\"}}",
-   $" Set-Content -NoNewline -Path $t -Value \"{token}\"",
-   $" $p=Start-Process $f -ArgumentList \"/console={consoleUrl}\",\"/tokenfile=$t\"{(allowManaged?",\"/allowmanaged=1\"":"")} -Wait -PassThru",
-   " if($p.ExitCode -ne 0){throw \"Installation fehlgeschlagen (Code $($p.ExitCode))\"}",
-   "} finally { Remove-Item $t -ErrorAction SilentlyContinue }",
-   "}");
+  var key=commandKey?.Trim().ReplaceLineEndings("\n");
+  if(platform=="win-x64")
+  {
+   var lines=new List<string>{"# PowerShell als Administrator","& {","$ErrorActionPreference='Stop'",
+    "$f=\"$env:TEMP\\DariaTechBackupSetup.exe\"; $t=\"$env:TEMP\\dariatech-token.txt\"; $k=\"$env:TEMP\\dariatech-commands.pub\"","try {",
+    $" Invoke-WebRequest -UseBasicParsing \"{url}\" -OutFile $f",
+    $" if((Get-FileHash $f -Algorithm SHA256).Hash -ne \"{sha.ToUpperInvariant()}\"){{throw \"Prüfsumme stimmt nicht\"}}",
+    $" Set-Content -NoNewline -Path $t -Value \"{token}\""};
+   if(key is not null){lines.Add(" Set-Content -Path $k -Value @'");lines.Add(key);lines.Add("'@");}
+   var args=$"\"/console={consoleUrl}\",\"/tokenfile=$t\""+(allowManaged?",\"/allowmanaged=1\"":"")+(key is not null?",\"/allowremote=1\",\"/commandkeyfile=$k\"":"");
+   lines.Add($" $p=Start-Process $f -ArgumentList {args} -Wait -PassThru");
+   lines.Add(" if($p.ExitCode -ne 0){throw \"Installation fehlgeschlagen (Code $($p.ExitCode))\"}");
+   lines.Add("} finally { Remove-Item $t,$k -ErrorAction SilentlyContinue }");lines.Add("}");
+   return string.Join("\n",lines);
+  }
   var mac=platform.StartsWith("osx",StringComparison.Ordinal);
   var tmp=mac?"/private/tmp":"/tmp";var check=mac?"shasum -a 256 -c -":"sha256sum -c -";
-  return string.Join("\n",
-   $"# Terminal ({(mac?"macOS":"Linux")}), Benutzer mit sudo-Rechten",
-   "(",
-   "set -eu",
+  var restoreRoot=mac?"/Library/Application Support/DariaTechBackup/Restores":"/var/lib/dariatech-backup-restores";
+  var unix=new List<string>{$"# Terminal ({(mac?"macOS":"Linux")}), Benutzer mit sudo-Rechten","(","set -eu",
    $"p=$(mktemp {tmp}/dariatech-agent.XXXXXXXX); d=$(sudo mktemp -d {tmp}/dariatech.XXXXXXXX)",
    "trap 'rm -f \"$p\"; sudo rm -rf \"$d\"' EXIT",
    $"curl -fsSL -o \"$p\" \"{url}\"",
    $"echo \"{sha}  $p\" | {check}",
    "sudo tar -xzf \"$p\" -C \"$d\"",
    "sudo install -m 600 /dev/null \"$d/token\"",
-   "printf %s '"+token+"' | sudo tee \"$d/token\" >/dev/null",
-   $"sudo \"$d/install.sh\" --console-url '{consoleUrl}' --enrollment-token-file \"$d/token\"{(allowManaged?" --allow-managed-configuration":"")}",
-   ")");
+   "printf %s '"+token+"' | sudo tee \"$d/token\" >/dev/null"};
+  if(key is not null){unix.Add("sudo tee \"$d/commands.pub\" >/dev/null <<'DARIATECH_KEY'");unix.Add(key);unix.Add("DARIATECH_KEY");}
+  unix.Add($"sudo \"$d/install.sh\" --console-url '{consoleUrl}' --enrollment-token-file \"$d/token\""+(allowManaged?" --allow-managed-configuration":"")
+   +(key is not null?$" --allow-remote-commands --command-key-file \"$d/commands.pub\" --restore-root '{restoreRoot}'":""));
+  unix.Add(")");
+  return string.Join("\n",unix);
  }
 }

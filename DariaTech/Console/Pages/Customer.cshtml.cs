@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 namespace DariaTech.Console.Pages;
-public sealed class CustomerModel(ManagementDb db,IOptions<MonitoringOptions> options,AgentReleases agents,ISecretStore secrets):PageModel
+public sealed class CustomerModel(ManagementDb db,IOptions<MonitoringOptions> options,AgentReleases agents,ISecretStore secrets,CommandSigning signer):PageModel
 {
  // One backup of this customer, wherever its device is (like Acronis "Backup storage"): it stays listed and
  // recoverable when the device is offline or replaced.
@@ -20,7 +20,7 @@ public sealed class CustomerModel(ManagementDb db,IOptions<MonitoringOptions> op
  public bool CanManageLocations=>User.IsInRole("SuperAdmin");
  public string? RecoveryMessage {get;private set;}public bool RecoveryFailed {get;private set;}
  public Customer Customer{get;private set;}=null!;public List<Site> Sites{get;private set;}=[];public List<DeviceRow> Rows{get;private set;}=[];public string? Token{get;private set;}
- public string Platform{get;private set;}="win-x64";public AgentRelease? Release{get;private set;}public AgentAsset? Asset{get;private set;}public string? Command{get;private set;}public bool AllowManaged{get;private set;}=true;
+ public string Platform{get;private set;}="win-x64";public AgentRelease? Release{get;private set;}public AgentAsset? Asset{get;private set;}public string? Command{get;private set;}public bool AllowManaged{get;private set;}=true;public bool AllowRemote{get;private set;}=true;
  public string ReleasesPage=>agents.ReleasesPage;
  public bool CanManage=>User.IsInRole("SuperAdmin")||User.IsInRole("Administrator")||User.IsInRole("Technician");
  public async Task<IActionResult> OnGetAsync(Guid id,Guid? recovery=null)
@@ -65,15 +65,15 @@ public sealed class CustomerModel(ManagementDb db,IOptions<MonitoringOptions> op
   if(await db.Sites.AnyAsync(x=>x.TenantId==Customer.TenantId&&x.Name==siteName)){ModelState.AddModelError("","Standort existiert bereits.");return Page();}
   var s=new Site{TenantId=Customer.TenantId,Name=siteName,Address=address??""};db.Sites.Add(s);ManagementApi.Audit(db,HttpContext,s.TenantId,"site.created",s.Id);await db.SaveChangesAsync();return RedirectToPage(new{id});
  }
- public async Task<IActionResult> OnPostEnrollAsync(Guid id,Guid siteId,int validMinutes,string? platform,bool allowManaged)
+ public async Task<IActionResult> OnPostEnrollAsync(Guid id,Guid siteId,int validMinutes,string? platform,bool allowManaged,bool allowRemote)
  {
   if(!CanManage)return Forbid();if(await OnGetAsync(id) is NotFoundResult)return NotFound();
   if(!Customer.Active||validMinutes<5||validMinutes>1440||Sites.All(x=>x.Id!=siteId)||!AgentReleases.Platforms.Contains(platform??"win-x64"))return BadRequest();
-  Platform=platform??"win-x64";AllowManaged=allowManaged;
+  Platform=platform??"win-x64";AllowManaged=allowManaged;AllowRemote=allowRemote;
   Token=Tokens.Create();var e=new EnrollmentToken{TenantId=Customer.TenantId,SiteId=siteId,Expires=DateTimeOffset.UtcNow.AddMinutes(validMinutes),TokenHash=Tokens.Hash(Token)};db.EnrollmentTokens.Add(e);ManagementApi.Audit(db,HttpContext,e.TenantId,"enrollment.issued",e.Id);await db.SaveChangesAsync();
   // The package comes from the newest published agent release; without one the token still works with a manually downloaded installer.
   Release=await agents.Latest(HttpContext.RequestAborted);Asset=Release?.Assets.FirstOrDefault(x=>x.Platform==Platform);
-  Command=AgentReleases.Command(Platform,Asset,$"{Request.Scheme}://{Request.Host}{Request.PathBase}",Token,AllowManaged);
+  Command=AgentReleases.Command(Platform,Asset,$"{Request.Scheme}://{Request.Host}{Request.PathBase}",Token,AllowManaged,AllowRemote?signer.PublicKeyPem:null);
   Response.Headers.CacheControl="no-store";return Page();
  }
 }

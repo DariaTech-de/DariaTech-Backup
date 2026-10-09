@@ -495,7 +495,7 @@ public sealed class PostgresTests
   using var admin=await Login(UserRole.SuperAdmin);
   string Token(string html){var m=Regex.Match(html,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");Assert.That(m.Success,Is.True);return WebUtility.HtmlDecode(m.Groups[1].Value);}
   async Task<HttpResponseMessage> Enroll(string platform)=>await admin.PostAsync($"/Customer?id={customer.Id}&handler=Enroll",new FormUrlEncodedContent(new Dictionary<string,string>{
-   {"id",customer.Id.ToString()},{"siteId",site.Id.ToString()},{"validMinutes","30"},{"platform",platform},{"allowManaged","true"},{"__RequestVerificationToken",Token(await admin.GetStringAsync($"/Customer?id={customer.Id}"))}}));
+   {"id",customer.Id.ToString()},{"siteId",site.Id.ToString()},{"validMinutes","30"},{"platform",platform},{"allowManaged","true"},{"allowRemote","true"},{"__RequestVerificationToken",Token(await admin.GetStringAsync($"/Customer?id={customer.Id}"))}}));
   var page=await admin.GetStringAsync($"/Customer?id={customer.Id}");
   Assert.That(page,Does.Contain("value=\"osx-arm64\"").And.Contain("value=\"linux-arm64\"").And.Contain("Betriebssystem des Geräts"));
   // No published release reachable: the token is still issued and the page points to the releases page.
@@ -512,7 +512,9 @@ public sealed class PostgresTests
    var html=WebUtility.HtmlDecode(await windows.Content.ReadAsStringAsync());
    var token=Regex.Match(html,"<code class=\"token\">([0-9A-F]{64})</code>").Groups[1].Value;Assert.That(token,Has.Length.EqualTo(64));
    Assert.That(await db.EnrollmentTokens.IgnoreQueryFilters().CountAsync(x=>x.TenantId==t.Id&&x.TokenHash==Tokens.Hash(token)),Is.EqualTo(1));
-Assert.That(html,Does.Contain("Agent 0.2.0 · Pilot").And.Contain(url).And.Contain(sha.ToUpperInvariant()).And.Contain($"-Value \"{token}\"").And.Contain("\"/console=https://localhost\",\"/tokenfile=$t\",\"/allowmanaged=1\"").And.Contain("Backup-Jobs aus der Konsole zulassen"));
+Assert.That(html,Does.Contain("Agent 0.2.0 · Pilot").And.Contain(url).And.Contain(sha.ToUpperInvariant()).And.Contain($"-Value \"{token}\"").And.Contain("\"/console=https://localhost\",\"/tokenfile=$t\",\"/allowmanaged=1\",\"/allowremote=1\",\"/commandkeyfile=$k\"").And.Contain("Backup-Jobs aus der Konsole zulassen"));
+   // The pinned key is the Console's own public command key.
+   Assert.That(html,Does.Contain(factory.Services.GetRequiredService<CommandSigning>().PublicKeyPem.Trim()));
   }
   // A platform without a published package falls back instead of showing another platform's file.
   using(var mac=await Enroll("osx-arm64")){var html=WebUtility.HtmlDecode(await mac.Content.ReadAsStringAsync());Assert.That(html,Does.Contain("Kein veröffentlichtes Agent-Paket").And.Not.Contain(url));}

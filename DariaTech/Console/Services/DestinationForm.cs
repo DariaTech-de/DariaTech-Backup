@@ -18,6 +18,7 @@ public static class DestinationForm
  };
  public static string HostLabel(string key)=>key switch
  {
+  "webdav"=>"Server oder WebDAV-URL",
   "s3" or "b2" or "e2" or "gcs"=>"Bucket","azure"=>"Container","openstack"=>"Container",
   _ when OAuthFolder.Contains(key)=>"Ordner",
   _=>"Server",
@@ -31,7 +32,8 @@ public static class DestinationForm
   _ when OAuthFolder.Contains(key)||key=="gcs"=>"Die AuthID erzeugen Sie unter oauth-service.duplicati.com mit dem Konto des Speicherziels.",
   "ssh"=>"Der Host-Key-Fingerprint ist Pflicht, damit sich der Agent nur mit dem echten Server verbindet.",
   "ftp" or "aftp"=>"Unverschlüsseltes FTP wird nicht unterstützt; wählen Sie Explicit oder Implicit TLS.",
-  "s3" or "webdav"=>"Die Verbindung erfolgt immer über TLS (HTTPS).",
+  "webdav"=>"Nextcloud: Server „cloud.firma.de“, Ordner „remote.php/dav/files/BENUTZER/Backups“. OpenCloud: beim Ordner unter Details die WebDAV-URL kopieren und komplett ins Feld Server einfügen. Als Passwort ein App-Passwort bzw. App-Token verwenden (nötig bei Zwei-Faktor- oder SSO-Anmeldung). Die Verbindung läuft immer über HTTPS.",
+  "s3"=>"Die Verbindung erfolgt immer über TLS (HTTPS).",
   "file"=>"Der Ordner muss auf dem Gerät existieren oder anlegbar sein, z. B. eine externe Festplatte.",
   _=>null,
  };
@@ -83,7 +85,8 @@ public static class DestinationForm
   }
   if(HasHost(key)&&host.Length==0)return null;
   if(port.Length>0&&(!int.TryParse(port,out var p)||p is <1 or >65535))return null;
-  var segments=path.Replace('\\','/').Split('/',StringSplitOptions.RemoveEmptyEntries).Select(Uri.EscapeDataString);
+  // "$" is a valid path character (RFC 3986) and part of OpenCloud space IDs; keep it readable.
+  var segments=path.Replace('\\','/').Split('/',StringSplitOptions.RemoveEmptyEntries).Select(x=>Uri.EscapeDataString(x).Replace("%24","$"));
   var authority=HasHost(key)?Uri.EscapeDataString(host)+(port.Length>0?":"+port:""):"";
   var url=key+"://"+authority+(HasPath(key)?"/"+string.Join('/',segments):"");
   return Uri.TryCreate(url,UriKind.Absolute,out _)?url:null;
@@ -101,7 +104,27 @@ public static class DestinationForm
    if(value.Length>0)options[option.Name]=value;
   }
   foreach(var (k,v) in Forced(type.Key))options[k]=v;
-  return (Build(type.Key,Field("host"),Field("port"),Field("path")),options);
+  var (host,port,path)=Split(Field("host"),Field("port"),Field("path"));
+  return (Build(type.Key,host,port,path),options);
+ }
+ // The server field also accepts a pasted address such as the WebDAV URL shown by Nextcloud or OpenCloud
+ // ("https://cloud.example.de/remote.php/dav/files/admin"): host and port are taken from it and its path is
+ // put in front of the folder field.
+ public static (string Host,string Port,string Path) Split(string host,string port,string path)
+ {
+  var value=host.Trim();
+  if(!value.Contains("://",StringComparison.Ordinal))
+  {
+   var slash=value.IndexOf('/');
+   if(slash<0)return (value,port,path);
+   value="https://"+value;
+  }
+  if(!Uri.TryCreate(value,UriKind.Absolute,out var uri)||uri.Host.Length==0||!string.IsNullOrEmpty(uri.UserInfo)||!string.IsNullOrEmpty(uri.Query))return (host,port,path);
+  var prefix=Uri.UnescapeDataString(uri.AbsolutePath).Trim('/');
+  var folder=path.Replace('\\','/').Trim('/');
+  if(prefix.Length>0&&(folder==prefix||folder.StartsWith(prefix+"/",StringComparison.Ordinal)))prefix="";
+  var combined=string.Join('/',new[]{prefix,folder}.Where(x=>x.Length>0));
+  return (uri.Host,port.Length>0||uri.IsDefaultPort?port:uri.Port.ToString(System.Globalization.CultureInfo.InvariantCulture),combined);
  }
  // Each job needs its own folder below a shared destination; Duplicati refuses two backups in one folder.
  public static string? Below(string baseUrl,params string[] segments)

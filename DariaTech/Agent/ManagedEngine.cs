@@ -79,7 +79,10 @@ public sealed class ManagedEngine(AgentOptions options,ProtectedState state,ILog
   var uri=new Uri(engineUrl);
   if(!uri.IsLoopback||uri.Host is not ("127.0.0.1" or "localhost")||uri.Scheme!=(tls is null?"http":"https"))throw new InvalidOperationException("Invalid managed loopback transport");
   var start=new ProcessStartInfo(executable){UseShellExecute=false,CreateNoWindow=true,RedirectStandardOutput=true,RedirectStandardError=true,WorkingDirectory=Path.GetDirectoryName(executable)!};
-  foreach(var arg in new[]{"--webservice-interface=loopback",$"--webservice-port={uri.Port}",$"--server-datafolder={data}","--disable-update-check=true","--require-db-encryption-key=true","--webservice-allowed-hostnames=localhost,127.0.0.1","--webservice-suppress-welcome-page=true"})start.ArgumentList.Add(arg);
+  foreach(var arg in new[]{"--webservice-interface=loopback",$"--webservice-port={uri.Port}",$"--server-datafolder={data}","--disable-update-check=true","--require-db-encryption-key=true","--webservice-allowed-hostnames=localhost,127.0.0.1","--webservice-suppress-welcome-page=true",
+   // No local Duplicati web interface (and with it no remote-control or update settings): devices are managed
+   // from the DariaTech Console only. The agent talks to the engine API.
+   "--webservice-api-only=true"})start.ArgumentList.Add(arg);
   if(tls is not null)
   {
    start.ArgumentList.Add("--webservice-sslcertificatefile="+tls.Path);start.ArgumentList.Add("--webservice-disable-https=false");

@@ -128,16 +128,26 @@ try {
  $engineAcl.RemoveAccessRuleAll((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier('S-1-1-0')),'Write','ContainerInherit,ObjectInherit','None','Allow')))
  Set-Acl $externalRoot $engineAcl
  $configuration.Agent | Add-Member ExternalEngineExecutable $externalExe -Force
- $configuration.Agent | Add-Member CommandPublicKeyFile (Join-Path $state 'commands-public.pem') -Force
- $configuration.Agent | Add-Member RestoreRoot (Join-Path $state 'Restores') -Force
  $configuration | ConvertTo-Json -Depth 5 | Set-Content $configFile -Encoding UTF8
- # The upgrade opts in through the installer parameter; trust settings are preserved from the existing configuration.
- Invoke-Setup @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/console=https://localhost:18443','/allowmanaged=1')
+ if($configuration.Agent.AllowRemoteCommands){throw 'Remote actions must stay disabled without the local /allowremote opt-in'}
+ # The upgrade opts in through installer parameters exactly like the Console's install command: managed jobs,
+ # remote actions with the pinned Console key and a protected restore folder.
+ $commandKey=Join-Path $temporary 'commands.pub'
+ & node -e "const c=require('crypto');process.stdout.write(c.generateKeyPairSync('ec',{namedCurve:'P-256'}).publicKey.export({type:'spki',format:'pem'}))" | Set-Content $commandKey -Encoding ascii
+ Invoke-Setup @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/console=https://localhost:18443','/allowmanaged=1','/allowremote=1',"/commandkeyfile=$commandKey")
  $preserved=Get-Content $configFile -Raw|ConvertFrom-Json
  if($preserved.Agent.ExternalEngineExecutable -ne $externalExe){throw 'Upgrade discarded external engine selection'}
  $selected=Get-CimInstance Win32_Process -Filter "Name='Duplicati.Server.exe'"
  if($selected.ExecutablePath -ne $externalExe){throw 'Agent did not launch the selected external engine'}
- if(!$preserved.Agent.AllowManagedConfiguration -or $preserved.Agent.CommandPublicKeyFile -ne $configuration.Agent.CommandPublicKeyFile -or $preserved.Agent.RestoreRoot -ne $configuration.Agent.RestoreRoot){throw 'Upgrade discarded local management opt-in or trust settings'}
+ if(!$preserved.Agent.AllowManagedConfiguration -or !$preserved.Agent.AllowRemoteCommands -or $preserved.Agent.CommandPublicKeyFile -ne (Join-Path $state 'commands-public.pem') -or $preserved.Agent.RestoreRoot -ne (Join-Path $state 'Restores')){throw 'Installer did not apply the local management and remote-action opt-in'}
+ if((Get-Content (Join-Path $state 'commands-public.pem') -Raw).Trim() -ne (Get-Content $commandKey -Raw).Trim()){throw 'Console command key was not pinned'}
+ & $agentExe --check-restore-root (Join-Path $state 'Restores')
+ if($LASTEXITCODE){throw 'Installer-created restore folder is not protected'}
+ $otherKey=Join-Path $temporary 'other.pub'
+ & node -e "const c=require('crypto');process.stdout.write(c.generateKeyPairSync('ec',{namedCurve:'P-256'}).publicKey.export({type:'spki',format:'pem'}))" | Set-Content $otherKey -Encoding ascii
+ Invoke-Setup @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/console=https://localhost:18443','/allowremote=1',"/commandkeyfile=$otherKey") -ExpectFailure $true
+ if((Get-Content (Join-Path $state 'commands-public.pem') -Raw).Trim() -ne (Get-Content $commandKey -Raw).Trim()){throw 'A reinstall replaced the pinned command key'}
+ if((Get-Service DariaTechBackupAgent).Status -ne 'Running'){Start-Service DariaTechBackupAgent}
  if((Get-FileHash (Join-Path $state 'identity.bin')).Hash -ne $identityHash -or (Get-FileHash (Join-Path $state 'engine-credential.bin')).Hash -ne $credentialHash){throw 'Upgrade changed enrolled identity or engine credential'}
  Stop-Service DariaTechBackupAgent
  Start-Sleep 3
