@@ -264,6 +264,37 @@ public sealed class SecurityTests
    Assert.That(receipt.Status,Is.EqualTo("Failed"));Assert.That(receipt.ErrorCode,Is.EqualTo(code));Assert.That(receipt.Detail,Is.Null);
   }finally{if(Directory.Exists(directory))Directory.Delete(directory,true);}
  }
+ [Test]
+ public async Task CreatingAJobFolderAlsoCreatesMissingParentFoldersLikeWebDavNeeds()
+ {
+  var directory=Path.Combine(Path.GetTempPath(),"dt-folders-"+Guid.NewGuid());
+  try
+  {
+   // Like WebDAV MKCOL: only the last level can be created, and only when its parent exists.
+   var server=new FolderServer(["/dav/spaces/K1/"]);
+   var options=new AgentOptions{StateDirectory=directory};var state=new ProtectedState(options);
+   using var adapter=new DuplicatiAdapter(options,state,server);
+   var now=DateTimeOffset.UtcNow;var target="webdav://ocloud.example/dav/spaces/K1/Kunde/MacBook/Downloads-ab12cd";
+   DeviceCommand Test(bool create)=>new(Guid.NewGuid(),Guid.NewGuid(),Guid.NewGuid(),"0",RemoteAction.TestDestination,null,now,now.AddMinutes(5),null,Test:new(target,new(){{"use-ssl","true"}},create));
+   Assert.That((await adapter.TestDestination(Test(false),CancellationToken.None)).ErrorCode,Is.EqualTo("DestinationFolderMissing"));
+   Assert.That((await adapter.TestDestination(Test(true),CancellationToken.None)).Status,Is.EqualTo("Completed"));
+   Assert.That(server.Folders,Is.SupersetOf(new[]{"/dav/spaces/K1/Kunde/","/dav/spaces/K1/Kunde/MacBook/","/dav/spaces/K1/Kunde/MacBook/Downloads-ab12cd/"}));
+   Assert.That(server.Queries.All(x=>x.Contains("use-ssl=true")),Is.True,"backend options reach every level");
+  }finally{if(Directory.Exists(directory))Directory.Delete(directory,true);}
+ }
+ private sealed class FolderServer(IEnumerable<string> existing):HttpMessageHandler
+ {
+  public HashSet<string> Folders {get;}=[..existing];public List<string> Queries {get;}=[];
+  protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct)
+  {
+   using var body=JsonDocument.Parse(await request.Content!.ReadAsStringAsync(ct));var url=new Uri(body.RootElement.GetProperty("path").GetString()!);
+   Queries.Add(url.Query);var path=url.AbsolutePath.TrimEnd('/')+"/";var create=request.RequestUri!.Query.Contains("autocreate=true");
+   if(Folders.Contains(path))return new(System.Net.HttpStatusCode.OK){Content=new StringContent("{}")};
+   var parent=path[..(path.TrimEnd('/').LastIndexOf('/')+1)];
+   if(create&&Folders.Contains(parent)){Folders.Add(path);return new(System.Net.HttpStatusCode.OK){Content=new StringContent("{}")};}
+   return new(System.Net.HttpStatusCode.InternalServerError){Content=new StringContent(create?"{\"Error\":\"error-creating-folder\"}":"{\"Error\":\"missing-folder\"}")};
+  }
+ }
  private sealed class TaskResultHandler(string result):HttpMessageHandler
  {
   protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct)=>Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK){Content=new StringContent(result)});

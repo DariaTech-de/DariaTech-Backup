@@ -65,6 +65,10 @@ public sealed partial class DuplicatiAdapter
    Filters=definition.Filters.Select((x,i)=>new{Order=i,x.Include,x.Expression})},Schedule=schedule};
   using var response=string.IsNullOrEmpty(id)?await client.PostAsJsonAsync("/api/v1/backups",input,ct):await client.PutAsJsonAsync($"/api/v1/backup/{Uri.EscapeDataString(id)}",input,ct);
   response.EnsureSuccessStatusCode();
+  // The first backup creates only the last folder level; parents (customer/device below a shared location) are
+  // created here. Best effort: an unreachable destination is reported by the backup itself.
+  if(!restoreOnly&&definition.Saas is null)
+   try{await EnsureFolder(definition.TargetUrl,definition.BackendOptions,ct);}catch(Exception error)when(error is HttpRequestException or TaskCanceledException&&!ct.IsCancellationRequested){}
   if(!string.IsNullOrEmpty(id))
   {
    BindSaasJob(id,assignment,mountPoint);BindSourceJob(id,assignment);BindRestoreOnly(id,restoreOnly);
