@@ -69,7 +69,9 @@ public sealed partial class DuplicatiAdapter
      return run.Status==RunStatus.Success?new("Completed",id,null):new("Failed",id,"EngineTaskFailed");
     }catch(JsonException){}
    }
-   return new("Indeterminate",id,"DispatchIndeterminate");
+   // The engine can report the task finished a moment before its result record is readable (seen on fast
+   // failing tasks); keep waiting briefly instead of settling on an indeterminate outcome.
+   return finished.Value>DateTimeOffset.UtcNow.AddMinutes(-1)?new("Accepted",id,null):new("Indeterminate",id,"DispatchIndeterminate");
   }
   return status switch {"Completed"=>new("Completed",id,null),"Failed"=>new("Failed",id,"EngineTaskFailed"),_=>new("Accepted",id,null)};
  }
