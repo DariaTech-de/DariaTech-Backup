@@ -649,7 +649,20 @@ Assert.That(html,Does.Contain("Agent 0.2.0 · Pilot").And.Contain(url).And.Conta
   Assert.That(assignment.JobId,Is.EqualTo(job.Id));Assert.That(assignment.Definition.Adopted,Is.True);Assert.That(assignment.Definition.TargetUrl,Is.EqualTo(definition.TargetUrl));
   Assert.That(assignment.Definition.Passphrase,Is.EqualTo(definition.Passphrase));Assert.That(assignment.Definition.Schedule,Is.Not.Null);Assert.That(ConfigurationPolicy.Valid(assignment.Definition),Is.True);
   Assert.That(ConfigurationPolicy.Valid(assignment.Definition with{RestoreOnly=true,Schedule=null}),Is.False,"a taken-over job is never a recovery copy");
-  using(var applied=await newMac.PostAsJsonAsync($"/api/v1/agent/configurations/{job.Id}/receipt",new ConfigurationReceipt(2,"5","Applied")))Assert.That(applied.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  // Editing before the agent applied the takeover keeps the marker, so the rebuild still happens.
+  using(var edited=await admin.PutAsJsonAsync($"/api/v1/management/managed-jobs/{job.Id}",new ConfigurationInput(2,assignment.Definition with{Adopted=null,KeepVersions=60})))Assert.That(edited.StatusCode,Is.EqualTo(HttpStatusCode.OK));
+  var latest=(await newMac.GetFromJsonAsync<ConfigurationAssignment[]>("/api/v1/agent/configurations"))!.Single();
+  Assert.That(latest.Revision,Is.EqualTo(3));Assert.That(latest.Definition.Adopted,Is.True);Assert.That(latest.Definition.KeepVersions,Is.EqualTo(60));
+  using(var applied=await newMac.PostAsJsonAsync($"/api/v1/agent/configurations/{job.Id}/receipt",new ConfigurationReceipt(3,"5","Applied")))Assert.That(applied.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  // A taken-over backup can still be recovered on yet another device (the recovery copy is not a takeover).
+  var (spare,spareId)=await Enroll("Ersatz-Mac");using(spare){
+   var customer=await db.Customers.Where(x=>x.TenantId==t.Id).Select(x=>x.Id).SingleAsync();
+   using var recover=await admin.PostAsync($"/Customer?id={customer}&handler=Recover",new FormUrlEncodedContent(new Dictionary<string,string>{
+    {"id",customer.ToString()},{"sourceJobId",job.Id.ToString()},{"targetDeviceId",spareId.DeviceId.ToString()},{"__RequestVerificationToken",Form(await admin.GetStringAsync($"/Customer?id={customer}"))}}));
+   Assert.That(recover.StatusCode,Is.EqualTo(HttpStatusCode.Redirect));
+   var copy=(await spare.GetFromJsonAsync<ConfigurationAssignment[]>("/api/v1/agent/configurations"))!.Single();
+   Assert.That(copy.Definition.RestoreOnly,Is.True);Assert.That(copy.Definition.Adopted,Is.Null);
+  }
   // The stored passphrase can be shown to an administrator, and every view is audited.
   var edit=await admin.GetStringAsync($"/BackupEdit?deviceId={newId.DeviceId}&id={job.Id}");
   Assert.That(edit,Does.Contain("Passphrase anzeigen").And.Contain("/Users/").And.Not.Contain("replace-passphrase"));

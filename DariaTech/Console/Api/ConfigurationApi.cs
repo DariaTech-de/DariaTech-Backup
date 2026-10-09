@@ -66,7 +66,9 @@ public static class ConfigurationApi
    // Rotating the backup passphrase or destination silently makes the existing chain inaccessible.
    if(definition.RestoreOnly!=input.Definition.RestoreOnly)return Results.Conflict(new{code="RestoreOnlyFixed"});
    if(definition.Passphrase!=input.Definition.Passphrase||definition.TargetUrl!=input.Definition.TargetUrl||!SaasPolicy.SameDirectory(definition.Saas,input.Definition.Saas)||(definition.Proxmox is null)!=(input.Definition.Proxmox is null))return Results.Conflict(new{code="NewBackupChainRequired"});
-   job.LatestRevision++;job.Name=input.Definition.Name;job.Status="Pending";AddRevision(db,secrets,job,input.Definition);
+   // A taken-over job keeps its marker: the agent decides from its local database whether a rebuild is still due.
+   var next=input.Definition with{Adopted=definition.Adopted};if(!ConfigurationPolicy.Valid(next))return Results.BadRequest();
+   job.LatestRevision++;job.Name=input.Definition.Name;job.Status="Pending";AddRevision(db,secrets,job,next);
    ManagementApi.Audit(db,ctx,job.TenantId,"backup.configuration-changed",job.Id);await db.SaveChangesAsync();await tx.CommitAsync();return Results.Ok(job);
  }
  // Recovery to another device (Acronis "recover to another machine"): the target device gets a copy of the
@@ -84,7 +86,7 @@ public static class ConfigurationApi
   if(await db.ManagedJobs.AnyAsync(x=>x.DeviceId==target.Id&&x.SourceManagedJobId==source.Id))return (null,"Dieses Backup ist auf dem Gerät bereits zur Wiederherstellung verbunden.");
   var sourceDevice=await db.Devices.Where(x=>x.Id==source.DeviceId).Select(x=>x.Name).SingleAsync();
   var name=$"Wiederherstellung: {original.Name} (von {sourceDevice})";if(name.Length>200)name=name[..200];
-  var copy=original with{Name=name,Schedule=null,SourceMounts=null,RestoreOnly=true};
+  var copy=original with{Name=name,Schedule=null,SourceMounts=null,RestoreOnly=true,Adopted=null};
   if(!ConfigurationPolicy.Valid(copy))return (null,"Die Konfiguration des Backups ist ungültig.");
   var job=new ManagedJob{TenantId=target.TenantId,DeviceId=target.Id,Name=name,LatestRevision=1,RestoreOnly=true,SourceManagedJobId=source.Id};db.ManagedJobs.Add(job);
   AddRevision(db,secrets,job,copy);ManagementApi.Audit(db,ctx,job.TenantId,"backup.recovery-copy-created",job.Id);
