@@ -4,6 +4,7 @@ set -euo pipefail
 umask 077
 rid="${1:?RID required}"
 node_bin="${2:?Absolute CI Node executable required}"
+: "${UPDATE_CANDIDATE_VERSION:?Candidate agent version required}"
 repo="$(cd "$(dirname "$0")/../../.." && pwd -P)"
 if [ "$(uname -s)" = Darwin ]; then work="$(mktemp -d /private/tmp/dariatech-update.XXXXXXXX)"; else work="$(mktemp -d)"; fi
 node_pid=''
@@ -39,7 +40,7 @@ openssl ecparam -name prime256v1 -genkey -noout -out "$UPDATE_PRIVATE_KEY"
 openssl pkey -in "$UPDATE_PRIVATE_KEY" -pubout -out "$work/update.pub"
 printf '%s' "$FIXTURE_TOKEN" > "$work/token"
 printf '%s' bad > "$UPDATE_PHASE"
-export UPDATE_ARTIFACT="$repo/artifacts/update/$rid/DariaTechBackupAgent-0.3.0-$rid.tar.gz"
+export UPDATE_ARTIFACT="$repo/artifacts/update/$rid/DariaTechBackupAgent-$UPDATE_CANDIDATE_VERSION-$rid.tar.gz"
 "$node_bin" "$repo/deploy/unix/tests/update-fixture.cjs" >"$work/fixture.log" 2>&1 &
 node_pid=$!
 for attempt in {1..40}; do
@@ -71,6 +72,6 @@ wait_receipt tampered Failed
 printf '%s' good > "$UPDATE_PHASE"
 wait_receipt good Installed
 test "$(openssl dgst -sha256 "$state/identity.bin")" = "$identity_hash"
-python3 -c 'import json,sys;v=json.load(open(sys.argv[1]));assert v["enrollments"]==1 and "0.3.0.0" in v["versions"]' "$FIXTURE_RESULT"
+python3 -c 'import json,sys;v=json.load(open(sys.argv[1]));assert v["enrollments"]==1 and sys.argv[2]+".0" in v["versions"]' "$FIXTURE_RESULT" "$UPDATE_CANDIDATE_VERSION"
 test "$("$prefix/DariaTech.Agent" --service-name)" = DariaTechBackupAgent
-printf '%s\n' 'PASS: independent native supervisor, invalid-signature rejection, tampered-binary rejection, actual 0.2 to 0.3 update and retained identity'
+printf '%s\n' "PASS: independent native supervisor, invalid-signature rejection, tampered-binary rejection, actual update to $UPDATE_CANDIDATE_VERSION and retained identity"

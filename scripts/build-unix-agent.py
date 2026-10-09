@@ -33,6 +33,10 @@ try:
 finally:
     for path,content in portable_locks.items():
         path.write_bytes(content)
+# Devices are managed from the Console only: the packaged engine serves a notice instead of the Duplicati web
+# interface (with its remote-control and update settings). Only packaged files change, not engine code.
+shutil.rmtree(engine/"webroot")
+shutil.copytree(repo/"DariaTech/Agent/local-ui", engine/"webroot")
 for file in engine.rglob("*"):
     if file.is_symlink():
         raise SystemExit("Links are not allowed in release payloads")

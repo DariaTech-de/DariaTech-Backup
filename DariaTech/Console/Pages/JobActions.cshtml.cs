@@ -36,9 +36,42 @@ public sealed class JobActionsModel(ManagementDb db,CommandSigning signer,ISecre
  public bool Administrator=>User.IsInRole("SuperAdmin")||User.IsInRole("Administrator");
  public string Actor=>User.FindFirstValue(ClaimTypes.NameIdentifier)??"";
  public string? Error {get;private set;}
- public async Task<IActionResult> OnGetAsync(Guid id,Guid? catalogId)
+ // Guided restore: 1. version (from the latest loaded version list), 2. files of that version, 3. where to.
+ public RestoreCatalog? Versions {get;private set;}
+ public DateTimeOffset? Point {get;private set;}
+ public RestoreCatalog? Files {get;private set;}public string? FilesFilter {get;private set;}
+ public bool Waiting {get;private set;}
+ public bool FourEyes {get;private set;}
+ public RemoteCommand? LastCheck {get;private set;}
+ public string Platform {get;private set;}="";
+ public string RestoreRootHint=>Platform switch{"win-x64"=>@"C:\ProgramData\DariaTechBackup\Restores",var p when p.StartsWith("osx")=>"/Library/Application Support/DariaTechBackup/Restores","" =>"Wiederherstellungsordner des Geräts",_=>"/var/lib/dariatech-backup-restores"};
+ public string DefaultFolder=>"Wiederherstellung-"+DateTime.Now.ToString("yyyyMMdd-HHmm");
+ public static string ActionLabel(RemoteAction a)=>a switch
+ {
+  RemoteAction.RunBackup=>"Backup starten",RemoteAction.StopBackup=>"Lauf stoppen",RemoteAction.VerifyBackup=>"Backup prüfen",RemoteAction.Restore=>"Wiederherstellung",
+  RemoteAction.ListRestorePoints=>"Versionen laden",RemoteAction.ListRestoreFiles=>"Dateien laden",RemoteAction.RestoreSaas=>"Cloud-Wiederherstellung",RemoteAction.RestoreProxmox=>"Proxmox-Wiederherstellung",_=>a.ToString(),
+ };
+ public static (string Text,string Css) StatusLabel(RemoteCommand c)=>c.Status switch
+ {
+  "Pending" when c.Expires<DateTimeOffset.UtcNow=>("Abgelaufen – Gerät war nicht erreichbar","offline"),
+  "AwaitingApproval" when c.Expires<DateTimeOffset.UtcNow=>("Abgelaufen – nicht freigegeben","offline"),
+  "Pending"=>("Wartet auf Gerät","waiting"),"AwaitingApproval"=>("Wartet auf Freigabe","warning"),"Accepted"=>("Läuft","waiting"),
+  "Completed"=>("Erfolgreich","healthy"),"Failed"=>("Fehlgeschlagen","critical"),"Rejected"=>("Vom Gerät abgelehnt","critical"),"Indeterminate"=>("Ergebnis unklar","warning"),
+  var other=>(other,"offline"),
+ };
+ public static string ErrorText(string? code)=>code switch
+ {
+  null or ""=>"",
+  "PolicyRejected"=>"Auf dem Gerät nicht freigegeben (Fernaktionen bzw. Wiederherstellungsordner fehlen – Agent mit aktuellem Befehl aus „Gerät hinzufügen“ neu installieren).",
+  "EngineTaskFailed"=>"Die Backup-Engine meldet einen Fehler (z. B. Ziel nicht erreichbar oder falsches Passwort).",
+  "DispatchIndeterminate"=>"Das Gerät konnte den Start nicht bestätigen.",
+  var other=>other,
+ };
+ public async Task<IActionResult> OnGetAsync(Guid id,Guid? catalogId,string? point)
  {
   JobId=id;if(!await Load())return NotFound();
+  if(DateTimeOffset.TryParse(point,System.Globalization.CultureInfo.InvariantCulture,System.Globalization.DateTimeStyles.AssumeUniversal,out var p))Point=p.ToUniversalTime();
+  await LoadGuide();
   if(catalogId is {} selected)
   {
    var command=await db.Commands.SingleOrDefaultAsync(x=>x.Id==selected&&x.JobId==JobId);
@@ -63,6 +96,50 @@ public sealed class JobActionsModel(ManagementDb db,CommandSigning signer,ISecre
   if(result is IStatusCodeHttpResult {StatusCode:>=400}){Error="Die Aktion wurde abgelehnt. Berechtigungen, Signierung, Auswahl und angewendete Konfigurationsrevision prüfen.";return Page();}
   return RedirectToPage(new{id=JobId});
  }
+ // Quick actions and the guided restore post here; all go through the same signed command path.
+ public async Task<IActionResult> OnPostGuideAsync(string step,string? point,string? filter,string[]? paths,string? target,string? folder)
+ {
+  if(!await Load())return NotFound();
+  DateTimeOffset? at=DateTimeOffset.TryParse(point,System.Globalization.CultureInfo.InvariantCulture,System.Globalization.DateTimeStyles.AssumeUniversal,out var p)?p.ToUniversalTime():null;
+  CommandInput? input=step switch
+  {
+   "run"=>new(JobId,RemoteAction.RunBackup,null,15),"stop"=>new(JobId,RemoteAction.StopBackup,null,15),"verify"=>new(JobId,RemoteAction.VerifyBackup,null,15),
+   "versions"=>new(JobId,RemoteAction.ListRestorePoints,null,15),
+   "files" when at is not null=>new(JobId,RemoteAction.ListRestoreFiles,null,15,new(at,string.IsNullOrWhiteSpace(filter)?null:filter.Trim())),
+   "restore" when at is not null&&paths is {Length:>0}=>new(JobId,RemoteAction.Restore,new(at.Value,paths,target=="original"?"":(folder??"").Trim(),target=="original"),15),
+   _=>null,
+  };
+  if(input is null){Error=step=="restore"?"Bitte mindestens eine Datei oder einen Ordner auswählen.":"Bitte zuerst eine Version wählen.";Point=at;await LoadGuide();return Page();}
+  if(input.Restore is {OriginalLocation:false} r&&!CommandProtocol.SafeFolder(r.DestinationFolder)){Error="Der Ordnername darf nur Buchstaben, Ziffern, - und _ enthalten.";Point=at;await LoadGuide();return Page();}
+  var result=await CommandApi.Request(input,db,signer,secrets,HttpContext);
+  if(result is IStatusCodeHttpResult {StatusCode:>=400} rejected)
+  {
+   Error=rejected.StatusCode==409&&step=="run"?"Über eine Wiederherstellungs-Verbindung werden keine Backups gestartet."
+    :rejected.StatusCode==403?"Für diese Aktion fehlt Ihnen die Berechtigung (Wiederherstellen: Administrator).":"Die Aktion wurde abgelehnt. Bitte Auswahl prüfen.";
+   Point=at;await LoadGuide();return Page();
+  }
+  return RedirectToPage(new{id=JobId,point=at?.ToString("O")});
+ }
+ private async Task LoadGuide()
+ {
+  Platform=await db.Agents.Where(x=>x.DeviceId==Device.Id).Select(x=>x.Platform).FirstOrDefaultAsync()??"";
+  FourEyes=await CommandApi.SecondApprovalPossible(db);
+  var now=DateTimeOffset.UtcNow;
+  // Refresh while the device still has to answer; a long-running task stops refreshing after two hours.
+  Waiting=Commands.Any(x=>x.Status=="Pending"&&x.Expires>now||x.Status=="Accepted"&&x.Expires>now.AddHours(-2));
+  LastCheck=Commands.FirstOrDefault(x=>x.Action==RemoteAction.VerifyBackup);
+  var versions=Commands.FirstOrDefault(x=>x.Action==RemoteAction.ListRestorePoints&&x.EncryptedCatalog is not null);
+  if(versions is not null)Versions=ReadCatalog(versions);
+  if(Point is {} point)
+  {
+   foreach(var c in Commands.Where(x=>x.Action==RemoteAction.ListRestoreFiles&&x.EncryptedCatalog is not null))
+   {
+    var request=JsonSerializer.Deserialize<DeviceCommand>(Convert.FromBase64String(secrets.Unprotect(c.TenantId,$"command:{c.Id}",c.EncryptedPayload)))!;
+    if(request.Catalog?.Snapshot is {} snapshot&&Math.Abs((snapshot-point).TotalSeconds)<1){Files=ReadCatalog(c);FilesFilter=request.Catalog.Prefix;break;}
+   }
+  }
+ }
+ private RestoreCatalog ReadCatalog(RemoteCommand c)=>JsonSerializer.Deserialize<RestoreCatalog>(secrets.Unprotect(c.TenantId,$"catalog:{c.Id}",c.EncryptedCatalog!))!;
  public async Task<IActionResult> OnPostApproveAsync(Guid commandId)
  {
   if(!await Load()||!await db.Commands.AnyAsync(x=>x.Id==commandId&&x.JobId==JobId))return NotFound();

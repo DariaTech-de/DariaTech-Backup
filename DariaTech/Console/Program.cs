@@ -45,6 +45,7 @@ builder.Services.AddRazorPages(o=>{o.Conventions.AuthorizeFolder("/");o.Conventi
 builder.Services.AddOptions<MonitoringOptions>().Bind(builder.Configuration.GetSection("Monitoring"))
  .Validate(o=>o.OfflineMinutes is >=1 and <=1440&&o.BackupAgeHours is >=1 and <=8760&&o.PollSeconds is >=10 and <=3600&&o.RepeatedFailureCount is >=2 and <=20&&o.QuotaCriticalPercent is >=1 and <=99&&o.QuotaWarningPercent>o.QuotaCriticalPercent&&o.QuotaWarningPercent<=99,"Invalid monitoring thresholds").ValidateOnStart();
 builder.Services.AddHostedService<Monitoring>();
+builder.Services.AddHostedService<Verifications>();
 builder.Services.AddOptions<NotificationOptions>().Bind(builder.Configuration.GetSection("Notifications")).Validate(o=>o.Valid(),"Valid SMTP settings and encrypted password file required").ValidateOnStart();
 builder.Services.AddSingleton<INotificationTransport,SmtpTransport>();builder.Services.AddHostedService<Notifications>();
 builder.Services.AddRateLimiter(o=>

@@ -72,9 +72,10 @@ document.querySelectorAll('[data-destination-mode]').forEach(radio => radio.addE
    panel.hidden = false; list.replaceChildren(); current.textContent = path ?? ''; status.textContent = waitText(0);
    const data = new FormData(); data.set('deviceId', deviceId()); if (path) data.set('path', path);
    const started = await post('Browse', data);
-   if (started.error) { status.textContent = started.error; return; }
+   status.classList.remove('bad');
+   if (started.error) { status.textContent = started.error; status.classList.add('bad'); return; }
    await poll(started.id, result => {
-    if (!result.ok) { status.textContent = result.message; return; }
+    if (!result.ok) { status.textContent = result.message; status.classList.add('bad'); return; }
     status.textContent = result.folders.length === 0 ? 'Keine Unterordner.' : (result.truncated ? 'Nur die ersten Ordner werden angezeigt.' : '');
     for (const folder of result.folders) {
      const li = document.createElement('li');
@@ -122,3 +123,8 @@ document.querySelectorAll('[data-copy]').forEach(button => button.addEventListen
  try { await navigator.clipboard.writeText(source.textContent ?? ''); button.textContent = 'Kopiert'; }
  catch { getSelection()?.selectAllChildren(source); button.textContent = 'Markiert – mit Strg+C kopieren'; }
 }));
+// Restore guide: select all files, and refresh while the device still has to answer.
+document.querySelectorAll('[data-select-all]').forEach(all => all.addEventListener('change', () => {
+ all.closest('form')?.querySelectorAll('[data-file]').forEach(box => { box.checked = all.checked; });
+}));
+if (document.querySelector('[data-auto-refresh]')) setTimeout(() => location.reload(), 4000);

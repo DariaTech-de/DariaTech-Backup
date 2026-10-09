@@ -65,7 +65,7 @@
    <div class="choice" role="radiogroup" aria-label="Art des Speicherziels">
     <label class="choice-option"><input type="radio" name="DestinationMode" value="template" checked="@(templateMode?"checked":null)" data-destination-mode />
      <span><strong>Gespeichertes Speicherziel</strong><span class="sub">Der Job erhält automatisch einen eigenen Ordner: Kundennummer / Gerät / Job.</span>
-      <select name="TemplateId" aria-label="Gespeichertes Speicherziel">@foreach(var t in Model.Templates){<option value="@t.Id" selected="@(t.Id==Model.TemplateId?"selected":null)">@t.Name@(t.IsDefault?" (Standard)":"") – @DestinationForm.Describe(t.TargetUrl)</option>}</select></span></label>
+      <select name="TemplateId" aria-label="Gespeichertes Speicherziel">@foreach(var t in Model.Templates){<option value="@t.Id" selected="@(t.Id==Model.TemplateId?"selected":null)">@t.Name@(t.IsDefault?" (Standard)":"")@(t.TenantId is null?"":" · Kundenziel") – @DestinationForm.Describe(t.TargetUrl)</option>}</select></span></label>
     <label class="choice-option"><input type="radio" name="DestinationMode" value="custom" checked="@(templateMode?null:"checked")" data-destination-mode />
      <span><strong>Eigenes Ziel für diesen Job</strong><span class="sub">Beliebiges Speicherziel der Backup-Engine, z. B. externe Festplatte, NAS oder Cloud des Kunden.</span></span></label>
    </div>

@@ -3,7 +3,11 @@ param(
  [Parameter(Mandatory=$true)][string]$InstallDirectory,
  [string]$ConsoleUrl='https://backup.dariatech.de',
  # Local administrator opt-in for Console-managed backup jobs; it only ever enables, an existing opt-in is kept.
- [switch]$AllowManagedConfiguration
+ [switch]$AllowManagedConfiguration,
+ # Local administrator opt-in for Console-signed remote actions: pins the Console's public command key and
+ # creates the protected restore folder that remote restores write into.
+ [switch]$AllowRemoteCommands,
+ [string]$CommandKeyFile
 )
 $ErrorActionPreference='Stop'
 # The installer launches Windows PowerShell 5.1. Do not inherit PowerShell 7
@@ -64,6 +68,29 @@ if ($Action -eq 'Prepare') {
   }
  }
  if ($AllowManagedConfiguration) { $agentConfiguration.AllowManagedConfiguration=$true }
+ if ($AllowRemoteCommands) {
+  if (!$CommandKeyFile -or !(Test-Path -LiteralPath $CommandKeyFile -PathType Leaf)) { throw 'Command key file required for remote actions' }
+  $pem=(Get-Content -LiteralPath $CommandKeyFile -Raw).Trim()
+  if ($pem -notmatch '^-----BEGIN PUBLIC KEY-----\r?\n[A-Za-z0-9+/=\r\n]{40,1000}\r?\n-----END PUBLIC KEY-----$') { throw 'Invalid command public key' }
+  # A pinned key only changes through deliberate local administration, never through a reinstall:
+  # an existing pin (also a manually provisioned path) must hold exactly the supplied key.
+  $pinned=if ($agentConfiguration.CommandPublicKeyFile) { [string]$agentConfiguration.CommandPublicKeyFile } else { Join-Path $state 'commands-public.pem' }
+  if (Test-Path -LiteralPath $pinned) {
+   if ((Get-Content -LiteralPath $pinned -Raw).Trim() -ne $pem) { throw 'A different Console command key is already pinned on this device' }
+  } elseif ($agentConfiguration.CommandPublicKeyFile) { throw 'The configured command key file is missing; restore it through local administration' }
+  else { [IO.File]::WriteAllText($pinned,$pem+"`n") }
+  $restoreRoot=Join-Path $state 'Restores'
+  if (!(Test-Path $restoreRoot)) { New-Item -ItemType Directory -Path $restoreRoot | Out-Null }
+  $restoreAcl=New-Object System.Security.AccessControl.DirectorySecurity
+  $restoreAcl.SetAccessRuleProtection($true,$false)
+  $restoreAcl.SetOwner((New-Object System.Security.Principal.SecurityIdentifier('S-1-5-32-544')))
+  foreach ($sid in 'S-1-5-18','S-1-5-32-544') {
+   $restoreAcl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule((New-Object System.Security.Principal.SecurityIdentifier($sid)),'FullControl','ContainerInherit,ObjectInherit','None','Allow')))
+  }
+  Set-Acl -Path $restoreRoot -AclObject $restoreAcl
+  $agentConfiguration.AllowRemoteCommands=$true;$agentConfiguration.CommandPublicKeyFile=$pinned
+  if (!$agentConfiguration.RestoreRoot) { $agentConfiguration.RestoreRoot=$restoreRoot }
+ }
  @{Agent=$agentConfiguration;Logging=@{LogLevel=@{Default='Information'}}} |
   ConvertTo-Json -Depth 5 | Set-Content (Join-Path $InstallDirectory 'appsettings.json') -Encoding UTF8
  exit 0

@@ -9,6 +9,8 @@ public sealed partial class DuplicatiAdapter
  public async Task<long> Dispatch(DeviceCommand command,AgentOptions options,CancellationToken ct)
  {
   var jobs=await ReadJobs(ct);if(jobs.All(x=>x.LocalId!=command.LocalJobId))throw new InvalidOperationException("Backup job no longer exists");
+  // Two devices writing to one destination would corrupt it; a recovery copy only restores.
+  if(command.Action==RemoteAction.RunBackup&&IsRestoreOnly(command.LocalJobId))throw new InvalidOperationException("Recovery copy cannot run backups");
   var cloudBindings=state.Read<Dictionary<string,SaasJobBinding>>("saas-bindings.bin")??[];
   if(command.Action==RemoteAction.RunBackup&&cloudBindings.TryGetValue(command.LocalJobId,out var cloud))await RequireSaasProvider(cloud.Source,false,ct);
   if(command.Action==RemoteAction.RestoreProxmox)return await RestoreProxmox(command,ct);
@@ -21,8 +23,11 @@ public sealed partial class DuplicatiAdapter
   }
   if(command.Action==RemoteAction.Restore)
   {
-   var restore=command.Restore!;var destination=RestoreDestination(options.RestoreRoot,restore.DestinationFolder);
-   response=await client.PostAsJsonAsync($"/api/v1/backup/{command.LocalJobId}/restore",new{paths=restore.Paths,time=restore.Snapshot.ToUniversalTime().ToString("O"),restore_path=destination,overwrite=false,permissions=false,skip_metadata=true},ct);
+   var restore=command.Restore!;var time=restore.Snapshot.ToUniversalTime().ToString("O");
+   // Original location: the engine writes to the original paths and keeps existing files (overwrite=false
+   // stores the restored version next to them with a timestamp suffix).
+   if(restore.OriginalLocation)response=await client.PostAsJsonAsync($"/api/v1/backup/{command.LocalJobId}/restore",new{paths=restore.Paths,time,overwrite=false,permissions=false,skip_metadata=false},ct);
+   else response=await client.PostAsJsonAsync($"/api/v1/backup/{command.LocalJobId}/restore",new{paths=restore.Paths,time,restore_path=RestoreDestination(options.RestoreRoot,restore.DestinationFolder),overwrite=false,permissions=false,skip_metadata=true},ct);
   }
   else response=await client.PostAsync($"/api/v1/backup/{command.LocalJobId}/{(command.Action==RemoteAction.RunBackup?"run":"verify")}",null,ct);
   using(response)
@@ -64,7 +69,9 @@ public sealed partial class DuplicatiAdapter
      return run.Status==RunStatus.Success?new("Completed",id,null):new("Failed",id,"EngineTaskFailed");
     }catch(JsonException){}
    }
-   return new("Indeterminate",id,"DispatchIndeterminate");
+   // The engine can report the task finished a moment before its result record is readable (seen on fast
+   // failing tasks); keep waiting briefly instead of settling on an indeterminate outcome.
+   return finished.Value>DateTimeOffset.UtcNow.AddMinutes(-1)?new("Accepted",id,null):new("Indeterminate",id,"DispatchIndeterminate");
   }
   return status switch {"Completed"=>new("Completed",id,null),"Failed"=>new("Failed",id,"EngineTaskFailed"),_=>new("Accepted",id,null)};
  }

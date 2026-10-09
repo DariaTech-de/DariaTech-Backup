@@ -8,7 +8,7 @@ The Windows installer source is in deploy/windows. The Windows installer GitHub 
 
 Interactive setup requests the HTTPS Console origin, a site-bound enrollment token and a local engine UI password (14–200 characters). Run as administrator. Setup refuses pre-existing state directories with untrusted ownership, inherited/broad ACLs or reparse points. It returns a nonzero exit code on provisioning failure, including silent installs. Setup creates an automatic LocalSystem service with restart recovery. A Windows Job Object terminates its engine child on service termination. Initial enrollment and DPAPI protection execute inside LocalSystem; no manual SYSTEM shell is needed.
 
-The installer owns a separate loopback engine on port 8210 and stores databases under `%ProgramData%\DariaTechBackup\engine`. It never adopts or modifies an existing Duplicati service/database. Its password and settings encryption key are DPAPI CurrentUser-protected under SYSTEM; secrets are supplied to the child via process environment, not command-line arguments. The local UI is available at http://127.0.0.1:8210/ngax/ using the chosen local password. Configure actual backup jobs there; registration alone does not create a backup job.
+The installer owns a separate loopback engine on port 8210 and stores databases under `%ProgramData%\DariaTechBackup\engine`. It never adopts or modifies an existing Duplicati service/database. Its password and settings encryption key are DPAPI CurrentUser-protected under SYSTEM; secrets are supplied to the child via process environment, not command-line arguments. The packaged engine's `webroot` is replaced by a notice page (`DariaTech/Agent/local-ui`): there is no local Duplicati web interface, and with it no remote-control or update settings on the device. Engine code is unchanged. (`--webservice-api-only` is not used: on a fresh engine database it widens a start-up race in the engine.) Backup jobs, restores and checks are managed from the Console; registration alone does not create a backup job.
 
 For RMM deployment, prefer protected input files:
 
@@ -46,7 +46,7 @@ Run both provisioning commands under the exact Windows service identity (normall
 
 ## Engine service profile
 
-Build/publish only the OSS server entrypoint with DariaTechOssOnly=true. Start the existing engine service automatically with a protected local database-encryption key and local API password. Keep webservice-interface=loopback; for managed hosts use webservice-api-only=true. Configure real sources, destinations, schedules, passphrase, filters and retention using the existing Duplicati local APIs/tools. Sources and encryption/storage secrets stay local. Persist both engine and per-job databases and protect their filesystem permissions.
+Build/publish only the OSS server entrypoint with DariaTechOssOnly=true. Start the existing engine service automatically with a protected local database-encryption key and local API password. Keep webservice-interface=loopback; the packaged webroot only holds the DariaTech notice page. Configure real sources, destinations, schedules, passphrase, filters and retention using the existing Duplicati local APIs/tools. Sources and encryption/storage secrets stay local. Persist both engine and per-job databases and protect their filesystem permissions.
 
 Disable vendor communications in the managed service environment:
 
@@ -72,7 +72,7 @@ Active progress is a separate snapshot, not a fabricated historical BackupRun. C
 2. Generate a fresh enrollment token for the correct customer/site in the Console.
 3. Run setup as administrator; enter https://backup.dariatech.de, the token and a strong local engine UI password.
 4. Check that the registered device reports a heartbeat in the Console. Installation alone does not create a backup job.
-5. Open http://127.0.0.1:8210/ngax/ on that PC, sign in using the local engine password and configure sources, destination, schedule, backup encryption passphrase and retention. Keep the backup encryption passphrase in your protected recovery store; it is different from the local API/UI password.
+5. In the Console open the device and create its backup jobs (sources, destination, schedule, passphrase, retention).
 6. Run a backup and a restore test, then check the transmitted result in the Console. Do not roll the unsigned pilot out across production customers before signing and customer-platform validation.
 
 Branding pilot.2 uses the official DariaTech assets documented in [branding provenance](../branding/README.md). Windows workflow [37693913159](https://github.com/DariaTech-de/DariaTech-Backup/actions/runs/37693913159) passed installation, enrollment, engine authentication, heartbeat, upgrade, restart and uninstall checks for this package.

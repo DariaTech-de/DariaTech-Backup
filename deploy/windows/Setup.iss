@@ -53,7 +53,7 @@ ReadyLabel2a=Klicken Sie auf „Installieren“, um {#ProductName} einzurichten 
 WizardInstalling=Installation läuft
 InstallingLabel=Bitte warten Sie, während {#ProductName} eingerichtet wird. Sie können dieses Fenster minimieren.
 FinishedHeadingLabel={#ProductName} ist bereit
-FinishedLabel=Der Agent ist installiert und mit Ihrer Console verbunden. Der Dienst startet künftig automatisch mit Windows.%n%nNächster Schritt: Richten Sie Ihre Backup-Jobs in der lokalen Oberfläche ein (http://127.0.0.1:8210/ngax).
+FinishedLabel=Der Agent ist installiert und mit Ihrer Console verbunden. Der Dienst startet künftig automatisch mit Windows.%n%nNächster Schritt: Richten Sie die Backup-Jobs für dieses Gerät in der DariaTech Console ein.
 ClickFinish=Klicken Sie auf „Fertigstellen“, um den Assistenten zu schließen.
 BeveledLabel={#CompanyName} · {#SupportUrl}
 
@@ -66,9 +66,6 @@ Source: "..\..\LICENSE"; DestDir: "{app}\legal"; Flags: ignoreversion
 Source: "..\..\thirdparty\*"; DestDir: "{app}\legal\thirdparty"; Excludes: "*.dll,*.exe,*.zip,*.nupkg"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\..\DariaTech\Console\wwwroot\legal\management\*"; DestDir: "{app}\legal\management"; Flags: ignoreversion
 
-[Run]
-Filename: "http://127.0.0.1:8210/ngax"; Description: "Lokale Backup-Oberfläche jetzt öffnen"; Flags: postinstall shellexec nowait skipifsilent runasoriginaluser; Check: InstallSucceeded
-
 [UninstallRun]
 Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""{app}\Service.ps1"" -Action Remove -InstallDirectory ""{app}"""; Flags: runhidden waituntilterminated; RunOnceId: "RemoveService"
 
@@ -76,7 +73,7 @@ Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile
 var ConnectionPage: TInputQueryWizardPage;
     Token, TokenFile, ConsoleUrl, EnginePassword, EnginePasswordFile: String;
     SetupError: String;
-    AllowManaged: Boolean;
+    AllowManaged, AllowRemote: Boolean; CommandKeyFile: String;
 
 function InstallSucceeded: Boolean;
 begin
@@ -103,14 +100,15 @@ begin
  TokenFile := ExpandConstant('{param:tokenfile|}');
  EnginePasswordFile := ExpandConstant('{param:enginepasswordfile|}');
  AllowManaged := ExpandConstant('{param:allowmanaged|0}') = '1';
+ AllowRemote := ExpandConstant('{param:allowremote|0}') = '1';
+ CommandKeyFile := ExpandConstant('{param:commandkeyfile|}');
  ConnectionPage := CreateInputQueryPage(wpSelectDir, 'Gerät registrieren',
   'Mit Ihrer DariaTech Console verbinden',
   'Der Registrierungstoken gilt einmalig und ordnet dieses Gerät dem richtigen Kunden und Standort zu. ' +
-  'Sie erzeugen ihn in der Console unter Kunden › Gerät hinzufügen.' + #13#10#13#10 +
-  'Das lokale Passwort schützt die Backup-Oberfläche auf diesem PC.');
+  'Sie erzeugen ihn in der Console unter Kunden › Gerät hinzufügen. Backups und Wiederherstellungen ' +
+  'steuern Sie anschließend vollständig aus der Console.');
  ConnectionPage.Add('Console-Adresse (HTTPS):', False);
  ConnectionPage.Add('Registrierungstoken (64 Zeichen):', True);
- ConnectionPage.Add('Passwort für die lokale Oberfläche (14–200 Zeichen):', True);
  ConnectionPage.Values[0] := ConsoleUrl;
  ConnectionPage.Values[1] := Token;
 end;
@@ -126,10 +124,6 @@ begin
      not FileExists(ExpandConstant('{commonappdata}\DariaTechBackup\identity.bin')) then begin
    MsgBox('Geben Sie den Registrierungstoken mit 64 Zeichen ein.', mbError, MB_OK); Result := False;
   end;
-  if (EnginePasswordFile = '') and not FileExists(ExpandConstant('{commonappdata}\DariaTechBackup\engine-credential.bin')) and
-     ((Length(ConnectionPage.Values[2]) < 14) or (Length(ConnectionPage.Values[2]) > 200)) then begin
-   MsgBox('Geben Sie ein lokales Passwort mit 14–200 Zeichen ein.', mbError, MB_OK); Result := False;
-  end;
  end;
 end;
 
@@ -144,6 +138,10 @@ var Code: Integer; Extra: String;
 begin
  Extra := '';
  if (Action = 'Prepare') and AllowManaged then Extra := ' -AllowManagedConfiguration';
+ if (Action = 'Prepare') and AllowRemote then begin
+  if (CommandKeyFile = '') or (Pos('"', CommandKeyFile) > 0) then RaiseException('Für Fernaktionen ist /commandkeyfile mit dem Schlüssel der Console erforderlich.');
+  Extra := Extra + ' -AllowRemoteCommands -CommandKeyFile "' + CommandKeyFile + '"';
+ end;
  if Action = 'Prepare' then ShowStatus('Geschütztes Datenverzeichnis wird vorbereitet …')
  else ShowStatus('Gerät wird bei der Console registriert und der Dienst gestartet …');
  if not Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
@@ -170,7 +168,7 @@ var State: String; ReadToken: AnsiString;
 begin
  if CurStep <> ssPostInstall then Exit;
  try
- ConsoleUrl := ConnectionPage.Values[0]; Token := ConnectionPage.Values[1]; EnginePassword := ConnectionPage.Values[2];
+ ConsoleUrl := ConnectionPage.Values[0]; Token := ConnectionPage.Values[1]; EnginePassword := '';
  if (Pos('"', ConsoleUrl) > 0) or (Pos(#13, ConsoleUrl) > 0) or (Pos(#10, ConsoleUrl) > 0) then RaiseException('Ungültige Console-Adresse.');
  State := ExpandConstant('{commonappdata}\DariaTechBackup');
  if not FileExists(State+'\identity.bin') then begin
@@ -191,7 +189,7 @@ begin
  if (EnginePassword <> '') and not FileExists(State+'\engine-credential.bin') then
   if not SaveStringToFile(State+'\engine-password.txt', UTF8Encode(EnginePassword), False) then RaiseException('Lokales Passwort kann nicht gespeichert werden.');
  RunHelper('Install');
- Token := ''; EnginePassword := ''; ConnectionPage.Values[1] := ''; ConnectionPage.Values[2] := '';
+ Token := ''; EnginePassword := ''; ConnectionPage.Values[1] := '';
  except
   SetupError := GetExceptionMessage;
   Log('Service provisioning failed: ' + SetupError);

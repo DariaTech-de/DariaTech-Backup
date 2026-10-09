@@ -55,6 +55,8 @@ public static class CommandApi
    if(input.Action is RemoteAction.Restore or RemoteAction.RestoreSaas or RemoteAction.RestoreProxmox&&!ctx.User.IsInRole("Administrator")&&!ctx.User.IsInRole("SuperAdmin"))return Results.Forbid();
    var job=await db.Jobs.SingleOrDefaultAsync(x=>x.Id==input.JobId&&x.Active);if(job is null)return Results.NotFound();
    var device=await db.Devices.SingleOrDefaultAsync(x=>x.Id==job.DeviceId&&x.Active);if(device is null||!await db.Customers.AnyAsync(x=>x.TenantId==job.TenantId&&x.Active))return Results.NotFound();
+   // A recovery copy shares the original device's destination; backing up into it would mix two devices' data.
+   if(input.Action==RemoteAction.RunBackup&&await db.ManagedJobs.AnyAsync(x=>x.DeviceId==job.DeviceId&&x.LocalJobId==job.LocalId&&x.RestoreOnly))return Results.Conflict(new{code="RestoreOnly"});
    if(input.Action==RemoteAction.RestoreSaas)
    {
     var managed=await db.ManagedJobs.SingleOrDefaultAsync(x=>x.DeviceId==job.DeviceId&&x.LocalJobId==job.LocalId);
@@ -71,9 +73,46 @@ public static class CommandApi
    }
    var now=DateTimeOffset.UtcNow;var command=new DeviceCommand(Guid.NewGuid(),job.TenantId,job.DeviceId,job.LocalId,input.Action,input.Restore,now,now.AddMinutes(input.ValidMinutes),input.Catalog,input.SaasRestore,input.ProxmoxRestore);
    if(!CommandProtocol.Valid(command,job.DeviceId,now))return Results.BadRequest();
-   var signed=signer.Sign(command);if(signed.Payload.Length>80000)return Results.BadRequest();var record=new RemoteCommand{Id=command.Id,TenantId=job.TenantId,JobId=job.Id,DeviceId=job.DeviceId,RequestedBy=ctx.User.FindFirstValue(ClaimTypes.NameIdentifier)!,Action=command.Action,Expires=command.Expires,Status=command.Action is RemoteAction.Restore or RemoteAction.RestoreSaas or RemoteAction.RestoreProxmox?"AwaitingApproval":"Pending",Signature=signed.Signature};
-   record.EncryptedPayload=secrets.Protect(job.TenantId,$"command:{record.Id}",signed.Payload);db.Commands.Add(record);ManagementApi.Audit(db,ctx,job.TenantId,"command.requested-"+command.Action.ToString().ToLowerInvariant(),record.Id);
+   // Restores need a second administrator's approval; with a single administrator account that would make
+   // restores impossible, so then the request is approved by its author and audited as such.
+   var restore=command.Action is RemoteAction.Restore or RemoteAction.RestoreSaas or RemoteAction.RestoreProxmox;
+   var fourEyes=restore&&await SecondApprovalPossible(db);
+   var record=Store(db,signer,secrets,command,job.Id,ctx.User.FindFirstValue(ClaimTypes.NameIdentifier)!,fourEyes?"AwaitingApproval":"Pending");if(record is null)return Results.BadRequest();
+   ManagementApi.Audit(db,ctx,job.TenantId,"command.requested-"+command.Action.ToString().ToLowerInvariant(),record.Id);
+   if(restore&&!fourEyes)ManagementApi.Audit(db,ctx,job.TenantId,"restore.single-administrator",record.Id);
    await db.SaveChangesAsync();return Results.Created($"/api/v1/management/commands/{record.Id}",new{record.Id,record.Status});
+ }
+ public static async Task<bool> SecondApprovalPossible(ManagementDb db)=>
+  await db.Users.CountAsync(x=>x.Active&&x.TenantId==null&&(x.Role==UserRole.SuperAdmin||x.Role==UserRole.Administrator))>=2;
+ static RemoteCommand? Store(ManagementDb db,CommandSigning signer,ISecretStore secrets,DeviceCommand command,Guid jobId,string actor,string status)
+ {
+  var signed=signer.Sign(command);if(signed.Payload.Length>80000)return null;
+  var record=new RemoteCommand{Id=command.Id,TenantId=command.TenantId,JobId=jobId,DeviceId=command.DeviceId,RequestedBy=actor,Action=command.Action,Expires=command.Expires,Status=status,Signature=signed.Signature};
+  record.EncryptedPayload=secrets.Protect(command.TenantId,$"command:{record.Id}",signed.Payload);db.Commands.Add(record);return record;
+ }
+ // Monthly verification (like scheduled backup validation in MSP consoles): the engine downloads sample
+ // volumes and checks them against its records. Queued by the Console itself; the result raises an alert.
+ public const string Scheduler="system:monthly-verification";
+ public static async Task<int> QueueDueVerifications(ManagementDb db,CommandSigning signer,ISecretStore secrets,DateTimeOffset now,int offlineMinutes,CancellationToken ct=default)
+ {
+  var online=now.AddMinutes(-Math.Clamp(offlineMinutes,1,1440));
+  var devices=await db.Devices.Where(x=>x.Active&&x.EngineReachable&&x.LastHeartbeat>=online).Select(x=>x.Id).ToListAsync(ct);
+  var activeTenants=await db.Customers.Where(x=>x.Active).Select(x=>x.TenantId).ToListAsync(ct);
+  var jobs=await db.Jobs.Where(x=>x.Active&&devices.Contains(x.DeviceId)&&activeTenants.Contains(x.TenantId)).ToListAsync(ct);
+  var recoveryCopies=await db.ManagedJobs.Where(x=>x.RestoreOnly&&x.LocalJobId!=null).Select(x=>new{x.DeviceId,x.LocalJobId}).ToListAsync(ct);
+  var queued=0;
+  foreach(var job in jobs)
+  {
+   if(recoveryCopies.Any(x=>x.DeviceId==job.DeviceId&&x.LocalJobId==job.LocalId))continue;
+   if(!await db.Runs.AnyAsync(x=>x.JobId==job.Id&&x.Status==RunStatus.Success,ct))continue;
+   var verifications=db.Commands.Where(x=>x.JobId==job.Id&&x.Action==RemoteAction.VerifyBackup);
+   // Due 30 days after the last successful check; after a failed, expired or open attempt, retry daily.
+   if(await verifications.AnyAsync(x=>x.Status=="Completed"&&x.Expires>now.AddDays(-30),ct)||await verifications.AnyAsync(x=>x.Expires>now.AddDays(-1),ct))continue;
+   var command=new DeviceCommand(Guid.NewGuid(),job.TenantId,job.DeviceId,job.LocalId,RemoteAction.VerifyBackup,null,now,now.AddMinutes(30));
+   if(!CommandProtocol.Valid(command,job.DeviceId,now)||Store(db,signer,secrets,command,job.Id,Scheduler,"Pending") is not {} record)continue;
+   db.Audit.Add(new AuditEvent{TenantId=job.TenantId,Actor=Scheduler,Action="command.requested-verifybackup",Resource=record.Id.ToString()});queued++;
+  }
+  await db.SaveChangesAsync(ct);return queued;
  }
  // Folder browse and destination test have no backup job yet; they are signed and device-bound like job commands.
  public static async Task<(RemoteCommand? Command,string? Error)> RequestDeviceQuery(Guid deviceId,RemoteAction action,CatalogRequest? catalog,DestinationTest? test,ManagementDb db,CommandSigning signer,ISecretStore secrets,HttpContext ctx)

@@ -44,6 +44,10 @@ public sealed class SecurityTests
   {
    var command=DariaTech.Console.Services.AgentReleases.Command(platform,asset,"https://backup.example",token,true);
    var local=DariaTech.Console.Services.AgentReleases.Command(platform,asset,"https://backup.example",token,false);
+   const string key="-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEexample\n-----END PUBLIC KEY-----";
+   var remote=DariaTech.Console.Services.AgentReleases.Command(platform,asset,"https://backup.example",token,true,key);
+   Assert.That(remote,Does.Contain(key).And.Contain(platform=="win-x64"?"/commandkeyfile=$k":"--command-key-file"));
+   Assert.That(command,Does.Not.Contain("BEGIN PUBLIC KEY").And.Not.Contain("allowremote").And.Not.Contain("allow-remote-commands"));
    Assert.That(command,Does.Contain(asset.Url).And.Contain("https://backup.example"));
    Assert.That(command,Does.Contain(platform=="win-x64"?"/allowmanaged=1":"--allow-managed-configuration"));Assert.That(local,Does.Not.Contain("allowmanaged").And.Not.Contain("allow-managed"));
    Assert.That(command.Split('\n').Count(x=>x.Contains(token)),Is.EqualTo(1),"the token is written once into a protected file");
@@ -52,6 +56,53 @@ public sealed class SecurityTests
    if(platform=="win-x64")Assert.That(command,Does.Contain("Get-FileHash").And.Contain("/tokenfile=$t").And.Contain(sha.ToUpperInvariant()).And.Contain("$ErrorActionPreference='Stop'").And.Contain("$p.ExitCode -ne 0").And.StartWith("# PowerShell").And.EndWith("}"));
    else Assert.That(command,Does.Contain("set -eu").And.EndWith(")").And.Contain("--enrollment-token-file").And.Contain("install -m 600").And.Contain(sha+"  ").And.Contain(platform.StartsWith("osx")?"shasum -a 256":"sha256sum"));
   }
+ }
+ [Test]public void ConsoleCreatesItsCommandKeyOnceAndStoresItEncrypted()
+ {
+  var dir=Path.Combine(Path.GetTempPath(),"dariatech-keys-"+Guid.NewGuid());
+  try
+  {
+   var config=new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?>{{"Security:KeyDirectory",dir}}).Build();
+   var store=new MarkingSecretStore();
+   var first=new DariaTech.Console.Security.CommandSigning(config,store);var publicKey=first.PublicKeyPem;
+   Assert.That(publicKey,Does.StartWith("-----BEGIN PUBLIC KEY-----"));
+   var stored=File.ReadAllText(Path.Combine(dir,"command-signing.key"));Assert.That(stored,Does.StartWith("protected:").And.Not.Contain("BEGIN PRIVATE KEY"));
+   Assert.That(new DariaTech.Console.Security.CommandSigning(config,store).PublicKeyPem,Is.EqualTo(publicKey),"a restart keeps the pinned key");
+   var now=DateTimeOffset.UtcNow;var command=new DeviceCommand(Guid.NewGuid(),Guid.NewGuid(),Guid.NewGuid(),"1",RemoteAction.VerifyBackup,null,now,now.AddMinutes(5));
+   using var verifier=ECDsa.Create();verifier.ImportFromPem(publicKey);
+   Assert.That(CommandProtocol.Verify(first.Sign(command),verifier,command.DeviceId,now).Id,Is.EqualTo(command.Id));
+  }
+  finally{if(Directory.Exists(dir))Directory.Delete(dir,true);}
+ }
+ private sealed class MarkingSecretStore:DariaTech.Console.Security.ISecretStore
+ {
+  public string Protect(Guid tenant,string purpose,string value)=>"protected:"+Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(value));
+  public string Unprotect(Guid tenant,string purpose,string value)=>System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(value["protected:".Length..]));
+ }
+ [Test]public void PastedWebDavAddressesOfNextcloudAndOpenCloudBecomeValidDestinations()
+ {
+  var (host,port,path)=DariaTech.Console.Services.DestinationForm.Split("https://ocloud.dariatech.de/dav","","/spaces/2d52bc17-d0bf$0d08febf-0381");
+  Assert.That((host,port,path),Is.EqualTo(("ocloud.dariatech.de","","dav/spaces/2d52bc17-d0bf$0d08febf-0381")));
+  var url=DariaTech.Console.Services.DestinationForm.Build("webdav",host,port,path);
+  Assert.That(url,Is.EqualTo("webdav://ocloud.dariatech.de/dav/spaces/2d52bc17-d0bf$0d08febf-0381"));
+  Assert.That(ConfigurationPolicy.ValidDestination(url,new(){{"use-ssl","true"},{"auth-username","admin"},{"auth-password","app-token"}}),Is.True);
+  // The whole WebDAV URL pasted into the server field, folder field empty or repeating it.
+  Assert.That(DariaTech.Console.Services.DestinationForm.Split("https://ocloud.dariatech.de/dav/spaces/abc$def","",""),Is.EqualTo(("ocloud.dariatech.de","","dav/spaces/abc$def")));
+  Assert.That(DariaTech.Console.Services.DestinationForm.Split("https://cloud.firma.de:8443/remote.php/dav/files/admin","","remote.php/dav/files/admin/Backups"),Is.EqualTo(("cloud.firma.de","8443","remote.php/dav/files/admin/Backups")));
+  Assert.That(DariaTech.Console.Services.DestinationForm.Split("cloud.firma.de/remote.php/dav/files/admin","","Backups"),Is.EqualTo(("cloud.firma.de","","remote.php/dav/files/admin/Backups")));
+  Assert.That(DariaTech.Console.Services.DestinationForm.Split("cloud.firma.de","443","Backups"),Is.EqualTo(("cloud.firma.de","443","Backups")));
+  Assert.That(DariaTech.Console.Services.DestinationForm.Parse(url).Path,Is.EqualTo("dav/spaces/2d52bc17-d0bf$0d08febf-0381"));
+ }
+ [Test]public void RestoreToOriginalLocationCarriesNoFolderAndFolderRestoreNeedsASafeName()
+ {
+  var now=DateTimeOffset.UtcNow;var device=Guid.NewGuid();
+  DeviceCommand C(RestoreSelection r)=>new(Guid.NewGuid(),Guid.NewGuid(),device,"1",RemoteAction.Restore,r,now,now.AddMinutes(5));
+  Assert.That(CommandProtocol.Valid(C(new(now.AddHours(-1),["C:\\a.txt"],"",true)),device,now),Is.True);
+  Assert.That(CommandProtocol.Valid(C(new(now.AddHours(-1),["C:\\a.txt"],"Ordner",true)),device,now),Is.False);
+  Assert.That(CommandProtocol.Valid(C(new(now.AddHours(-1),["C:\\a.txt"],"Wiederherstellung-1")),device,now),Is.True);
+  Assert.That(CommandProtocol.Valid(C(new(now.AddHours(-1),["C:\\a.txt"],"")),device,now),Is.False);
+  // Older agents read the same payload: the flag is only written when set.
+  Assert.That(System.Text.Json.JsonSerializer.Serialize(new RestoreSelection(now,["/a"],"x")),Does.Not.Contain("OriginalLocation"));
  }
  [Test]public void TotpMatchesRfc6238AndRejectsReplay()
  {

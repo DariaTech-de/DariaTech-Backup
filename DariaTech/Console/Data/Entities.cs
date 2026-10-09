@@ -93,6 +93,8 @@ public sealed class ManagedJob : TenantEntity
  public Guid DeviceId { get; set; } public string Name { get; set; } = "";
  public long LatestRevision { get; set; } public long AppliedRevision { get; set; } public long LastReportedRevision { get; set; }
  public string? LocalJobId { get; set; } public string Status { get; set; } = "Pending";
+ // Recovery copy of another device's job: same destination and passphrase, never backs up.
+ public bool RestoreOnly { get; set; } public Guid? SourceManagedJobId { get; set; }
 }
 public sealed class ConfigurationRevision : TenantEntity
 {
@@ -136,9 +138,11 @@ public sealed class UpdateDeployment : TenantEntity
 }
 // Operator-level saved destination (e.g. the DariaTech storage server). Not tenant data: customer
 // users never see it. Jobs copy URL and options at creation and get their own sub-folder.
+// A saved storage location. TenantId null: offered to every customer (e.g. the DariaTech storage server);
+// otherwise only to that customer (e.g. the customer's own Nextcloud). Each scope has at most one default.
 public sealed class DestinationTemplate
 {
- public Guid Id { get; set; } = Guid.NewGuid(); public string Name { get; set; } = "";
+ public Guid Id { get; set; } = Guid.NewGuid(); public Guid? TenantId { get; set; } public string Name { get; set; } = "";
  public string TargetUrl { get; set; } = ""; public string EncryptedOptions { get; set; } = "";
  public bool IsDefault { get; set; } public DateTimeOffset Created { get; set; } = DateTimeOffset.UtcNow;
 }
