@@ -68,12 +68,15 @@ jobs:
         run: |
           mkdir -p "artifacts/update/${{ matrix.rid }}"
           mv "artifacts/unix/${{ matrix.rid }}" "artifacts/unix/${{ matrix.rid }}-original"
-          python3 scripts/build-unix-agent.py --rid "${{ matrix.rid }}" --version 0.3.0
+          # Candidate is always newer than the packaged agent: current version with the patch number raised.
+          candidate=$(python3 -c "import xml.etree.ElementTree as E;v=E.parse('DariaTech/Agent/DariaTech.Agent.csproj').findtext('./PropertyGroup/Version').split('.');print(f'{v[0]}.{v[1]}.{int(v[2])+1}')")
+          echo "UPDATE_CANDIDATE_VERSION=$candidate" >> "$GITHUB_ENV"
+          python3 scripts/build-unix-agent.py --rid "${{ matrix.rid }}" --version "$candidate"
           mv artifacts/unix/${{ matrix.rid }}/*.tar.gz "artifacts/update/${{ matrix.rid }}/"
           rm -rf "artifacts/unix/${{ matrix.rid }}"
           mv "artifacts/unix/${{ matrix.rid }}-original" "artifacts/unix/${{ matrix.rid }}"
       - name: Test actual signed update with independent native supervisor
-        run: sudo --preserve-env=PATH bash deploy/unix/tests/ApprovedUpdate.sh "${{ matrix.rid }}" "$(command -v node)"
+        run: sudo --preserve-env=PATH,UPDATE_CANDIDATE_VERSION bash deploy/unix/tests/ApprovedUpdate.sh "${{ matrix.rid }}" "$(command -v node)"
       - uses: actions/upload-artifact@v4
         with:
           name: DariaTechBackupAgent-${{ matrix.rid }}-pilot

@@ -8,7 +8,7 @@ const result={enrollments:0,heartbeats:0,receipts:[],versions:[]};function save(
 function phase(){return fs.readFileSync(process.env.UPDATE_PHASE,'utf8').trim();}
 function assignment(){
  const p=phase(),now=new Date(),expires=new Date(now.getTime()+86400000);
- const manifest={ReleaseId:release,Sequence:p==='bad'?1:p==='tampered'?2:3,Product:'DariaTechBackupAgent',Platform:process.env.UPDATE_PLATFORM,Version:'0.3.0.0',ArtifactUrl:'https://localhost/agent.tar.gz',Sha256:crypto.createHash('sha256').update(bytes).digest('hex'),Length:bytes.length,Issued:now.toISOString(),Expires:expires.toISOString()};
+ const manifest={ReleaseId:release,Sequence:p==='bad'?1:p==='tampered'?2:3,Product:'DariaTechBackupAgent',Platform:process.env.UPDATE_PLATFORM,Version:process.env.UPDATE_CANDIDATE_VERSION+'.0',ArtifactUrl:'https://localhost/agent.tar.gz',Sha256:crypto.createHash('sha256').update(bytes).digest('hex'),Length:bytes.length,Issued:now.toISOString(),Expires:expires.toISOString()};
  const payload=Buffer.from(JSON.stringify(manifest)),signature=crypto.sign('sha256',payload,{key,dsaEncoding:'ieee-p1363'});
  if(p==='bad')signature[0]^=1;
  return {deploymentId:deployments[p],manifest:{payload:payload.toString('base64'),signature:signature.toString('base64')}};
