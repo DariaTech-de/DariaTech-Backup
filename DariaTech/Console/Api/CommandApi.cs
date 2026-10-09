@@ -27,7 +27,7 @@ public static class CommandApi
   app.MapPost("/api/v1/agent/commands/{id:guid}/receipt",async(Guid id,CommandReceipt receipt,ManagementDb db,TenantScope scope,ISecretStore secrets,HttpContext ctx)=>
   {
    var agent=await DeviceAuthentication.Authenticate(ctx,db,scope);if(agent is null)return Results.Unauthorized();
-   if(receipt.Status is not ("Accepted" or "Completed" or "Failed" or "Indeterminate" or "Rejected")||receipt.TaskId<1||receipt.ErrorCode is not(null or "EngineTaskFailed" or "DispatchIndeterminate" or "PolicyRejected" or "DestinationFolderMissing" or "DestinationHostKeyMismatch" or "DestinationCertificateInvalid" or "DestinationTestFailed"))return Results.BadRequest();
+   if(receipt.Status is not ("Accepted" or "Completed" or "Failed" or "Indeterminate" or "Rejected")||receipt.TaskId<1||receipt.ErrorCode is not(null or "EngineTaskFailed" or "SourceAccessDenied" or "RepairNeeded" or "PassphraseInvalid" or "TargetFolderMissing" or "TargetLoginFailed" or "TargetUnreachable" or "DispatchIndeterminate" or "PolicyRejected" or "DestinationFolderMissing" or "DestinationHostKeyMismatch" or "DestinationCertificateInvalid" or "DestinationTestFailed"))return Results.BadRequest();
    // Only a host key or certificate fingerprint may accompany a failed destination test.
    if(receipt.Detail is {} detail&&(receipt.ErrorCode is not ("DestinationHostKeyMismatch" or "DestinationCertificateInvalid")||!ManagementApi.Text(detail,300)))return Results.BadRequest();
    await using var tx=await db.Database.BeginTransactionAsync();await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({BitConverter.ToInt64(id.ToByteArray())})");

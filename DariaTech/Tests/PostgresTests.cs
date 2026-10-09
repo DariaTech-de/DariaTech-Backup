@@ -609,6 +609,67 @@ Assert.That(html,Does.Contain("Agent 0.2.0 · Pilot").And.Contain(url).And.Conta
   Assert.That(edit.StatusCode,Is.EqualTo(HttpStatusCode.Conflict));
   }
  }
+ [Test]public async Task ReplacedDeviceHandsItsBackupsToTheNewDeviceAndExplainsMacErrors()
+ {
+  var(t,site)=await Customer();
+  async Task<(HttpClient Client,EnrollmentResponse Identity)> Enroll(string name)
+  {
+   var client=factory.CreateClient(new(){BaseAddress=new Uri("https://localhost")});
+   using var e=await client.PostAsJsonAsync("/api/v1/agent/enroll",new EnrollmentRequest(await Token(t,site),name,"Darwin 25.0.0","0.3.0","osx-arm64"));var identity=(await e.Content.ReadFromJsonAsync<EnrollmentResponse>())!;
+   client.DefaultRequestHeaders.Authorization=new("Bearer",identity.Credential);client.DefaultRequestHeaders.Add("X-Device-Id",identity.DeviceId.ToString());return (client,identity);
+  }
+  var (oldMac,oldId)=await Enroll("MacBook-von-Sam");var (newMac,newId)=await Enroll("MacBook-von-Sam");
+  using(oldMac)using(newMac){
+  using var admin=await Login(UserRole.SuperAdmin);using var csrf=System.Text.Json.JsonDocument.Parse(await admin.GetStringAsync("/api/v1/management/csrf"));admin.DefaultRequestHeaders.Add("X-CSRF-Token",csrf.RootElement.GetProperty("token").GetString());
+  var definition=new ManagedBackupDefinition("Ordner Downloads",["/Users/sam/Downloads"],"webdav://ocloud.example/dav/spaces/K1/Mac","replace-passphrase-24680",new(){{"use-ssl","true"},{"auth-username","u"},{"auth-password","p"}},30,[],new(DateTimeOffset.UtcNow,24,Enum.GetValues<DayOfWeek>()));
+  using var created=await admin.PostAsJsonAsync($"/api/v1/management/devices/{oldId.DeviceId}/managed-jobs",new ConfigurationInput(0,definition));
+  var job=(await created.Content.ReadFromJsonAsync<ManagedJob>())!;
+  using(var applied=await oldMac.PostAsJsonAsync($"/api/v1/agent/configurations/{job.Id}/receipt",new ConfigurationReceipt(1,"3","Applied")))Assert.That(applied.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  string Form(string html){var m=Regex.Match(html,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");Assert.That(m.Success,Is.True);return WebUtility.HtmlDecode(m.Groups[1].Value);}
+  // The new device suggests the old one with the same name and explains Full Disk Access on a Mac.
+  var page=WebUtility.HtmlDecode(await admin.GetStringAsync($"/Device?id={newId.DeviceId}"));
+  Assert.That(page,Does.Contain("Gerät ersetzen – Backups übernehmen").And.Contain("hat denselben Namen").And.Contain("Festplattenvollzugriff").And.Not.Contain("replace-passphrase"));
+  async Task<string> Replace(bool confirm)
+  {
+   var fields=new Dictionary<string,string>{{"oldDeviceId",oldId.DeviceId.ToString()},{"__RequestVerificationToken",Form(await admin.GetStringAsync($"/Device?id={newId.DeviceId}"))}};if(confirm)fields["confirm"]="true";
+   using var response=await admin.PostAsync($"/Device?id={newId.DeviceId}&handler=Replace",new FormUrlEncodedContent(fields));Assert.That(response.StatusCode,Is.EqualTo(HttpStatusCode.Redirect));
+   return WebUtility.HtmlDecode(await admin.GetStringAsync(response.Headers.Location!.ToString()));
+  }
+  Assert.That(await Replace(false),Does.Contain("Bitte bestätigen"));
+  await using var db=Db();
+  Assert.That(await db.ManagedJobs.AsNoTracking().Where(x=>x.Id==job.Id).Select(x=>x.DeviceId).SingleAsync(),Is.EqualTo(oldId.DeviceId));
+  Assert.That(await Replace(true),Does.Contain("1 Backup(s) übernommen"));
+  var moved=await db.ManagedJobs.AsNoTracking().SingleAsync(x=>x.Id==job.Id);
+  Assert.That(moved.DeviceId,Is.EqualTo(newId.DeviceId));Assert.That(moved.LatestRevision,Is.EqualTo(2));Assert.That(moved.LocalJobId,Is.Null);
+  Assert.That(await db.Devices.AsNoTracking().Where(x=>x.Id==oldId.DeviceId).Select(x=>x.Active).SingleAsync(),Is.False);
+  Assert.That(await db.Agents.AsNoTracking().Where(x=>x.DeviceId==oldId.DeviceId).Select(x=>x.Revoked).SingleAsync(),Is.True);
+  using(var revoked=await oldMac.GetAsync("/api/v1/agent/configurations"))Assert.That(revoked.StatusCode,Is.EqualTo(HttpStatusCode.Unauthorized),"the old device can no longer take part");
+  // Same destination, passphrase and schedule; the agent rebuilds its database before the first backup.
+  var assignment=(await newMac.GetFromJsonAsync<ConfigurationAssignment[]>("/api/v1/agent/configurations"))!.Single();
+  Assert.That(assignment.JobId,Is.EqualTo(job.Id));Assert.That(assignment.Definition.Adopted,Is.True);Assert.That(assignment.Definition.TargetUrl,Is.EqualTo(definition.TargetUrl));
+  Assert.That(assignment.Definition.Passphrase,Is.EqualTo(definition.Passphrase));Assert.That(assignment.Definition.Schedule,Is.Not.Null);Assert.That(ConfigurationPolicy.Valid(assignment.Definition),Is.True);
+  Assert.That(ConfigurationPolicy.Valid(assignment.Definition with{RestoreOnly=true,Schedule=null}),Is.False,"a taken-over job is never a recovery copy");
+  using(var applied=await newMac.PostAsJsonAsync($"/api/v1/agent/configurations/{job.Id}/receipt",new ConfigurationReceipt(2,"5","Applied")))Assert.That(applied.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  // The stored passphrase can be shown to an administrator, and every view is audited.
+  var edit=await admin.GetStringAsync($"/BackupEdit?deviceId={newId.DeviceId}&id={job.Id}");
+  Assert.That(edit,Does.Contain("Passphrase anzeigen").And.Contain("/Users/").And.Not.Contain("replace-passphrase"));
+  using(var shown=await admin.PostAsync("/BackupEdit?handler=Passphrase",new FormUrlEncodedContent(new Dictionary<string,string>{{"DeviceId",newId.DeviceId.ToString()},{"ManagedJobId",job.Id.ToString()},{"__RequestVerificationToken",Form(edit)}})))
+  {
+   Assert.That(shown.Headers.CacheControl?.NoStore,Is.True);
+   using var json=System.Text.Json.JsonDocument.Parse(await shown.Content.ReadAsStringAsync());Assert.That(json.RootElement.GetProperty("passphrase").GetString(),Is.EqualTo(definition.Passphrase));
+  }
+  Assert.That(await db.Audit.AnyAsync(x=>x.Action=="backup.passphrase-viewed"&&x.Resource==job.Id.ToString()),Is.True);
+  Assert.That(WebUtility.HtmlDecode(await admin.GetStringAsync($"/BackupEdit?deviceId={newId.DeviceId}")),Does.Contain("Sicheren Schlüssel erzeugen").And.Contain("als Pfadname kopieren"));
+  // A failed backup on the Mac reports a fixed code that the Console explains.
+  var backup=await db.Jobs.AsNoTracking().SingleAsync(x=>x.DeviceId==newId.DeviceId&&x.LocalId=="5");
+  var actions=await admin.GetStringAsync($"/JobActions?id={backup.Id}");
+  using(var run=await admin.PostAsync("/JobActions?handler=Request",new FormUrlEncodedContent(new Dictionary<string,string>{{"JobId",backup.Id.ToString()},{"Action","RunBackup"},{"__RequestVerificationToken",Form(actions)}})))Assert.That((int)run.StatusCode,Is.LessThan(400));
+  var command=await db.Commands.AsNoTracking().SingleAsync(x=>x.DeviceId==newId.DeviceId&&x.Action==RemoteAction.RunBackup);
+  using(var bogus=await newMac.PostAsJsonAsync($"/api/v1/agent/commands/{command.Id}/receipt",new CommandReceipt("Failed",77,"Access to the path is denied")))Assert.That(bogus.StatusCode,Is.EqualTo(HttpStatusCode.BadRequest),"raw engine text is never accepted");
+  using(var failed=await newMac.PostAsJsonAsync($"/api/v1/agent/commands/{command.Id}/receipt",new CommandReceipt("Failed",77,"SourceAccessDenied")))Assert.That(failed.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  Assert.That(WebUtility.HtmlDecode(await admin.GetStringAsync($"/JobActions?id={backup.Id}")),Does.Contain("Festplattenvollzugriff"));
+  }
+ }
  [Test]public async Task GuidedRestoreAndMonthlyCheckUseSignedCommands()
  {
   var(t,site)=await Customer();await using var db=Db();var now=DateTimeOffset.UtcNow;

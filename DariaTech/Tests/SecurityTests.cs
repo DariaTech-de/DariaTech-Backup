@@ -244,6 +244,26 @@ public sealed class SecurityTests
    Assert.That(JsonSerializer.Serialize(receipt),Does.Not.Contain("test-secret"));Assert.That(receipt.ErrorCode,Is.EqualTo(expected=="Failed"?"EngineTaskFailed":null));
   }finally{if(Directory.Exists(directory))Directory.Delete(directory,true);}
  }
+ [TestCase("Access to the path '/Users/sam/Downloads' is denied.","System.UnauthorizedAccessException: Access to the path","SourceAccessDenied")]
+ [TestCase("Operation not permitted",null,"SourceAccessDenied")]
+ [TestCase("Found 12 remote files that are not recorded in local storage. This can be caused by having two backups sharing a destination folder",null,"RepairNeeded")]
+ [TestCase("The folder /backup does not exist","Duplicati.Library.Interface.FolderMissingException: The folder","TargetFolderMissing")]
+ [TestCase("The remote server returned an error: (401) Unauthorized.",null,"TargetLoginFailed")]
+ [TestCase("No such host is known. (ocloud.example:443)","System.Net.Http.HttpRequestException",  "TargetUnreachable")]
+ [TestCase("Failed to decrypt data (invalid passphrase?): Invalid password or corrupted data",null,"PassphraseInvalid")]
+ [TestCase("Something unexpected",null,"EngineTaskFailed")]
+ public async Task EngineFailuresAreClassifiedWithoutForwardingText(string error,string? exception,string code)
+ {
+  Assert.That(EngineErrors.Classify(error,exception),Is.EqualTo(code));
+  var directory=Path.Combine(Path.GetTempPath(),"dt-task-class-"+Guid.NewGuid());
+  try
+  {
+   var options=new AgentOptions{StateDirectory=directory};var state=new ProtectedState(options);
+   using var adapter=new DuplicatiAdapter(options,state,new TaskResultHandler(JsonSerializer.Serialize(new{Status="Failed",ErrorMessage=error,Exception=exception})));
+   var receipt=await adapter.TaskReceipt(1,CancellationToken.None);
+   Assert.That(receipt.Status,Is.EqualTo("Failed"));Assert.That(receipt.ErrorCode,Is.EqualTo(code));Assert.That(receipt.Detail,Is.Null);
+  }finally{if(Directory.Exists(directory))Directory.Delete(directory,true);}
+ }
  private sealed class TaskResultHandler(string result):HttpMessageHandler
  {
   protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct)=>Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK){Content=new StringContent(result)});

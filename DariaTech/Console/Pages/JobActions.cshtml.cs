@@ -64,6 +64,12 @@ public sealed class JobActionsModel(ManagementDb db,CommandSigning signer,ISecre
   null or ""=>"",
   "PolicyRejected"=>"Auf dem Gerät nicht freigegeben (Fernaktionen bzw. Wiederherstellungsordner fehlen – Agent mit aktuellem Befehl aus „Gerät hinzufügen“ neu installieren).",
   "EngineTaskFailed"=>"Die Backup-Engine meldet einen Fehler (z. B. Ziel nicht erreichbar oder falsches Passwort).",
+  "SourceAccessDenied"=>"Kein Zugriff auf die zu sichernden Ordner. Auf einem Mac braucht der Agent „Festplattenvollzugriff“: Systemeinstellungen → Datenschutz & Sicherheit → Festplattenvollzugriff → „+“ → ⇧⌘G → /Library/Application Support/DariaTechBackup/agent/DariaTech.Agent hinzufügen und einschalten.",
+  "RepairNeeded"=>"Im Speicherziel liegen Sicherungen, die dieses Gerät nicht kennt (z. B. nach Neuinstallation). Über „Gerät ersetzen“ auf der Geräteseite werden sie übernommen; sonst bitte ein eigenes, leeres Zielverzeichnis verwenden.",
+  "PassphraseInvalid"=>"Die Backup-Passphrase passt nicht zu den Sicherungen im Speicherziel.",
+  "TargetFolderMissing"=>"Der Zielordner im Speicherziel existiert nicht. Mit „Verbindung testen“ im Backup-Job kann er angelegt werden.",
+  "TargetLoginFailed"=>"Das Speicherziel hat die Anmeldung abgelehnt. Benutzername und Passwort (bei Nextcloud/OpenCloud ein App-Passwort) prüfen.",
+  "TargetUnreachable"=>"Das Speicherziel ist vom Gerät aus nicht erreichbar (Adresse, Internet oder Firewall prüfen).",
   "DispatchIndeterminate"=>"Das Gerät konnte den Start nicht bestätigen.",
   var other=>other,
  };

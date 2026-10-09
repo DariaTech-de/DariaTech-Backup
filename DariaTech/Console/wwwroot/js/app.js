@@ -89,6 +89,29 @@ document.querySelectorAll('[data-destination-mode]').forEach(radio => radio.addE
    }, i => { status.textContent = waitText(i); });
   };
   browser.querySelectorAll('[data-browse-root]').forEach(b => b.addEventListener('click', () => open(null)));
+  browser.querySelectorAll('[data-browse-path]').forEach(b => b.addEventListener('click', () => open(b.dataset.browsePath)));
+ }
+
+ const secret = document.querySelector('[data-passphrase]');
+ if (secret) {
+  const input = secret.querySelector('[data-passphrase-input]'), status = secret.querySelector('[data-passphrase-status]'), copy = secret.querySelector('[data-passphrase-copy]');
+  const show = value => { input.value = value; input.type = 'text'; copy.hidden = false; };
+  secret.querySelector('[data-passphrase-generate]')?.addEventListener('click', () => {
+   // 30 characters from an unambiguous alphabet (about 175 bits), grouped for reading aloud.
+   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+   const bytes = crypto.getRandomValues(new Uint32Array(30));
+   const chars = Array.from(bytes, b => alphabet[b % alphabet.length]).join('');
+   show(chars.match(/.{1,6}/g).join('-'));
+   status.className = 'dest-test-status good'; status.textContent = 'Schlüssel erzeugt. Er wird mit dem Job verschlüsselt in der Console gespeichert – zusätzlich bitte im Passwort-Manager ablegen.';
+  });
+  secret.querySelector('[data-passphrase-reveal]')?.addEventListener('click', async () => {
+   const result = await post('Passphrase', new FormData(form));
+   if (result.error || !result.passphrase) { status.className = 'dest-test-status bad'; status.textContent = result.error ?? 'Die Passphrase konnte nicht geladen werden.'; return; }
+   show(result.passphrase); status.className = 'dest-test-status'; status.textContent = '';
+  });
+  copy.addEventListener('click', async () => {
+   try { await navigator.clipboard.writeText(input.value); copy.textContent = 'Kopiert'; } catch { input.select(); }
+  });
  }
 
  const test = document.querySelector('[data-dest-test]');

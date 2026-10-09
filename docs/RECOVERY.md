@@ -40,6 +40,24 @@ SaaS and Proxmox jobs are recovered through their own restore actions and are no
 Without the Console, any backup can still be restored with stock Duplicati given the destination access and the
 passphrase.
 
+## Replacing a device
+
+When a device is reinstalled or replaced, the new installation enrolls as a new device. Its device page offers
+"Gerät ersetzen – Backups übernehmen" for any other device of the same customer that has backups; a device with
+the same name is suggested first. Taking over:
+
+- moves every file backup job of the old device to the new device as a new revision with the same destination,
+  passphrase, sources and schedule, marked `Adopted=true`;
+- deactivates the old device and revokes its agent credential, so two devices never write into one destination
+  (the operator confirms that the old device no longer backs up);
+- leaves SaaS and Proxmox jobs on the old device; they are set up again on the new host.
+
+On the new device the agent creates the engine job **without a schedule**, removes any local database of that
+job and runs the engine's repair, which recreates the database from the destination. Until that has succeeded
+the agent sends no configuration receipt and refuses `RunBackup` and `VerifyBackup`. A failed rebuild is reported
+as a failed configuration and retried after 30 minutes. After the rebuild the job gets its schedule and the next
+backup continues the existing version chain.
+
 ## Restoring from the Console
 
 `Backup-Job → Wiederherstellen` guides through three steps: load the versions from the device, load the files

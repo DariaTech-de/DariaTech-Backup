@@ -90,6 +90,34 @@ public static class ConfigurationApi
   AddRevision(db,secrets,job,copy);ManagementApi.Audit(db,ctx,job.TenantId,"backup.recovery-copy-created",job.Id);
   await db.SaveChangesAsync();return (job,null);
  }
+ // Replace a device (Acronis "replace machine"): the new device of the same customer takes over the old device's
+ // backups with the same destination and passphrase and continues the existing backup chain. The old device is
+ // revoked so two devices never write into one destination.
+ public static async Task<(int Moved,string? Error)> TakeOver(Guid oldDeviceId,Guid newDeviceId,ManagementDb db,ISecretStore secrets,HttpContext ctx)
+ {
+  if(!ctx.User.IsInRole("SuperAdmin")&&!ctx.User.IsInRole("Administrator"))return (0,"Keine Berechtigung.");
+  await using var tx=await db.Database.BeginTransactionAsync();
+  await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({BitConverter.ToInt64(oldDeviceId.ToByteArray())})");
+  var target=await db.Devices.SingleOrDefaultAsync(x=>x.Id==newDeviceId&&x.Active);
+  var old=await db.Devices.SingleOrDefaultAsync(x=>x.Id==oldDeviceId);
+  if(target is null||old is null||old.Id==target.Id||old.TenantId!=target.TenantId)return (0,"Bitte ein anderes Gerät desselben Kunden wählen.");
+  var jobs=await db.ManagedJobs.Where(x=>x.DeviceId==old.Id&&!x.RestoreOnly).ToListAsync();
+  var moved=0;
+  foreach(var job in jobs)
+  {
+   await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({BitConverter.ToInt64(job.Id.ToByteArray())})");
+   var definition=Read(secrets,await db.ConfigurationRevisions.SingleAsync(x=>x.ManagedJobId==job.Id&&x.Revision==job.LatestRevision));
+   // Cloud and Proxmox jobs depend on the host they were provisioned on; they are set up again on the new device.
+   if(definition.Saas is not null||definition.Proxmox is not null)continue;
+   var adopted=definition with{Adopted=true};if(!ConfigurationPolicy.Valid(adopted))continue;
+   job.DeviceId=target.Id;job.LatestRevision++;job.AppliedRevision=0;job.LastReportedRevision=0;job.LocalJobId=null;job.Status="Pending";
+   AddRevision(db,secrets,job,adopted);ManagementApi.Audit(db,ctx,job.TenantId,"backup.taken-over",job.Id);moved++;
+  }
+  if(moved==0)return (0,"Auf dem alten Gerät gibt es keine Datei-Backups, die übernommen werden können.");
+  old.Active=false;foreach(var agent in await db.Agents.Where(x=>x.DeviceId==old.Id).ToListAsync())agent.Revoked=true;
+  ManagementApi.Audit(db,ctx,old.TenantId,"device.replaced",old.Id);
+  await db.SaveChangesAsync();await tx.CommitAsync();return (moved,null);
+ }
  private static void AddRevision(ManagementDb db,ISecretStore secrets,ManagedJob job,ManagedBackupDefinition definition)
  {
   var r=new ConfigurationRevision{TenantId=job.TenantId,ManagedJobId=job.Id,Revision=job.LatestRevision};
