@@ -8,7 +8,7 @@ The Windows installer source is in deploy/windows. The Windows installer GitHub 
 
 Interactive setup requests the HTTPS Console origin, a site-bound enrollment token and a local engine UI password (14–200 characters). Run as administrator. Setup refuses pre-existing state directories with untrusted ownership, inherited/broad ACLs or reparse points. It returns a nonzero exit code on provisioning failure, including silent installs. Setup creates an automatic LocalSystem service with restart recovery. A Windows Job Object terminates its engine child on service termination. Initial enrollment and DPAPI protection execute inside LocalSystem; no manual SYSTEM shell is needed.
 
-The installer owns a separate loopback engine on port 8210 and stores databases under `%ProgramData%\DariaTechBackup\engine`. It never adopts or modifies an existing Duplicati service/database. Its password and settings encryption key are DPAPI CurrentUser-protected under SYSTEM; secrets are supplied to the child via process environment, not command-line arguments. The engine runs API-only (`--webservice-api-only=true`): there is no local Duplicati web interface, and with it no remote-control or update settings on the device. Backup jobs, restores and checks are managed from the Console; registration alone does not create a backup job.
+The installer owns a separate loopback engine on port 8210 and stores databases under `%ProgramData%\DariaTechBackup\engine`. It never adopts or modifies an existing Duplicati service/database. Its password and settings encryption key are DPAPI CurrentUser-protected under SYSTEM; secrets are supplied to the child via process environment, not command-line arguments. The packaged engine's `webroot` is replaced by a notice page (`DariaTech/Agent/local-ui`): there is no local Duplicati web interface, and with it no remote-control or update settings on the device. Engine code is unchanged. (`--webservice-api-only` is not used: on a fresh engine database it widens a start-up race in the engine.) Backup jobs, restores and checks are managed from the Console; registration alone does not create a backup job.
 
 For RMM deployment, prefer protected input files:
 
@@ -46,7 +46,7 @@ Run both provisioning commands under the exact Windows service identity (normall
 
 ## Engine service profile
 
-Build/publish only the OSS server entrypoint with DariaTechOssOnly=true. Start the existing engine service automatically with a protected local database-encryption key and local API password. Keep webservice-interface=loopback; for managed hosts use webservice-api-only=true. Configure real sources, destinations, schedules, passphrase, filters and retention using the existing Duplicati local APIs/tools. Sources and encryption/storage secrets stay local. Persist both engine and per-job databases and protect their filesystem permissions.
+Build/publish only the OSS server entrypoint with DariaTechOssOnly=true. Start the existing engine service automatically with a protected local database-encryption key and local API password. Keep webservice-interface=loopback; the packaged webroot only holds the DariaTech notice page. Configure real sources, destinations, schedules, passphrase, filters and retention using the existing Duplicati local APIs/tools. Sources and encryption/storage secrets stay local. Persist both engine and per-job databases and protect their filesystem permissions.
 
 Disable vendor communications in the managed service environment:
 

@@ -17,6 +17,10 @@ dotnet publish DariaTech/Agent/DariaTech.Agent.csproj -c Release -r win-x64 --se
 if ($LASTEXITCODE) { throw 'Agent publish failed' }
 dotnet publish Executables/Duplicati.Server/Duplicati.Server.csproj -c Release -r win-x64 --self-contained true -p:DariaTechOssOnly=true -o artifacts/windows/engine
 if ($LASTEXITCODE) { throw 'OSS engine publish failed' }
+# Devices are managed from the Console only: the packaged engine serves a notice instead of the Duplicati web
+# interface (with its remote-control and update settings). Only packaged files change, not engine code.
+Remove-Item artifacts/windows/engine/webroot -Recurse -Force
+Copy-Item DariaTech/Agent/local-ui artifacts/windows/engine/webroot -Recurse
 $restricted=Get-ChildItem artifacts/windows/engine -Recurse -File | Where-Object { $_.Name -match '(?i)(Proprietary|Office365|GoogleWorkspace|DiskImage).*\.(dll|exe)$' }
 if($restricted){throw 'Subscription-restricted binaries found in OSS payload'}
 $cache=(dotnet nuget locals global-packages --list) -replace '^global-packages:\s*',''
