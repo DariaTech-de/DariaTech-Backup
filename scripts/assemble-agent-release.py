@@ -18,7 +18,7 @@ def verified(path: pathlib.Path) -> str:
 
 platforms = [
     ("win-x64", "Windows", "DariaTechBackupSetup-win-x64.exe", source / "DariaTechBackupSetup-win-x64-unsigned" / "DariaTechBackupSetup.exe"),
-    *[(rid, label, f"DariaTechBackupAgent-{rid}.tar.gz", source / f"DariaTechBackupAgent-{rid}-pilot" / f"DariaTechBackupAgent-{version}-{rid}.tar.gz")
+    *[(rid, label, f"DariaTechBackupAgent-{rid}.tar.gz", source / f"DariaTechBackupAgent-{rid}-package" / f"DariaTechBackupAgent-{version}-{rid}.tar.gz")
       for rid, label in [("linux-x64", "Linux x64"), ("linux-arm64", "Linux ARM64"), ("osx-arm64", "macOS Apple Silicon"), ("osx-x64", "macOS Intel")]],
 ]
 windows_version = (source / "DariaTechBackupSetup-win-x64-unsigned" / "agent-version.txt").read_text().strip()

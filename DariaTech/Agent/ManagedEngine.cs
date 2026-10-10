@@ -59,12 +59,15 @@ public sealed class ManagedEngine(AgentOptions options,ProtectedState state,ILog
   while(!ct.IsCancellationRequested)
   {
    using var process=new Process{StartInfo=CreateStartInfo(executable,data,options.EngineUrl,credential,key,tls)};
-   // Child logs may include customer paths. Consume locally without forwarding/logging them.
-   process.OutputDataReceived+=(_,_)=>{};process.ErrorDataReceived+=(_,_)=>{};
+   // Child logs may include customer paths. Consume locally without forwarding/logging them; only the
+   // start message is recognised so requests wait until the engine has finished starting.
+   var instance=Guid.NewGuid();var port=new Uri(options.EngineUrl).Port;
+   process.OutputDataReceived+=(_,e)=>{if(EngineReadiness.IsStartedLine(e.Data,port))EngineReadiness.Started(state,instance);};process.ErrorDataReceived+=(_,_)=>{};
    var started=false;
    try
    {
-    state.Write("engine-instance.bin",Guid.NewGuid());
+    EngineReadiness.Starting(state,instance);
+    state.Write("engine-instance.bin",instance);
     process.Start();started=true;using var job=OperatingSystem.IsWindows()?WindowsJob.Attach(process):null;
     state.Write("engine-process.bin",new EngineProcessIdentity(process.Id,process.StartTime.ToUniversalTime().Ticks));
     process.BeginOutputReadLine();process.BeginErrorReadLine();

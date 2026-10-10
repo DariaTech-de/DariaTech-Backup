@@ -295,6 +295,27 @@ public sealed class SecurityTests
    return new(System.Net.HttpStatusCode.InternalServerError){Content=new StringContent(create?"{\"Error\":\"error-creating-folder\"}":"{\"Error\":\"missing-folder\"}")};
   }
  }
+ [Test]
+ public void RequestsToAManagedEngineWaitUntilItHasFinishedStarting()
+ {
+  Assert.That(EngineReadiness.IsStartedLine("Server has started and is listening on 127.0.0.1, port 8200",8200),Is.True);
+  Assert.That(EngineReadiness.IsStartedLine("Server wurde gestartet und lauscht auf 127.0.0.1, Port 8200",8200),Is.True);
+  Assert.That(EngineReadiness.IsStartedLine("Use the following link to sign in: https://localhost:8200/signin.html",8200),Is.False);
+  Assert.That(EngineReadiness.IsStartedLine(null,8200),Is.False);
+  var directory=Path.Combine(Path.GetTempPath(),"dt-ready-"+Guid.NewGuid());Directory.CreateDirectory(directory);
+  try
+  {
+   var key=Path.Combine(directory,"agent.key");File.WriteAllText(key,Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
+   if(!OperatingSystem.IsWindows())File.SetUnixFileMode(key,UnixFileMode.UserRead|UnixFileMode.UserWrite);
+   var state=new ProtectedState(new AgentOptions{StateDirectory=Path.Combine(directory,"state"),LinuxKeyFile=key});var now=DateTimeOffset.UtcNow;
+   Assert.That(EngineReadiness.Ready(state,now),Is.True,"an external engine is never gated");
+   var instance=Guid.NewGuid();EngineReadiness.Starting(state,instance);
+   Assert.That(EngineReadiness.Ready(state,DateTimeOffset.UtcNow),Is.False,"a starting engine is not ready");
+   EngineReadiness.Started(state,Guid.NewGuid());Assert.That(EngineReadiness.Ready(state,DateTimeOffset.UtcNow),Is.False,"a message of an older instance does not count");
+   Assert.That(EngineReadiness.Ready(state,DateTimeOffset.UtcNow+EngineReadiness.Grace),Is.True,"the grace period covers a localized or missing message");
+   EngineReadiness.Started(state,instance);Assert.That(EngineReadiness.Ready(state,DateTimeOffset.UtcNow),Is.True);
+  }finally{if(Directory.Exists(directory))Directory.Delete(directory,true);}
+ }
  private sealed class TaskResultHandler(string result):HttpMessageHandler
  {
   protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct)=>Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK){Content=new StringContent(result)});

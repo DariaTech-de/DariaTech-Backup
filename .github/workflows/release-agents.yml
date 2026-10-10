@@ -5,9 +5,9 @@ on:
   workflow_dispatch:
     inputs:
       prerelease:
-        description: Mark as pre-release (pilot)
+        description: Only for testing - publish as a pre-release instead of the production release
         type: boolean
-        default: true
+        default: false
 permissions:
   contents: read
 concurrency:
