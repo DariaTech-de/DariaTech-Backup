@@ -296,7 +296,7 @@ public sealed class SecurityTests
   }
  }
  [Test]
- public void RequestsToAManagedEngineWaitUntilItHasFinishedStarting()
+ public async Task RequestsToAManagedEngineWaitUntilItHasFinishedStarting()
  {
   Assert.That(EngineReadiness.IsStartedLine("Server has started and is listening on 127.0.0.1, port 8200",8200),Is.True);
   Assert.That(EngineReadiness.IsStartedLine("Server wurde gestartet und lauscht auf 127.0.0.1, Port 8200",8200),Is.True);
@@ -307,13 +307,17 @@ public sealed class SecurityTests
   {
    var key=Path.Combine(directory,"agent.key");File.WriteAllText(key,Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
    if(!OperatingSystem.IsWindows())File.SetUnixFileMode(key,UnixFileMode.UserRead|UnixFileMode.UserWrite);
-   var state=new ProtectedState(new AgentOptions{StateDirectory=Path.Combine(directory,"state"),LinuxKeyFile=key});var now=DateTimeOffset.UtcNow;
-   Assert.That(EngineReadiness.Ready(state,now),Is.True,"an external engine is never gated");
+   var state=new ProtectedState(new AgentOptions{StateDirectory=Path.Combine(directory,"state"),LinuxKeyFile=key});
+   Assert.That(EngineReadiness.Ready(state,DateTimeOffset.UtcNow),Is.False,"without a marker a managed engine is not known to be ready");
+   var previous=Guid.NewGuid();EngineReadiness.Starting(state,previous);EngineReadiness.Started(state,previous);Assert.That(EngineReadiness.Ready(state,DateTimeOffset.UtcNow),Is.True);
+   EngineReadiness.Reset(state);Assert.That(EngineReadiness.Ready(state,DateTimeOffset.UtcNow),Is.False,"a ready marker of the previous service run does not count");
    var instance=Guid.NewGuid();EngineReadiness.Starting(state,instance);
-   Assert.That(EngineReadiness.Ready(state,DateTimeOffset.UtcNow),Is.False,"a starting engine is not ready");
-   EngineReadiness.Started(state,Guid.NewGuid());Assert.That(EngineReadiness.Ready(state,DateTimeOffset.UtcNow),Is.False,"a message of an older instance does not count");
-   Assert.That(EngineReadiness.Ready(state,DateTimeOffset.UtcNow+EngineReadiness.Grace),Is.True,"the grace period covers a localized or missing message");
+   EngineReadiness.Started(state,previous);Assert.That(EngineReadiness.Ready(state,DateTimeOffset.UtcNow),Is.False,"a message of an older instance does not count");
+   Assert.That(EngineReadiness.Ready(state,DateTimeOffset.UtcNow+EngineReadiness.Grace),Is.True,"after the grace period a missing or localized message no longer delays requests");
    EngineReadiness.Started(state,instance);Assert.That(EngineReadiness.Ready(state,DateTimeOffset.UtcNow),Is.True);
+   Assert.That(EngineReadiness.Grace,Is.LessThan(TimeSpan.FromSeconds(15)),"the wait stays below the adapter's HTTP timeout");
+   EngineReadiness.Reset(state);var watch=System.Diagnostics.Stopwatch.StartNew();
+   await EngineReadiness.Wait(state,CancellationToken.None);Assert.That(watch.Elapsed,Is.GreaterThanOrEqualTo(EngineReadiness.Grace-TimeSpan.FromMilliseconds(300)),"a missing start message falls back to the grace period");
   }finally{if(Directory.Exists(directory))Directory.Delete(directory,true);}
  }
  private sealed class TaskResultHandler(string result):HttpMessageHandler

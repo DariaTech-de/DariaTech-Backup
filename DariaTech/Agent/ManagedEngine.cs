@@ -8,6 +8,11 @@ namespace DariaTech.Agent;
 // Installer-owned engine only; never adopts an existing Duplicati database/service.
 public sealed class ManagedEngine(AgentOptions options,ProtectedState state,ILogger<ManagedEngine> log):BackgroundService
 {
+ public override Task StartAsync(CancellationToken cancellationToken)
+ {
+  EngineReadiness.Reset(state);
+  return base.StartAsync(cancellationToken);
+ }
  protected override async Task ExecuteAsync(CancellationToken ct)
  {
 
