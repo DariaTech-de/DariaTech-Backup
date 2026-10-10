@@ -24,7 +24,7 @@ public sealed class EngineIntegrationTests
   var start=new ProcessStartInfo("dotnet"){RedirectStandardOutput=true,RedirectStandardError=true,UseShellExecute=false};
   foreach(var a in new[]{dll!,"--server-datafolder="+Path.Combine(dir,"engine-db"),"--webservice-interface=loopback","--webservice-port="+port,"--webservice-password="+password,"--webservice-api-only=true","--webservice-allowed-hostnames=localhost,127.0.0.1","--disable-update-check=true","--webservice-suppress-welcome-page=true"})start.ArgumentList.Add(a);
   start.Environment["DO_NOT_TRACK"]="1";start.Environment["AUTOUPDATER_Duplicati_SKIP_UPDATE"]="1";start.Environment["SETTINGS_ENCRYPTION_KEY"]=Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-  using var server=Process.Start(start)!;var output=server.StandardOutput.ReadToEndAsync();var error=server.StandardError.ReadToEndAsync();
+  using var server=Process.Start(start)!;var started=new TaskCompletionSource();var output=EngineStartWatch.Read(server,port,started);var error=server.StandardError.ReadToEndAsync();
   try
   {
    using var ct=new CancellationTokenSource(TimeSpan.FromMinutes(3));using var client=new HttpClient{BaseAddress=new Uri($"http://127.0.0.1:{port}"),Timeout=TimeSpan.FromSeconds(15)};
@@ -34,6 +34,8 @@ public sealed class EngineIntegrationTests
     try{using var response=await client.PostAsJsonAsync("/api/v1/auth/login",new{Password=password,RememberMe=false},ct.Token);if(response.IsSuccessStatusCode){auth=JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct.Token));break;}}catch(HttpRequestException){}
     if(server.HasExited)Assert.Fail("Engine exited during startup; inspect locally captured engine logs");await Task.Delay(100,ct.Token);
    }
+   // The engine still initializes its settings database after the web server is up; wait like the agent does.
+   await Task.WhenAny(started.Task,Task.Delay(TimeSpan.FromSeconds(30),ct.Token));
    Assert.That(auth,Is.Not.Null);using(auth!){client.DefaultRequestHeaders.Authorization=new("Bearer",DuplicatiAdapter.Get(auth!.RootElement,"AccessToken").GetString());}
    var settings=new[]{new{Name="encryption-module",Value="aes"},new{Name="passphrase",Value=passphrase},new{Name="dblock-size",Value="4mb"},new{Name="disable-module",Value="console-password-input"}};
    using var created=await client.PostAsJsonAsync("/api/v1/backups",new{Backup=new{Name="Encrypted smoke backup",TargetURL=new Uri(destination+Path.DirectorySeparatorChar).AbsoluteUri,Sources=new[]{source+Path.DirectorySeparatorChar},Settings=settings}},ct.Token);Assert.That(created.IsSuccessStatusCode,Is.True,$"Create backup returned {(int)created.StatusCode}");

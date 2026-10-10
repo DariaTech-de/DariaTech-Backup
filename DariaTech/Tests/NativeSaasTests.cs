@@ -23,7 +23,7 @@ public sealed class NativeSaasTests
   foreach(var arg in new[]{dll!,"--server-datafolder="+Path.Combine(directory,"engine"),"--webservice-interface=loopback","--webservice-port="+port,"--webservice-api-only=true","--webservice-allowed-hostnames=localhost,127.0.0.1","--disable-update-check=true","--require-db-encryption-key=true"})start.ArgumentList.Add(arg);
   start.Environment["DUPLICATI__WEBSERVICE_PASSWORD"]=password;start.Environment["SETTINGS_ENCRYPTION_KEY"]=dbKey;
   start.Environment["DO_NOT_TRACK"]="1";start.Environment["USAGEREPORTER_Duplicati_LEVEL"]="none";start.Environment["AUTOUPDATER_Duplicati_SKIP_UPDATE"]="1";
-  using var process=Process.Start(start)!;var output=process.StandardOutput.ReadToEndAsync();var errors=process.StandardError.ReadToEndAsync();
+  using var process=Process.Start(start)!;var started=new TaskCompletionSource();var output=EngineStartWatch.Read(process,port,started);var errors=process.StandardError.ReadToEndAsync();
   var safeMasks=new List<string>{password,dbKey};var failed=false;
   var oldEnvironment=Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT");var oldMode=Environment.GetEnvironmentVariable("DARIATECH_SAAS_TESTS");
   try
@@ -36,6 +36,8 @@ public sealed class NativeSaasTests
     try{using var response=await client.PostAsJsonAsync("/api/v1/auth/login",new{Password=password,RememberMe=false},timeout.Token);if(response.IsSuccessStatusCode){using var auth=JsonDocument.Parse(await response.Content.ReadAsStringAsync(timeout.Token));token=DuplicatiAdapter.Get(auth.RootElement,"AccessToken").GetString();break;}}catch(HttpRequestException){}
     if(process.HasExited)Assert.Fail("Native development engine exited");await Task.Delay(100,timeout.Token);
    }
+   // The engine still initializes its settings database after the web server is up; wait like the agent does.
+   await Task.WhenAny(started.Task,Task.Delay(TimeSpan.FromSeconds(30),timeout.Token));
    Assert.That(token,Is.Not.Null);client.DefaultRequestHeaders.Authorization=new("Bearer",token);
    using var rsa=RSA.Create(2048);
    var account=JsonSerializer.Serialize(new{type="service_account",project_id="dariatech-development-negative-test",private_key_id="not-a-live-key",private_key=rsa.ExportPkcs8PrivateKeyPem(),client_email="test@dariatech-development-negative-test.iam.gserviceaccount.com",client_id="123456789",token_uri="https://oauth2.googleapis.com/token"});
