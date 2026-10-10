@@ -476,6 +476,7 @@ input[readonly]{background:var(--sunken);color:var(--muted)}
 .browser{display:flex;flex-direction:column;gap:12px;align-items:flex-start}
 .browser-panel{align-self:stretch;border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;background:var(--panel-2)}
 .browser-panel[hidden]{display:none}
+.browser-actions{display:flex;flex-wrap:wrap;gap:10px}
 .browser-head{display:flex;flex-wrap:wrap;align-items:center;gap:10px;font-size:13px}
 .browser-status{font-size:13.5px;color:var(--ink);min-height:1em}
 .browser-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;max-height:320px;overflow:auto}
@@ -536,3 +537,6 @@ body.dark .link-button{color:var(--accent)!important}
 .advanced-actions summary{cursor:pointer;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
 .advanced-actions[open] summary{margin-bottom:16px}
 .choice-option input.folder-input{width:100%;max-width:420px;height:auto;min-height:40px;margin:10px 0 0;accent-color:auto}
+.notice-inline.good{color:var(--ok-fg);background:var(--ok-bg)}
+.card.highlight{border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 18%,transparent)}
+.steps-list{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:8px;font-size:14.5px;line-height:1.5}

@@ -87,6 +87,26 @@ Engine tags `DariaTechManaged:<job UUID>` provide stable identity: repeating a c
 
 Central policy initially exposes keep-versions, filters, AES and hourly repeat/day scheduling. More engine capabilities remain available in local job configuration. Never delete an agent journal to force a revision rollback in production. Restore an older desired definition as a new increasing revision instead. Keep the local service configuration and state accessible only to SYSTEM/administrators.
 
+## macOS
+
+The agent runs as a LaunchDaemon (`de.dariatech.dariatechbackupagent`) without a window; it is operated from the
+Console. macOS protects Documents, Desktop, Downloads and similar folders even from root: grant **Full Disk
+Access** to `/Library/Application Support/DariaTechBackup/agent/DariaTech.Agent` (System Settings → Privacy &
+Security → Full Disk Access). The installer prints these steps in German, copies the path to the clipboard and
+opens the Finder and the settings pane for the user who ran `sudo`. Without it, backups fail with
+`SourceAccessDenied`. macOS may ask again after an agent update, because the binaries are not notarized.
+
+Check the service with `sudo launchctl print system/de.dariatech.dariatechbackupagent`; the log is
+`/Library/Application Support/DariaTechBackup/state/agent-service.log`.
+
+## Command polling and error codes
+
+With remote commands enabled the agent asks the Console for commands every 5 seconds, so folder browsing,
+connection tests and restores answer promptly; the full telemetry cycle still runs once per heartbeat interval.
+A failed engine task is reported with a fixed code derived on the device (`SourceAccessDenied`,
+`TargetUnreachable`, `TargetLoginFailed`, `TargetFolderMissing`, `PassphraseInvalid`, `RepairNeeded` or
+`EngineTaskFailed`); the engine's error text never leaves the device.
+
 ## Remote-operation trust
 
 Generate a private/public ECDSA key pair outside Git with `scripts/generate-command-signing-key.sh /protected/keys`. Mount the private key read-only on the Console and set `Commands__SigningKeyFile`. Distribute **only the public key** over your trusted RMM/local installer administration channel; set Agent:CommandPublicKeyFile and Agent:AllowRemoteCommands=true. Remote commands require ManageEngine=true, default disabled. No automatic trust of a key fetched with a command. Changing the pinned key requires trusted local administration.

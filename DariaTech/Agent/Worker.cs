@@ -5,6 +5,7 @@ using DariaTech.Contracts;
 namespace DariaTech.Agent;
 public sealed class Worker(AgentOptions options,ProtectedState state,ILogger<Worker> log):BackgroundService
 {
+ private const int CommandPollSeconds=5;
  protected override async Task ExecuteAsync(CancellationToken ct)
  {
   options.Validate();
@@ -14,9 +15,22 @@ public sealed class Worker(AgentOptions options,ProtectedState state,ILogger<Wor
   client.DefaultRequestHeaders.Authorization=new AuthenticationHeaderValue("Bearer",identity.Credential);client.DefaultRequestHeaders.Add("X-Device-Id",identity.DeviceId.ToString());
   using var adapter=new DuplicatiAdapter(options,state);
   var queue=state.Read<List<HeartbeatRequest>>("outbox.bin")??[];
-  using var timer=new PeriodicTimer(TimeSpan.FromSeconds(options.HeartbeatSeconds));
+  // Remote commands are polled every few seconds so folder browsing, connection tests and restores answer
+  // promptly; the full telemetry cycle still runs once per heartbeat interval.
+  var tick=options.AllowRemoteCommands?TimeSpan.FromSeconds(Math.Min(CommandPollSeconds,options.HeartbeatSeconds)):TimeSpan.FromSeconds(options.HeartbeatSeconds);
+  using var timer=new PeriodicTimer(tick);
+  var lastCycle=DateTimeOffset.MinValue;
   do
   {
+   if(DateTimeOffset.UtcNow-lastCycle<TimeSpan.FromSeconds(options.HeartbeatSeconds))
+   {
+    var update=state.Read<UpdateJournal>("update.bin");if(update is {Status:"Applying"}&&update.Manifest.Version!=options.Version)continue;
+    try{await RemoteCommands.Synchronize(client,adapter,options,state,identity.DeviceId,ct);}
+    catch(OperationCanceledException)when(ct.IsCancellationRequested){break;}
+    catch(Exception ex){log.LogDebug("Remote command poll failed ({Type})",ex.GetType().Name);}
+    continue;
+   }
+   lastCycle=DateTimeOffset.UtcNow;
    try
    {
     JobReport[] jobs=[];ProgressReport? progress=null;var reachable=true;

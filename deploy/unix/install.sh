@@ -51,7 +51,7 @@ if ! "$prefix/DariaTech.Agent" "${initialize[@]}"; then
  rm -rf "$prefix"
  if [ -d "$previous" ]; then mv "$previous" "$prefix"; fi
  if [[ "$expected" == linux-* ]]; then systemctl start "$service.service" 2>/dev/null || true; else "$prefix/DariaTech.Agent" --service-start 2>/dev/null || true; fi
- printf '%s\n' 'Initialization failed; the previous installation was restored.' >&2
+ printf '%s\n' '✖ Installation fehlgeschlagen; die vorherige Installation wurde wiederhergestellt.' >&2
  exit 2
 fi
 # Existing configuration is retained by initialization, including pins and identity.
@@ -66,5 +66,27 @@ else
  "$prefix/DariaTech.Agent" --service-start
  launchctl print "system/$label" >/dev/null
 fi
-"$prefix/DariaTech.Agent" --service-health "$config"
-printf '%s\n' 'DariaTech Backup Agent installed and enrollment/local engine verified. Heartbeats will continue over HTTPS.'
+if ! "$prefix/DariaTech.Agent" --service-health "$config"; then
+ printf '\n%s\n%s\n%s\n' \
+  '✖ Der Agent ist installiert, hat sich aber noch nicht bei der DariaTech Console gemeldet.' \
+  '  Häufige Ursachen: Einmal-Code abgelaufen (in der Console einen neuen Befehl erzeugen), keine Internetverbindung oder Firewall.' \
+  "  Protokoll: $(if [[ "$expected" == osx-* ]]; then printf '%s' "sudo tail -n 50 '/Library/Application Support/DariaTechBackup/state/agent-service.log'"; else printf '%s' "sudo journalctl -u $service.service -n 50"; fi)" >&2
+ exit 2
+fi
+printf '\n%s\n%s\n' \
+ '✔ Installation erfolgreich: Der DariaTech Backup Agent läuft als Hintergrunddienst und ist mit der Console verbunden.' \
+ '  Das Gerät erscheint jetzt in der DariaTech Console beim Kunden. Ein Programmfenster gibt es nicht – alles wird über die Console gesteuert.'
+if [[ "$expected" == osx-* ]]; then
+ # macOS protects Documents, Desktop, Downloads etc. even from root; only the user can grant Full Disk Access.
+ printf '\n%s\n%s\n%s\n%s\n%s\n' \
+  '➜ Letzter Schritt auf dem Mac: Festplattenvollzugriff erlauben (sonst können Dokumente, Schreibtisch und Downloads nicht gesichert werden).' \
+  '  1. Die Systemeinstellungen öffnen sich bei „Datenschutz & Sicherheit → Festplattenvollzugriff“.' \
+  '  2. Im geöffneten Finder-Fenster ist „DariaTech.Agent“ markiert: diese Datei in die Liste ziehen (oder „+“ und ⇧⌘G, der Pfad ist schon in der Zwischenablage).' \
+  '  3. Den Schalter bei „DariaTech.Agent“ einschalten.' \
+  "  Pfad: $prefix/DariaTech.Agent"
+ if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ]; then
+  printf '%s' "$prefix/DariaTech.Agent" | sudo -u "$SUDO_USER" pbcopy 2>/dev/null || true
+  sudo -u "$SUDO_USER" open -R "$prefix/DariaTech.Agent" 2>/dev/null || true
+  sudo -u "$SUDO_USER" open 'x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles' 2>/dev/null || true
+ fi
+fi

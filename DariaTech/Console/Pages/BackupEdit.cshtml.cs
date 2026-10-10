@@ -50,6 +50,10 @@ public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets,Command
  public Dictionary<string,string> OptionValues {get;private set;}=new(StringComparer.OrdinalIgnoreCase);
  public HashSet<string> StoredSecrets {get;private set;}=new(StringComparer.OrdinalIgnoreCase);
  public Device Device {get;private set;}=null!;
+ public string Platform {get;private set;}="";
+ public bool IsMac=>Platform.StartsWith("osx",StringComparison.Ordinal)||Device?.OperatingSystem.Contains("Darwin",StringComparison.OrdinalIgnoreCase)==true||Device?.OperatingSystem.Contains("macOS",StringComparison.OrdinalIgnoreCase)==true;
+ public bool IsWindows=>Platform.StartsWith("win",StringComparison.Ordinal)||Platform==""&&Device?.OperatingSystem.Contains("Windows",StringComparison.OrdinalIgnoreCase)==true;
+ private async Task LoadPlatform()=>Platform=await db.Agents.Where(x=>x.DeviceId==DeviceId&&!x.Revoked).OrderByDescending(x=>x.Registered).Select(x=>x.Platform).FirstOrDefaultAsync()??"";
  public string? Error {get;private set;}
  public async Task<IActionResult> OnGetAsync(Guid deviceId,Guid? id,string provider="Files")
  {
@@ -79,13 +83,15 @@ public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets,Command
    UserTypes=provider=="Microsoft365"?["Mailbox","Calendar","Contacts"]:["Gmail","Drive","Calendar"];
   }
   Device=await db.Devices.SingleOrDefaultAsync(x=>x.Id==DeviceId&&x.Active)??null!;
-  return Device is null?NotFound():Page();
+  if(Device is null)return NotFound();
+  await LoadPlatform();return Page();
  }
  public async Task<IActionResult> OnPostAsync()
  {
   var previous=await LoadPrevious();
   if(ManagedJobId is not null&&previous is null)return NotFound();
   Device=await db.Devices.SingleOrDefaultAsync(x=>x.Id==DeviceId&&x.Active)??null!;if(Device is null)return NotFound();
+  await LoadPlatform();
   var validBinding=ModelState.IsValid;
   Dictionary<string,string> storage;
   Templates=await DestinationTemplates.For(db.DestinationTemplates,Device.TenantId).ToListAsync();
@@ -169,6 +175,15 @@ public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets,Command
   var (command,error)=await CommandApi.RequestDeviceQuery(deviceId,RemoteAction.BrowseFolders,new CatalogRequest(null,string.IsNullOrWhiteSpace(path)?null:path.Trim()),null,db,signer,secrets,HttpContext);
   return new JsonResult(command is null?new{error}:new{id=command.Id});
  }
+ // Shows the stored passphrase of an existing job to an administrator; every view is audited.
+ public async Task<IActionResult> OnPostPassphraseAsync()
+ {
+  if(!User.IsInRole("SuperAdmin")&&!User.IsInRole("Administrator"))return new JsonResult(new{error="Keine Berechtigung."});
+  var previous=await LoadPrevious();if(previous is null)return NotFound();
+  var job=await db.ManagedJobs.SingleAsync(x=>x.Id==ManagedJobId&&x.DeviceId==DeviceId);
+  ManagementApi.Audit(db,HttpContext,job.TenantId,"backup.passphrase-viewed",job.Id);await db.SaveChangesAsync();
+  Response.Headers.CacheControl="no-store";return new JsonResult(new{passphrase=previous.Passphrase});
+ }
  // Connection test with the destination exactly as it would be saved (stored secrets are reused for an existing job).
  public async Task<IActionResult> OnPostTestDestinationAsync(bool createFolder)
  {
@@ -197,7 +212,7 @@ public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets,Command
   if(c.Status is "Pending" or "Accepted")return new JsonResult(new{done=false});
   if(c.Action==RemoteAction.BrowseFolders)
   {
-   if(c.Status!="Completed"||c.EncryptedCatalog is null)return new JsonResult(new{done=true,ok=false,message="Der Ordner ist auf dem Gerät nicht verfügbar."});
+   if(c.Status!="Completed"||c.EncryptedCatalog is null)return new JsonResult(new{done=true,ok=false,message="Der Ordner ist auf dem Gerät nicht verfügbar oder geschützt. Auf einem Mac braucht der Agent dafür „Festplattenvollzugriff“ (siehe Geräteseite)."});
    var catalog=System.Text.Json.JsonSerializer.Deserialize<RestoreCatalog>(secrets.Unprotect(c.TenantId,$"catalog:{c.Id}",c.EncryptedCatalog))!;
    ManagementApi.Audit(db,HttpContext,c.TenantId,"device.folders-viewed",c.Id);await db.SaveChangesAsync();
    return new JsonResult(new{done=true,ok=true,folders=catalog.Files.Select(x=>x.Path),truncated=catalog.Truncated});

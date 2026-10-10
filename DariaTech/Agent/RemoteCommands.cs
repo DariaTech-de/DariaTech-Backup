@@ -11,6 +11,7 @@ public sealed partial class DuplicatiAdapter
   var jobs=await ReadJobs(ct);if(jobs.All(x=>x.LocalId!=command.LocalJobId))throw new InvalidOperationException("Backup job no longer exists");
   // Two devices writing to one destination would corrupt it; a recovery copy only restores.
   if(command.Action==RemoteAction.RunBackup&&IsRestoreOnly(command.LocalJobId))throw new InvalidOperationException("Recovery copy cannot run backups");
+  if(command.Action is RemoteAction.RunBackup or RemoteAction.VerifyBackup&&IsAdopting(command.LocalJobId))throw new InvalidOperationException("Taken-over backup is still rebuilding its database");
   var cloudBindings=state.Read<Dictionary<string,SaasJobBinding>>("saas-bindings.bin")??[];
   if(command.Action==RemoteAction.RunBackup&&cloudBindings.TryGetValue(command.LocalJobId,out var cloud))await RequireSaasProvider(cloud.Source,false,ct);
   if(command.Action==RemoteAction.RestoreProxmox)return await RestoreProxmox(command,ct);
@@ -50,7 +51,8 @@ public sealed partial class DuplicatiAdapter
   var status=Get(result.RootElement,"Status").GetString();
   // Engine tasks can return normally with a failed result (notably partial restores).
   // Never forward raw exception/error text, and never turn this into a successful receipt.
-  if(status=="Completed"&&(!string.IsNullOrWhiteSpace(Get(result.RootElement,"ErrorMessage").ToString())||!string.IsNullOrWhiteSpace(Get(result.RootElement,"Exception").ToString())))return new("Failed",id,"EngineTaskFailed");
+  var errorMessage=Get(result.RootElement,"ErrorMessage").ToString();var exception=Get(result.RootElement,"Exception").ToString();
+  if(status=="Completed"&&(!string.IsNullOrWhiteSpace(errorMessage)||!string.IsNullOrWhiteSpace(exception)))return new("Failed",id,EngineErrors.Classify(errorMessage,exception));
   if(status=="Completed"&&(state.Read<Dictionary<long,CloudTaskBinding>>("cloud-tasks.bin")??[]).TryGetValue(id,out var cloud))
   {
    // Native providers can report failed directory enumeration as Warning. A cloud
@@ -73,7 +75,7 @@ public sealed partial class DuplicatiAdapter
    // failing tasks); keep waiting briefly instead of settling on an indeterminate outcome.
    return finished.Value>DateTimeOffset.UtcNow.AddMinutes(-1)?new("Accepted",id,null):new("Indeterminate",id,"DispatchIndeterminate");
   }
-  return status switch {"Completed"=>new("Completed",id,null),"Failed"=>new("Failed",id,"EngineTaskFailed"),_=>new("Accepted",id,null)};
+  return status switch {"Completed"=>new("Completed",id,null),"Failed"=>new("Failed",id,EngineErrors.Classify(errorMessage,exception)),_=>new("Accepted",id,null)};
  }
  public static string RestoreDestination(string? root,string folder)
  {

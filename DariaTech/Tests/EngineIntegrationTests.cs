@@ -109,6 +109,23 @@ public sealed class EngineIntegrationTests
    await WaitTask(client,(await adapter.Dispatch(original with{Id=Guid.NewGuid()},options,ct.Token)).ToString(),ct.Token,password,passphrase);
    Assert.That(await File.ReadAllTextAsync(Path.Combine(source,"restore-check.bin"),ct.Token),Is.EqualTo("changed locally"),"existing files are kept");
    Assert.That(Directory.GetFiles(source,"restore-check*.bin").Length,Is.EqualTo(2),"the restored version is placed next to it");
+   // Replacing a device: the taken-over job first rebuilds its database from the destination (no schedule, no
+   // backups meanwhile), then gets its schedule and continues the same version chain.
+   var versionsBefore=(await adapter.ReadCatalog(recoveryCommand with{Id=Guid.NewGuid(),Action=RemoteAction.ListRestorePoints},ct.Token)).Points.Length;
+   var adopted=new ConfigurationAssignment(Guid.NewGuid(),1,new ManagedBackupDefinition("Übernommen",[source+Path.DirectorySeparatorChar],new Uri(destination+Path.DirectorySeparatorChar).AbsoluteUri,passphrase,new(),30,[],new(DateTimeOffset.UtcNow.AddDays(1),24,[DayOfWeek.Monday]),Adopted:true));
+   Assert.That(async()=>await adapter.ApplyConfiguration(adopted,ct.Token),Throws.InstanceOf<AdoptionPendingException>());
+   var adoptions=state.Read<Dictionary<string,AdoptionState>>("adoptions.bin")!;var adoptedId=adoptions.Single().Key;
+   using(var pending=JsonDocument.Parse(await client.GetStringAsync("/api/v1/backups",ct.Token)))
+    Assert.That(pending.RootElement.EnumerateArray().Single(x=>DuplicatiAdapter.Get(DuplicatiAdapter.Get(x,"Backup"),"ID").ToString()==adoptedId).TryGetProperty("Schedule",out var none)&&none.ValueKind==JsonValueKind.Object,Is.False,"no schedule before the rebuild");
+   Assert.That(async()=>await adapter.Dispatch(command with{Id=Guid.NewGuid(),LocalJobId=adoptedId},options,ct.Token),Throws.InstanceOf<InvalidOperationException>(),"no backup before the rebuild");
+   await WaitTask(client,adoptions[adoptedId].TaskId.ToString(),ct.Token,password,passphrase);
+   Assert.That(await adapter.ApplyConfiguration(adopted,ct.Token),Is.EqualTo(adoptedId));
+   Assert.That(state.Read<Dictionary<string,AdoptionState>>("adoptions.bin")!,Is.Empty);
+   using(var scheduled=JsonDocument.Parse(await client.GetStringAsync("/api/v1/backups",ct.Token)))
+    Assert.That(DuplicatiAdapter.Get(scheduled.RootElement.EnumerateArray().Single(x=>DuplicatiAdapter.Get(DuplicatiAdapter.Get(x,"Backup"),"ID").ToString()==adoptedId),"Schedule").ValueKind,Is.EqualTo(JsonValueKind.Object),"schedule restored after the rebuild");
+   await WaitTask(client,(await adapter.Dispatch(command with{Id=Guid.NewGuid(),LocalJobId=adoptedId},options,ct.Token)).ToString(),ct.Token,password,passphrase);
+   var versionsAfter=(await adapter.ReadCatalog(command with{Id=Guid.NewGuid(),LocalJobId=adoptedId,Action=RemoteAction.ListRestorePoints},ct.Token)).Points.Length;
+   Assert.That(versionsAfter,Is.EqualTo(versionsBefore+1),"the taken-over job continues the existing version chain");
   }
   finally
   {

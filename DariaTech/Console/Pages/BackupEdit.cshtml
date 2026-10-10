@@ -23,11 +23,16 @@
   <div class="card-head"><div><h2><span class="step">1</span>Was wird gesichert?</h2><span class="sub">Quelle auf dem Gerät @Model.Device.Name</span></div></div>
   <div class="field"><label asp-for="Name">Jobname</label><input asp-for="Name" required maxlength="200" placeholder="z. B. Dateiserver täglich" /></div>
   @if(Model.Provider is "Files" or "NAS"){
-   <div class="field"><label asp-for="Sources"><span>Quellordner</span><span class="label-hint">ein absoluter Pfad je Zeile</span></label><textarea asp-for="Sources" required rows="4" placeholder="C:\Users&#10;D:\Daten&#10;/srv/daten" data-source-list></textarea></div>
+   <div class="field"><label asp-for="Sources"><span>Quellordner</span><span class="label-hint">ein absoluter Pfad je Zeile</span></label><textarea asp-for="Sources" required rows="4" placeholder="@(Model.IsMac?"/Users/name/Documents":Model.IsWindows?"C:\\Users\\name\\Documents":"/srv/daten")" data-source-list></textarea></div>
+   var users=Model.IsMac?"/Users/":Model.IsWindows?"C:\\Users\\":"/home/";
    <div class="browser" data-browser data-device="@Model.DeviceId">
-    <button type="button" class="button secondary" data-browse-root>@Ui.Icon("search")Ordner auf dem Gerät durchsuchen</button>
+    <div class="browser-actions">
+     <button type="button" class="button secondary" data-browse-path="@users">@Ui.Icon("search")Benutzerordner durchsuchen</button>
+     <button type="button" class="button secondary" data-browse-root>@(Model.IsWindows?"Laufwerke durchsuchen":"Ganzes Gerät durchsuchen")</button>
+    </div>
+    <p class="hint">@Ui.Icon("info")@if(Model.IsMac){<span>Im Benutzerordner den Namen des Benutzers öffnen, dann z. B. „Documents“ (Dokumente), „Desktop“ (Schreibtisch) oder „Downloads“ hinzufügen. Pfad selbst ermitteln: im Finder Rechtsklick auf den Ordner, die Wahltaste ⌥ gedrückt halten und „… als Pfadname kopieren“ wählen, dann hier einfügen.</span>}else if(Model.IsWindows){<span>Im Benutzerordner den Benutzer öffnen und z. B. „Documents“ oder „Desktop“ hinzufügen. Pfad selbst ermitteln: im Explorer Umschalt + Rechtsklick auf den Ordner → „Als Pfad kopieren“, dann hier einfügen.</span>}else{<span>Ordner öffnen und mit „Hinzufügen“ übernehmen, oder einen absoluten Pfad wie /srv/daten eintragen.</span>}</p>
     <div class="browser-panel" data-browser-panel hidden>
-     <div class="browser-head"><button type="button" class="link-button" data-browse-root>Laufwerke</button><span class="browser-path code" data-browser-path></span></div>
+     <div class="browser-head"><button type="button" class="link-button" data-browse-root>@(Model.IsWindows?"Laufwerke":"Gerät")</button><span class="browser-path code" data-browser-path></span></div>
      <p class="browser-status" data-browser-status role="status" aria-live="polite"></p>
      <ul class="browser-list" data-browser-list></ul>
     </div>
@@ -85,8 +90,17 @@
 
  <section class="card">
   <div class="card-head"><div><h2><span class="step">3</span>Verschlüsselung</h2><span class="sub">AES-256 auf dem Gerät, bevor Daten das Gerät verlassen.</span></div></div>
-  <div class="field"><label for="Passphrase"><span>Backup-Passphrase</span><span class="label-hint">@(isNew?"mindestens 14 Zeichen":"leer lassen, um sie zu behalten")</span></label><input type="password" name="Passphrase" id="Passphrase" autocomplete="new-password" minlength="14" required="@(isNew?"required":null)" /></div>
-  <p class="hint">@Ui.Icon("key")Ohne diese Passphrase lassen sich die Sicherungen nicht wiederherstellen. Bewahren Sie sie getrennt vom Gerät auf.</p>
+  <div class="passphrase" data-passphrase>
+  @if(isNew){
+   <div class="field"><label for="Passphrase"><span>Backup-Passphrase</span><span class="label-hint">mindestens 14 Zeichen</span></label><input type="password" name="Passphrase" id="Passphrase" autocomplete="new-password" minlength="14" required data-passphrase-input /></div>
+   <div class="browser-actions"><button type="button" class="button secondary" data-passphrase-generate>@Ui.Icon("key")Sicheren Schlüssel erzeugen</button><button type="button" class="button secondary" data-passphrase-copy hidden>Kopieren</button></div>
+  } else {
+   <div class="field"><label for="Passphrase"><span>Backup-Passphrase</span><span class="label-hint">bleibt unverändert</span></label><input type="password" name="Passphrase" id="Passphrase" autocomplete="off" readonly placeholder="••••••••••••••" data-passphrase-input /></div>
+   <div class="browser-actions"><button type="button" class="button secondary" data-passphrase-reveal>@Ui.Icon("key")Passphrase anzeigen</button><button type="button" class="button secondary" data-passphrase-copy hidden>Kopieren</button></div>
+  }
+   <p class="dest-test-status" data-passphrase-status role="status" aria-live="polite"></p>
+  </div>
+  <p class="hint">@Ui.Icon("key")Die Passphrase wird verschlüsselt in der Console gespeichert; Administratoren können sie hier jederzeit anzeigen (wird protokolliert). Für den Notfall zusätzlich getrennt aufbewahren, z. B. im Passwort-Manager.</p>
  </section>
 
  <section class="card">

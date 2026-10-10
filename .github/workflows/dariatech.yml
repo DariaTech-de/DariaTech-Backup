@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:17-bookworm
+        image: public.ecr.aws/docker/library/postgres:17-bookworm # Docker Hub rate-limits anonymous pulls on shared runners
         env:
           POSTGRES_DB: dariatech_ci
           # Disposable CI-only database, never production configuration.

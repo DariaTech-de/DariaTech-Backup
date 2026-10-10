@@ -11,7 +11,10 @@ public sealed record ManagedBackupDefinition(string Name,string[] Sources,string
     [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] ProxmoxSource? Proxmox=null,
     // Recovery copy of another device's backup: same destination and passphrase, no schedule, never runs a backup.
     // The engine lists versions and restores directly from the destination without a local database.
-    [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] bool? RestoreOnly=null);
+    [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] bool? RestoreOnly=null,
+    // Taken over from a replaced device: the destination already holds this backup, so a new engine job first
+    // rebuilds its local database from the destination and only then gets its schedule.
+    [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] bool? Adopted=null);
 public sealed record ConfigurationInput(long ExpectedRevision,ManagedBackupDefinition Definition);
 public sealed record ConfigurationAssignment(Guid JobId,long Revision,ManagedBackupDefinition Definition);
 public sealed record ConfigurationReceipt(long Revision,string? LocalJobId,string Status);
@@ -30,6 +33,7 @@ public static class ConfigurationPolicy
     ||d.Filters is null||d.Filters.Length>100||d.Filters.Any(x=>x is null||!Text(x.Expression,1000)))return false;
   if(uri.Scheme=="file"&&!string.IsNullOrEmpty(uri.Host)&&uri.Host!="localhost")return false;
   if(d.RestoreOnly is false||d.RestoreOnly is true&&(d.Schedule is not null||d.Saas is not null||d.Proxmox is not null||d.SourceMounts is not null))return false;
+  if(d.Adopted is false||d.Adopted is true&&(d.RestoreOnly is not null||d.Saas is not null||d.Proxmox is not null))return false;
   if(d.Schedule is {} s&&(s.RepeatHours is <1 or >8760||s.Days is null||s.Days.Length is <1 or >7||s.Days.Any(x=>!Enum.IsDefined(x))||s.Days.Distinct().Count()!=s.Days.Length||s.Start.Year is <2020 or >2100))return false;
   return System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(d).Length<=80000;
  }

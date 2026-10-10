@@ -28,9 +28,32 @@
   @if(User.IsInRole("SuperAdmin")||User.IsInRole("Administrator")||User.IsInRole("Technician")){<a class="button" href="#backup-jobs">@Ui.Icon("server")Backup-Aktionen / Restore</a>}
   @if(User.IsInRole("SuperAdmin")||User.IsInRole("Administrator")){<a class="button" asp-page="/BackupEdit" asp-route-deviceId="@d.Id">Backup-Job anlegen</a>}
  </div>
- <p id="remote-hint" class="hint">@Ui.Icon("info")Backup-Aktionen werden am jeweiligen Job angefordert. Remote-Restore benötigt eine zweite Administratorfreigabe und die lokale Freigabe des Agenten.</p>
+ <p id="remote-hint" class="hint">@Ui.Icon("info")Backup-Aktionen werden am jeweiligen Job angefordert. Gibt es einen zweiten Administrator, muss er eine Wiederherstellung freigeben.</p>
 </section>
 
+@if(Model.Message is not null){<p class="notice-inline good" role="status">@Ui.Icon("check")@Model.Message</p>}
+@if(Model.Failure is not null){<p class="form-error" role="alert">@Model.Failure</p>}
+@if(Model.IsMac){
+<section class="card">
+ <div class="card-head"><div><h2>Mac: Festplattenvollzugriff</h2><span class="sub">Ohne diese Freigabe kann macOS Dokumente, Schreibtisch und Downloads nicht sichern lassen.</span></div></div>
+ <ol class="steps-list">
+  <li>Auf dem Mac <strong>Systemeinstellungen → Datenschutz &amp; Sicherheit → Festplattenvollzugriff</strong> öffnen.</li>
+  <li>Auf <strong>„+“</strong> klicken, <strong>⇧⌘G</strong> drücken und <span class="code">/Library/Application Support/DariaTechBackup/agent/DariaTech.Agent</span> einfügen, dann „Öffnen“.</li>
+  <li>Den Schalter bei <strong>DariaTech.Agent</strong> einschalten. Nach einem Agent-Update kann macOS das erneut verlangen.</li>
+ </ol>
+</section>
+}
+@if(Model.Candidates.Count>0){
+<section class="card@(Model.Suggested is not null?" highlight":"")" id="replace">
+ <div class="card-head"><div><h2>Gerät ersetzen – Backups übernehmen</h2>
+  <span class="sub">@if(Model.Suggested is {} s){<text>„@s.Device.Name“ (zuletzt online @Ui.Ago(s.Device.LastHeartbeat)) hat denselben Namen. Ist dies eine Neuinstallation oder ein Ersatzgerät, übernimmt dieses Gerät die Backups mit Ziel, Passphrase und Zeitplan und sichert in derselben Versionskette weiter.</text>}else{<text>Ersetzt dieses Gerät ein anderes Gerät des Kunden, übernimmt es dessen Backups mit Ziel, Passphrase und Zeitplan und sichert in derselben Versionskette weiter.</text>}</span></div></div>
+ <form method="post" asp-page-handler="Replace" asp-route-id="@d.Id" class="form-grid">
+  <div class="field"><label for="oldDeviceId">Altes Gerät</label><select name="oldDeviceId" id="oldDeviceId">@foreach(var c in Model.Candidates){<option value="@c.Device.Id" selected="@(c==Model.Suggested)">@c.Device.Name · @c.Jobs Backup@(c.Jobs==1?"":"s") · @(c.Device.Active?$"zuletzt online {Ui.Ago(c.Device.LastHeartbeat)}":"deaktiviert")</option>}</select></div>
+  <label class="check"><input type="checkbox" name="confirm" value="true" /> Das alte Gerät sichert nicht mehr (ausgeschaltet, neu aufgesetzt oder Agent deinstalliert). Es wird in der Console deaktiviert.</label>
+  <div><button type="submit" class="button">Backups übernehmen</button></div>
+ </form>
+</section>
+}
 @foreach(var a in Model.Alerts.Take(3)){
 <section class="banner @Ui.SeverityClass(a.Severity)" role="alert">
  <span class="banner-icon">@Ui.Icon("alert")</span>
@@ -77,7 +100,7 @@
    <h2 id="backup-jobs">Backup-Jobs</h2>
    @if(Model.Jobs.Count==0){<p class="card-empty">@Ui.Icon("info")Noch keine Jobs eingerichtet.</p>}
    <ul class="job-list">@foreach(var j in Model.Jobs){<li><span class="dot @(j.Active?"healthy":"offline")"></span><span><strong>@j.Name</strong><span class="sub">@Ui.Ownership(j.Ownership) · Nächster Lauf @Ui.In(j.NextRun)</span></span>@if(User.IsInRole("SuperAdmin")||User.IsInRole("Administrator")||User.IsInRole("Technician")){<a asp-page="/JobActions" asp-route-id="@j.Id">Aktionen / Restore</a>}</li>}</ul>
-   @if(User.IsInRole("SuperAdmin")||User.IsInRole("Administrator")){@foreach(var managed in Model.Managed){<div class="managed-job"><strong>@managed.Name</strong><span class="dest-line">@Ui.Icon("cloud")Ziel: @(Model.Destinations.GetValueOrDefault(managed.Id)??"unbekannt")</span><span class="sub">@managed.Status · Revision @managed.AppliedRevision / @managed.LatestRevision · <a asp-page="/BackupEdit" asp-route-deviceId="@d.Id" asp-route-id="@managed.Id">Konfiguration ändern</a></span></div>}}
+   @if(User.IsInRole("SuperAdmin")||User.IsInRole("Administrator")){@foreach(var managed in Model.Managed){<div class="managed-job"><strong>@managed.Name</strong><span class="dest-line">@Ui.Icon("cloud")Ziel: @(Model.Destinations.GetValueOrDefault(managed.Id)??"unbekannt")</span><span class="sub">@(managed.Status=="Pending"&&managed.AppliedRevision==0?"Wird eingerichtet":managed.Status) · Revision @managed.AppliedRevision / @managed.LatestRevision · <a asp-page="/BackupEdit" asp-route-deviceId="@d.Id" asp-route-id="@managed.Id">Konfiguration ändern</a></span></div>}}
    <p class="sub">Lokal verwaltete Jobs werden in der Backup-Engine gepflegt. Zentrale Jobs verwenden versionierte, verschlüsselte Konfigurationen.</p>
   </article>
   <article class="card">

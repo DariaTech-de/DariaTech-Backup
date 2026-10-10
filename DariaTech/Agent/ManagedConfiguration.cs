@@ -12,14 +12,19 @@ public sealed partial class DuplicatiAdapter
   // A recovery copy never reads its sources (they belong to the original device), so they are not authorized here.
   if(!restoreOnly)SourceChecks.AuthorizeFiles(agentOptions,assignment.Definition.Sources);
   if(assignment.Definition.Saas is {} source)await RequireSaasProvider(source,false,ct);
+  var tag=$"DariaTechManaged:{assignment.JobId:D}";
+  // A taken-over job waits for its database rebuild before anything else changes (the rebuild is an engine task).
+  if(await FindManaged(tag,ct) is {Length:>0} existing&&!await AdoptionFinished(existing,ct))throw new AdoptionPendingException();
   if(await HasPendingTasks(ct))throw new InvalidOperationException("Configuration cannot change while engine tasks are active");
   using var list=await client.GetAsync("/api/v1/backups",ct);list.EnsureSuccessStatusCode();
   using var doc=JsonDocument.Parse(await list.Content.ReadAsStreamAsync(ct));
-  var tag=$"DariaTechManaged:{assignment.JobId:D}";
   var matches=doc.RootElement.EnumerateArray().Where(x=>Get(Get(x,"Backup"),"Tags") is var t&&t.ValueKind==JsonValueKind.Array&&t.EnumerateArray().Any(v=>v.GetString()==tag)).ToArray();
   if(matches.Length>1)throw new InvalidOperationException("Duplicate managed identity");
   var old=matches.Length==1?Get(matches[0],"Backup"):default;
   var id=Get(old,"ID").ToString();
+  // A taken-over backup without a local database (new engine job, or one whose rebuild never started) gets no
+  // schedule until the database has been rebuilt from the destination.
+  var adopting=assignment.Definition.Adopted==true&&(string.IsNullOrEmpty(id)||Get(old,"DBPathExists").ValueKind==JsonValueKind.False);
   var definition=assignment.Definition;
   // No script options, database paths, custom modules or arbitrary engine API supplied by the Console.
   // The engine unmask/update path requires unique option names, including options
@@ -54,17 +59,34 @@ public sealed partial class DuplicatiAdapter
    settings["symlink-policy"]="ignore";
   }
   var previousSchedule=matches.Length==1?Get(matches[0],"Schedule"):default;
-  var schedule=definition.Schedule is {} sc?new {ID=Get(previousSchedule,"ID").ValueKind==JsonValueKind.Number&&Get(previousSchedule,"ID").TryGetInt64(out var sid)?sid:0L,Time=sc.Start.UtcDateTime,Repeat=$"{sc.RepeatHours}h",AllowedDays=sc.Days.Select(x=>x.ToString()).ToArray()}:null;
+  var schedule=!adopting&&definition.Schedule is {} sc?new {ID=Get(previousSchedule,"ID").ValueKind==JsonValueKind.Number&&Get(previousSchedule,"ID").TryGetInt64(out var sid)?sid:0L,Time=sc.Start.UtcDateTime,Repeat=$"{sc.RepeatHours}h",AllowedDays=sc.Days.Select(x=>x.ToString()).ToArray()}:null;
   var input=new{Backup=new{Name=definition.Name,TargetURL=definition.TargetUrl,Sources=sources,Settings=settings.Select(x=>new{Name=x.Key,Value=x.Value}),
    Tags=restoreOnly?new[]{tag,$"DariaTechRevision:{assignment.Revision}",RestoreOnlyTag}:new[]{tag,$"DariaTechRevision:{assignment.Revision}"},Metadata=Get(old,"Metadata").ValueKind==JsonValueKind.Object?Get(old,"Metadata"):JsonSerializer.SerializeToElement(new{}),
    Filters=definition.Filters.Select((x,i)=>new{Order=i,x.Include,x.Expression})},Schedule=schedule};
   using var response=string.IsNullOrEmpty(id)?await client.PostAsJsonAsync("/api/v1/backups",input,ct):await client.PutAsJsonAsync($"/api/v1/backup/{Uri.EscapeDataString(id)}",input,ct);
   response.EnsureSuccessStatusCode();
-  if(!string.IsNullOrEmpty(id)){BindSaasJob(id,assignment,mountPoint);BindSourceJob(id,assignment);BindRestoreOnly(id,restoreOnly);return id;}
+  // The first backup creates only the last folder level; parents (customer/device below a shared location) are
+  // created here. Best effort: an unreachable destination is reported by the backup itself.
+  if(!restoreOnly&&definition.Saas is null)
+   try{await EnsureFolder(definition.TargetUrl,definition.BackendOptions,ct);}catch(Exception error)when(error is HttpRequestException or TaskCanceledException&&!ct.IsCancellationRequested){}
+  if(!string.IsNullOrEmpty(id))
+  {
+   BindSaasJob(id,assignment,mountPoint);BindSourceJob(id,assignment);BindRestoreOnly(id,restoreOnly);
+   if(adopting){await StartAdoption(id,assignment.JobId,ct);throw new AdoptionPendingException();}
+   return id;
+  }
   // Reconcile using stable engine tags rather than an in-memory response; safe after a service crash.
   using var result=await client.GetAsync("/api/v1/backups",ct);result.EnsureSuccessStatusCode();using var updated=JsonDocument.Parse(await result.Content.ReadAsStreamAsync(ct));
   var assignedId=updated.RootElement.EnumerateArray().Where(x=>Get(Get(x,"Backup"),"Tags") is var t&&t.ValueKind==JsonValueKind.Array&&t.EnumerateArray().Any(v=>v.GetString()==tag)).Select(x=>Get(Get(x,"Backup"),"ID").ToString()).Single();
-  BindSaasJob(assignedId,assignment,mountPoint);BindSourceJob(assignedId,assignment);BindRestoreOnly(assignedId,restoreOnly);return assignedId;
+  BindSaasJob(assignedId,assignment,mountPoint);BindSourceJob(assignedId,assignment);BindRestoreOnly(assignedId,restoreOnly);
+  if(adopting){await StartAdoption(assignedId,assignment.JobId,ct);throw new AdoptionPendingException();}
+  return assignedId;
+ }
+ private async Task<string?> FindManaged(string tag,CancellationToken ct)
+ {
+  using var list=await client.GetAsync("/api/v1/backups",ct);list.EnsureSuccessStatusCode();
+  using var doc=JsonDocument.Parse(await list.Content.ReadAsStreamAsync(ct));
+  return doc.RootElement.EnumerateArray().Select(x=>Get(x,"Backup")).Where(x=>Get(x,"Tags") is var t&&t.ValueKind==JsonValueKind.Array&&t.EnumerateArray().Any(v=>v.GetString()==tag)).Select(x=>Get(x,"ID").ToString()).FirstOrDefault();
  }
  public const string RestoreOnlyTag="DariaTechRestoreOnly";
  // Local journal of recovery copies; RunBackup is refused for them even if the Console asked for it.
@@ -106,6 +128,8 @@ public static class ManagedConfiguration
     else
     {
      try{receipt=new(assignment.Revision,await adapter.ApplyConfiguration(assignment,ct),"Applied");}
+     // Still rebuilding a taken-over job's database: no receipt yet, the assignment is applied again next cycle.
+     catch(AdoptionPendingException){continue;}
      catch(HttpRequestException){receipt=new(assignment.Revision,null,"Failed");}
      catch(InvalidOperationException){receipt=new(assignment.Revision,null,"Rejected");}
     }
