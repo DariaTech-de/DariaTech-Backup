@@ -137,6 +137,14 @@ public sealed class SecurityTests
   var incident=run with{Completed=null,Bytes=null,Files=null,StorageBytes=null,ErrorCode="EngineOperationFailed"};
   Assert.That(AgentApi.Valid(request with{Jobs=[new("1","Backup",null,incident)]}),Is.True);
   Assert.That(AgentApi.Valid(request with{Jobs=[new("1","Backup",null,incident with{Bytes=0})]}),Is.False);
+  // The heartbeat endpoint keeps the device online and drops only the implausible details.
+  var future=AgentApi.Sanitize(request with{Jobs=[new("1","Backup",null,run with{Started=DateTimeOffset.UtcNow.AddHours(2),Completed=DateTimeOffset.UtcNow.AddHours(2)}),new("2","Other",null,run)]})!;
+  Assert.That(future.Jobs.Select(x=>(x.LocalId,x.LastRun is null)),Is.EqualTo(new[]{("1",true),("2",false)}));
+  Assert.That(AgentApi.Sanitize(request with{EngineReachable=false})!.Jobs,Is.Empty);
+  Assert.That(AgentApi.Sanitize(request with{Jobs=[new("1","Backup",null,run),new("1","Dup",null,run)]})!.Jobs,Is.Empty);
+  Assert.That(AgentApi.Sanitize(request with{ActiveOperation=new("missing",1,0.5,0,0)})!.ActiveOperation,Is.Null);
+  Assert.That(AgentApi.Sanitize(request with{AgentVersion=""}),Is.Null);
+  Assert.That(AgentApi.Sanitize(request with{Platform="not-a-platform"}),Is.Null);
  }
  [Test]public void EngineResultAdapterOnlyExportsAllowlistedStatistics()
  {

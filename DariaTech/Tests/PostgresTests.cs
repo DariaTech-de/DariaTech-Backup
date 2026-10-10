@@ -73,7 +73,11 @@ public sealed class PostgresTests
   c.DefaultRequestHeaders.Remove("X-Device-Id");c.DefaultRequestHeaders.Add("X-Device-Id",identity.DeviceId.ToString());
   using var first=await c.PostAsJsonAsync("/api/v1/agent/heartbeat",heartbeat);Assert.That(first.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
   using var replay=await c.PostAsJsonAsync("/api/v1/agent/heartbeat",heartbeat);Assert.That(replay.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  // An implausible run (e.g. a clock or time-zone error on the device) must not keep the device offline.
+  var skewed=heartbeat with{Jobs=[new("1","Daily",null,run with{LocalRunId="run-future",Started=DateTimeOffset.UtcNow.AddHours(2),Completed=DateTimeOffset.UtcNow.AddHours(2)})]};
+  var before=DateTimeOffset.UtcNow;using var tolerated=await c.PostAsJsonAsync("/api/v1/agent/heartbeat",skewed);Assert.That(tolerated.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
   await using var db=Db();var job=await db.Jobs.SingleAsync(x=>x.DeviceId==identity.DeviceId);Assert.That(await db.Runs.CountAsync(x=>x.JobId==job.Id),Is.EqualTo(1));
+  Assert.That((await db.Devices.SingleAsync(x=>x.Id==identity.DeviceId)).LastHeartbeat,Is.GreaterThanOrEqualTo(before.AddSeconds(-1)));
   var agent=await db.Agents.SingleAsync(x=>x.DeviceId==identity.DeviceId);agent.Revoked=true;await db.SaveChangesAsync();using var revoked=await c.PostAsJsonAsync("/api/v1/agent/heartbeat",heartbeat);Assert.That(revoked.StatusCode,Is.EqualTo(HttpStatusCode.Unauthorized));
  }
  [Test]public async Task MonitoringDeduplicatesAndResolvesAlerts()

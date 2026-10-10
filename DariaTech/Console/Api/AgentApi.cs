@@ -34,7 +34,10 @@ public static class AgentApi
    var a=await db.Agents.IgnoreQueryFilters().SingleOrDefaultAsync(x=>x.DeviceId==id&&x.CredentialHash==hash&&!x.Revoked);
    if(a is null)return Results.Unauthorized();scope.AgentTenant=a.TenantId;
    if(!await db.Customers.AnyAsync(x=>x.TenantId==scope.AgentTenant&&x.Active))return Results.Unauthorized();
-   if(!Valid(r)||r.Platform is not null&&a.Platform!=""&&r.Platform!=a.Platform)return Results.BadRequest();
+   // A single implausible run or progress value must not keep the whole device offline: only the
+   // envelope is fatal, invalid job details are dropped and the heartbeat is still recorded.
+   if(Sanitize(r) is not {} clean||r.Platform is not null&&a.Platform!=""&&r.Platform!=a.Platform)return Results.BadRequest();
+   r=clean;
    await using var tx=await db.Database.BeginTransactionAsync();
    await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({BitConverter.ToInt64(id.ToByteArray())})");
    var d=await db.Devices.SingleOrDefaultAsync(x=>x.Id==id&&x.Active);if(d is null)return Results.Unauthorized();
@@ -62,21 +65,32 @@ public static class AgentApi
  }
  public static bool Valid(HeartbeatRequest r)
  {
+  if(!ValidEnvelope(r)||r.Jobs.Length>500||r.Jobs.Any(x=>x is null)||r.Jobs.Select(x=>x.LocalId).Distinct().Count()!=r.Jobs.Length)return false;
   var now=DateTimeOffset.UtcNow;
-  if(r.Platform is not null&&!UpdateProtocol.Platforms.Contains(r.Platform))return false;
-  if(!ManagementApi.Text(r.AgentVersion,80)||!ManagementApi.Text(r.OperatingSystem,200)||r.Jobs is null||r.Jobs.Length>500||r.Jobs.Any(x=>x is null)||r.Jobs.Select(x=>x.LocalId).Distinct().Count()!=r.Jobs.Length)return false;
-  foreach(var j in r.Jobs)
-  {
-   if(!ManagementApi.Text(j.LocalId,80)||!ManagementApi.Text(j.Name,200))return false;
-   if(j.LastRun is not {} v)continue;
-   if(!ManagementApi.Text(v.LocalRunId,100)||!Enum.IsDefined(v.Status)||v.Bytes<0||v.Files<0||v.StorageBytes<0||v.QuotaFreeBytes<0||v.QuotaTotalBytes<0||v.QuotaFreeBytes>v.QuotaTotalBytes&&v.QuotaTotalBytes>0||v.Started>now.AddMinutes(5)||v.Started<now.AddYears(-20)||v.Completed<v.Started||v.Completed>now.AddMinutes(5))return false;
-   if(v.Status is RunStatus.Success or RunStatus.Warning or RunStatus.Failed or RunStatus.Cancelled && v.Completed is null && v.ErrorCode!="EngineOperationFailed")return false;
-   if(v.Status==RunStatus.Running&&v.Completed is not null)return false;
-   if(v.Progress is {} p&&(!double.IsFinite(p)||p<0||p>1))return false;
-   if(v.ErrorCode=="EngineOperationFailed"&&(v.Status!=RunStatus.Failed||v.Bytes is not null||v.Files is not null||v.StorageBytes is not null||v.Completed is not null||v.QuotaFreeBytes is not null||v.QuotaTotalBytes is not null||v.QuotaWarning is not null||v.QuotaError is not null||v.RetentionError is not null))return false;
-   if(v.ErrorCode is not null&&!new[]{"BackupFailed","BackupWarning","EngineUnavailable","Cancelled","EngineOperationFailed"}.Contains(v.ErrorCode))return false;
-  }
-  if(r.ActiveOperation is {} progress&&(!r.EngineReachable||!ManagementApi.Text(progress.LocalJobId,80)||progress.TaskId<0||!double.IsFinite(progress.Fraction)||progress.Fraction<0||progress.Fraction>1||progress.Bytes<0||progress.Files<0||r.Jobs.All(x=>x.LocalId!=progress.LocalJobId)))return false;
+  if(r.Jobs.Any(j=>!ValidJob(j)||j.LastRun is {} v&&!ValidRun(v,now)))return false;
+  if(r.ActiveOperation is {} progress&&!ValidProgress(r,progress))return false;
   return r.EngineReachable||r.Jobs.Length==0;
+ }
+ /// <summary>Returns the heartbeat with invalid job details removed, or null when the envelope itself is invalid.</summary>
+ public static HeartbeatRequest? Sanitize(HeartbeatRequest r)
+ {
+  if(!ValidEnvelope(r))return null;
+  var now=DateTimeOffset.UtcNow;
+  var jobs=!r.EngineReachable?[]:r.Jobs.Where(x=>x is not null&&ValidJob(x)).GroupBy(x=>x.LocalId,StringComparer.Ordinal).Where(x=>x.Count()==1).Select(x=>x.Single()).Take(500)
+   .Select(j=>j.LastRun is {} v&&!ValidRun(v,now)?j with{LastRun=null}:j).ToArray();
+  var clean=r with{Jobs=jobs};
+  return clean.ActiveOperation is {} progress&&!ValidProgress(clean,progress)?clean with{ActiveOperation=null}:clean;
+ }
+ private static bool ValidEnvelope(HeartbeatRequest r)=>(r.Platform is null||UpdateProtocol.Platforms.Contains(r.Platform))&&ManagementApi.Text(r.AgentVersion,80)&&ManagementApi.Text(r.OperatingSystem,200)&&r.Jobs is not null;
+ private static bool ValidJob(JobReport j)=>ManagementApi.Text(j.LocalId,80)&&ManagementApi.Text(j.Name,200);
+ private static bool ValidProgress(HeartbeatRequest r,ProgressReport progress)=>r.EngineReachable&&ManagementApi.Text(progress.LocalJobId,80)&&progress.TaskId>=0&&double.IsFinite(progress.Fraction)&&progress.Fraction>=0&&progress.Fraction<=1&&progress.Bytes>=0&&progress.Files>=0&&r.Jobs.Any(x=>x.LocalId==progress.LocalJobId);
+ private static bool ValidRun(RunReport v,DateTimeOffset now)
+ {
+  if(!ManagementApi.Text(v.LocalRunId,100)||!Enum.IsDefined(v.Status)||v.Bytes<0||v.Files<0||v.StorageBytes<0||v.QuotaFreeBytes<0||v.QuotaTotalBytes<0||v.QuotaFreeBytes>v.QuotaTotalBytes&&v.QuotaTotalBytes>0||v.Started>now.AddMinutes(5)||v.Started<now.AddYears(-20)||v.Completed<v.Started||v.Completed>now.AddMinutes(5))return false;
+  if(v.Status is RunStatus.Success or RunStatus.Warning or RunStatus.Failed or RunStatus.Cancelled && v.Completed is null && v.ErrorCode!="EngineOperationFailed")return false;
+  if(v.Status==RunStatus.Running&&v.Completed is not null)return false;
+  if(v.Progress is {} p&&(!double.IsFinite(p)||p<0||p>1))return false;
+  if(v.ErrorCode=="EngineOperationFailed"&&(v.Status!=RunStatus.Failed||v.Bytes is not null||v.Files is not null||v.StorageBytes is not null||v.Completed is not null||v.QuotaFreeBytes is not null||v.QuotaTotalBytes is not null||v.QuotaWarning is not null||v.QuotaError is not null||v.RetentionError is not null))return false;
+  return v.ErrorCode is null||new[]{"BackupFailed","BackupWarning","EngineUnavailable","Cancelled","EngineOperationFailed"}.Contains(v.ErrorCode);
  }
 }

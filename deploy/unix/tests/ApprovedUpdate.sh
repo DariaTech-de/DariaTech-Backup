@@ -72,6 +72,16 @@ wait_receipt tampered Failed
 printf '%s' good > "$UPDATE_PHASE"
 wait_receipt good Installed
 test "$(openssl dgst -sha256 "$state/identity.bin")" = "$identity_hash"
-python3 -c 'import json,sys;v=json.load(open(sys.argv[1]));assert v["enrollments"]==1 and sys.argv[2]+".0" in v["versions"]' "$FIXTURE_RESULT" "$UPDATE_CANDIDATE_VERSION"
+# The updated agent reports its version with its first heartbeat, which follows the receipt once the
+# restarted engine has finished starting; wait for it instead of racing the receipt.
+reported=''
+for attempt in {1..120}; do
+ if python3 -c 'import json,sys;v=json.load(open(sys.argv[1]));assert v["enrollments"]==1 and sys.argv[2]+".0" in v["versions"]' "$FIXTURE_RESULT" "$UPDATE_CANDIDATE_VERSION" 2>/dev/null; then reported=1; break; fi
+ sleep 1
+done
+if [ -z "$reported" ]; then
+ if [ "$(uname -s)" = Linux ]; then journalctl -u DariaTechBackupAgent.service -n 80 --no-pager; else tail -n 80 "$state/agent-service.log"; fi
+ cat "$FIXTURE_RESULT"; exit 1
+fi
 test "$("$prefix/DariaTech.Agent" --service-name)" = DariaTechBackupAgent
 printf '%s\n' "PASS: independent native supervisor, invalid-signature rejection, tampered-binary rejection, actual update to $UPDATE_CANDIDATE_VERSION and retained identity"
