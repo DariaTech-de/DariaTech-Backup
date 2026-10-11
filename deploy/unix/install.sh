@@ -32,6 +32,13 @@ trap 'rm -rf "$stage"' EXIT
 cp -R "$package_dir/agent/." "$stage/"
 chown -R 0:0 "$stage"
 chmod 755 "$stage"
+if [[ "$expected" == osx-* ]]; then
+ # Program files hold no secrets (configuration and state live elsewhere). macOS only lets the user pick a
+ # binary for Full Disk Access when it is readable and executable for them, so the program folder is made
+ # readable for everyone; it stays owned by root and writable only by root.
+ chmod -R go+rX "$stage"
+ chmod go+rx "$parent"
+fi
 # The native validator checks all assemblies, ownership and ancestry before any service stop.
 "$stage/DariaTech.Agent" --check-engine-installation "$stage/engine/Duplicati.Server"
 service="$("$stage/DariaTech.Agent" --service-name)"

@@ -79,6 +79,6 @@ jobs:
         run: sudo --preserve-env=PATH,UPDATE_CANDIDATE_VERSION bash deploy/unix/tests/ApprovedUpdate.sh "${{ matrix.rid }}" "$(command -v node)"
       - uses: actions/upload-artifact@v4
         with:
-          name: DariaTechBackupAgent-${{ matrix.rid }}-pilot
+          name: DariaTechBackupAgent-${{ matrix.rid }}-package
           path: artifacts/unix/${{ matrix.rid }}/*.tar.gz*
           if-no-files-found: error

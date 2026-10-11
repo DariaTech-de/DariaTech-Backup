@@ -137,6 +137,14 @@ public sealed class SecurityTests
   var incident=run with{Completed=null,Bytes=null,Files=null,StorageBytes=null,ErrorCode="EngineOperationFailed"};
   Assert.That(AgentApi.Valid(request with{Jobs=[new("1","Backup",null,incident)]}),Is.True);
   Assert.That(AgentApi.Valid(request with{Jobs=[new("1","Backup",null,incident with{Bytes=0})]}),Is.False);
+  // The heartbeat endpoint keeps the device online and drops only the implausible details.
+  var future=AgentApi.Sanitize(request with{Jobs=[new("1","Backup",null,run with{Started=DateTimeOffset.UtcNow.AddHours(2),Completed=DateTimeOffset.UtcNow.AddHours(2)}),new("2","Other",null,run)]})!;
+  Assert.That(future.Jobs.Select(x=>(x.LocalId,x.LastRun is null)),Is.EqualTo(new[]{("1",true),("2",false)}));
+  Assert.That(AgentApi.Sanitize(request with{EngineReachable=false})!.Jobs,Is.Empty);
+  Assert.That(AgentApi.Sanitize(request with{Jobs=[new("1","Backup",null,run),new("1","Dup",null,run)]})!.Jobs,Is.Empty);
+  Assert.That(AgentApi.Sanitize(request with{ActiveOperation=new("missing",1,0.5,0,0)})!.ActiveOperation,Is.Null);
+  Assert.That(AgentApi.Sanitize(request with{AgentVersion=""}),Is.Null);
+  Assert.That(AgentApi.Sanitize(request with{Platform="not-a-platform"}),Is.Null);
  }
  [Test]public void EngineResultAdapterOnlyExportsAllowlistedStatistics()
  {
@@ -294,6 +302,31 @@ public sealed class SecurityTests
    if(create&&Folders.Contains(parent)){Folders.Add(path);return new(System.Net.HttpStatusCode.OK){Content=new StringContent("{}")};}
    return new(System.Net.HttpStatusCode.InternalServerError){Content=new StringContent(create?"{\"Error\":\"error-creating-folder\"}":"{\"Error\":\"missing-folder\"}")};
   }
+ }
+ [Test]
+ public async Task RequestsToAManagedEngineWaitUntilItHasFinishedStarting()
+ {
+  Assert.That(EngineReadiness.IsStartedLine("Server has started and is listening on 127.0.0.1, port 8200",8200),Is.True);
+  Assert.That(EngineReadiness.IsStartedLine("Server wurde gestartet und lauscht auf 127.0.0.1, Port 8200",8200),Is.True);
+  Assert.That(EngineReadiness.IsStartedLine("Use the following link to sign in: https://localhost:8200/signin.html",8200),Is.False);
+  Assert.That(EngineReadiness.IsStartedLine(null,8200),Is.False);
+  var directory=Path.Combine(Path.GetTempPath(),"dt-ready-"+Guid.NewGuid());Directory.CreateDirectory(directory);
+  try
+  {
+   var key=Path.Combine(directory,"agent.key");File.WriteAllText(key,Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
+   if(!OperatingSystem.IsWindows())File.SetUnixFileMode(key,UnixFileMode.UserRead|UnixFileMode.UserWrite);
+   var state=new ProtectedState(new AgentOptions{StateDirectory=Path.Combine(directory,"state"),LinuxKeyFile=key});
+   Assert.That(EngineReadiness.Ready(state,DateTimeOffset.UtcNow),Is.False,"without a marker a managed engine is not known to be ready");
+   var previous=Guid.NewGuid();EngineReadiness.Starting(state,previous);EngineReadiness.Started(state,previous);Assert.That(EngineReadiness.Ready(state,DateTimeOffset.UtcNow),Is.True);
+   EngineReadiness.Reset(state);Assert.That(EngineReadiness.Ready(state,DateTimeOffset.UtcNow),Is.False,"a ready marker of the previous service run does not count");
+   var instance=Guid.NewGuid();EngineReadiness.Starting(state,instance);
+   EngineReadiness.Started(state,previous);Assert.That(EngineReadiness.Ready(state,DateTimeOffset.UtcNow),Is.False,"a message of an older instance does not count");
+   Assert.That(EngineReadiness.Ready(state,DateTimeOffset.UtcNow+EngineReadiness.Grace),Is.True,"after the grace period a missing or localized message no longer delays requests");
+   EngineReadiness.Started(state,instance);Assert.That(EngineReadiness.Ready(state,DateTimeOffset.UtcNow),Is.True);
+   Assert.That(EngineReadiness.Grace,Is.LessThan(TimeSpan.FromSeconds(15)),"the wait stays below the adapter's HTTP timeout");
+   EngineReadiness.Reset(state);var watch=System.Diagnostics.Stopwatch.StartNew();
+   await EngineReadiness.Wait(state,CancellationToken.None);Assert.That(watch.Elapsed,Is.GreaterThanOrEqualTo(EngineReadiness.Grace-TimeSpan.FromMilliseconds(300)),"a missing start message falls back to the grace period");
+  }finally{if(Directory.Exists(directory))Directory.Delete(directory,true);}
  }
  private sealed class TaskResultHandler(string result):HttpMessageHandler
  {

@@ -34,7 +34,7 @@ public sealed class Worker(AgentOptions options,ProtectedState state,ILogger<Wor
    try
    {
     JobReport[] jobs=[];ProgressReport? progress=null;var reachable=true;
-    try{jobs=await adapter.ReadJobs(ct);progress=await adapter.ReadProgress(ct);if(progress is not null&&jobs.All(x=>x.LocalId!=progress.LocalJobId))progress=null;}catch(Exception ex)when(ex is HttpRequestException or InvalidOperationException or System.Text.Json.JsonException or TaskCanceledException){reachable=false;log.LogWarning("Local engine unavailable ({Type})",ex.GetType().Name);}
+    try{jobs=await adapter.ReadJobs(ct);progress=await adapter.ReadProgress(ct);if(progress is not null&&jobs.All(x=>x.LocalId!=progress.LocalJobId))progress=null;}catch(Exception ex)when(ex is HttpRequestException or InvalidOperationException or System.Text.Json.JsonException or TaskCanceledException){reachable=false;jobs=[];progress=null;log.LogWarning("Local engine unavailable ({Type})",ex.GetType().Name);}
     var update=state.Read<UpdateJournal>("update.bin");var updating=update is {Status:"Applying"}&&update.Manifest.Version!=options.Version;
     if(reachable&&!updating&&state.Read<EnginePauseState>("update-preserve-pause.bin") is {Paused:true} pause)
     {
@@ -67,6 +67,9 @@ public sealed class Worker(AgentOptions options,ProtectedState state,ILogger<Wor
     while(queue.Count>0)
     {
      using var result=await client.PostAsJsonAsync("/api/v1/agent/heartbeat",queue[0],ct);
+     // A snapshot the Console refuses as malformed will never be accepted; drop it instead of letting it
+     // block every newer heartbeat (the device would stay offline forever). Other failures are retried.
+     if(result.StatusCode==System.Net.HttpStatusCode.BadRequest){log.LogWarning("Console rejected a telemetry snapshot as invalid; discarded");queue.RemoveAt(0);state.Write("outbox.bin",queue);continue;}
      if(!result.IsSuccessStatusCode){log.LogWarning("Console rejected telemetry with HTTP {Code}",(int)result.StatusCode);break;}
      queue.RemoveAt(0);state.Write("outbox.bin",queue);telemetryDelivered=true;
     }
