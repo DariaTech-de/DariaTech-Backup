@@ -229,6 +229,16 @@ public sealed class PostgresTests
   var stored=DariaTech.Console.Api.ConfigurationApi.Read(factory.Services.GetRequiredService<ISecretStore>(),r);
   Assert.That(stored.TargetUrl,Does.Match($"^ssh://storage\\.dariatech\\.example:2222/backups/{Regex.Escape(number)}/Template-worker/Server-t-glich-[0-9a-f]{{6}}$"));
   Assert.That(stored.BackendOptions["auth-password"],Is.EqualTo("template-secret-321"));Assert.That(stored.BackendOptions["ssh-fingerprint"],Is.EqualTo("ssh-ed25519 256 11:22:33"));
+  // The connection test of a template runs on the device against the customer/device folder the job writes into.
+  using(var tested=await admin.PostAsync("/BackupEdit?handler=TestDestination&createFolder=true",new FormUrlEncodedContent(new Dictionary<string,string>{
+   {"DeviceId",device.Id.ToString()},{"DestinationMode","template"},{"TemplateId",template.Id.ToString()},{"__RequestVerificationToken",Token(form)}})))
+  {
+   using var answer=System.Text.Json.JsonDocument.Parse(await tested.Content.ReadAsStringAsync());var commandId=answer.RootElement.GetProperty("id").GetGuid();
+   var record=await db.Commands.AsNoTracking().SingleAsync(x=>x.Id==commandId);Assert.That(record.DeviceId,Is.EqualTo(device.Id));
+   var payload=factory.Services.GetRequiredService<ISecretStore>().Unprotect(t.Id,$"command:{commandId}",record.EncryptedPayload);
+   var command=System.Text.Json.JsonSerializer.Deserialize<DeviceCommand>(Convert.FromBase64String(payload))!;
+   Assert.That(command.Test!.TargetUrl,Is.EqualTo($"ssh://storage.dariatech.example:2222/backups/{number}/Template-worker"));Assert.That(command.Test.CreateFolder,Is.True);
+  }
   using var customer=await Login(UserRole.CustomerAdmin,t.Id);using var denied=await customer.GetAsync("/Targets");Assert.That(denied.StatusCode,Is.EqualTo(HttpStatusCode.Forbidden));
   db.DestinationTemplates.Remove(await db.DestinationTemplates.SingleAsync(x=>x.Id==template.Id));await db.SaveChangesAsync();
  }

@@ -199,7 +199,10 @@ public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets,Command
   if(previous is null&&DestinationMode=="template")
   {
    var template=await DestinationTemplates.For(db.DestinationTemplates,device.TenantId).SingleOrDefaultAsync(x=>x.Id==TemplateId);if(template is null)return new JsonResult(new{error="Speicherziel nicht gefunden."});
-   url=template.TargetUrl;options=DestinationTemplates.Options(secrets,template);
+   // Test where the job will actually write: the customer/device folder below the template (the job gets its
+   // own sub-folder there). Testing only the template's base folder would not show missing rights below it.
+   var customer=await db.Customers.Where(x=>x.TenantId==device.TenantId).Select(x=>x.Number).SingleOrDefaultAsync()??"kunde";
+   url=DestinationForm.Below(template.TargetUrl,customer,device.Name);options=DestinationTemplates.Options(secrets,template);
   }
   else
   {
