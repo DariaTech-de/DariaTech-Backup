@@ -63,6 +63,9 @@ public sealed class ManagedEngine(AgentOptions options,ProtectedState state,ILog
   if(!OperatingSystem.IsWindows())UnixPrivatePaths.Directory(data,true);
   while(!ct.IsCancellationRequested)
   {
+   // A retired device whose stop is confirmed does not run its engine at all: the engine's pause is not kept
+   // across engine restarts, and a restarted scheduler would catch up a missed run into the taken-over chain.
+   if(Retirement.Confirmed(state)){log.LogWarning("Device is retired; the backup engine stays stopped");await Retirement.WaitForever(ct);break;}
    using var process=new Process{StartInfo=CreateStartInfo(executable,data,options.EngineUrl,credential,key,tls)};
    // Child logs may include customer paths. Consume locally without forwarding/logging them; only the
    // start message is recognised so requests wait until the engine has finished starting.
@@ -76,7 +79,10 @@ public sealed class ManagedEngine(AgentOptions options,ProtectedState state,ILog
     process.Start();started=true;using var job=OperatingSystem.IsWindows()?WindowsJob.Attach(process):null;
     state.Write("engine-process.bin",new EngineProcessIdentity(process.Id,process.StartTime.ToUniversalTime().Ticks));
     process.BeginOutputReadLine();process.BeginErrorReadLine();
-    await process.WaitForExitAsync(ct);log.LogWarning("Bundled engine exited with code {Code}; restarting",process.ExitCode);
+    var exited=process.WaitForExitAsync(ct);
+    while(!exited.IsCompleted&&!Retirement.Confirmed(state))await Task.WhenAny(exited,Task.Delay(TimeSpan.FromSeconds(15),ct));
+    if(!exited.IsCompleted){log.LogWarning("Device retirement confirmed; stopping the backup engine");continue;} // finally stops the process
+    await exited;log.LogWarning("Bundled engine exited with code {Code}; restarting",process.ExitCode);
    }
    finally{if(started&&!process.HasExited){process.Kill(true);await process.WaitForExitAsync(CancellationToken.None);}}
    await Task.Delay(TimeSpan.FromSeconds(10),ct);

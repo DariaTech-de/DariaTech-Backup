@@ -11,9 +11,13 @@ public static class Retirement
  public const string StateFile="retired.bin";
  public static bool Requested(HttpStatusCode code)=>code==HttpStatusCode.Gone;
  public static bool Active(ProtectedState state)=>state.Read<RetiredState>(StateFile) is not null;
+ public static bool Confirmed(ProtectedState state)=>state.Read<RetiredState>(StateFile) is {Confirmed:true};
+ public static async Task WaitForever(CancellationToken ct){try{await Task.Delay(Timeout.Infinite,ct);}catch(OperationCanceledException){}}
  public static async Task<bool> Enforce(HttpClient console,DuplicatiAdapter adapter,ProtectedState state,CancellationToken ct,Action<string> log)
  {
   var retired=state.Read<RetiredState>(StateFile)??new(DateTimeOffset.UtcNow,false);state.Write(StateFile,retired);
+  // Once confirmed, the managed engine is no longer started (ManagedEngine), so there is nothing left to pause.
+  if(retired.Confirmed)return true;
   try
   {
    await adapter.ReadJobs(ct); // signs in to the engine; a retired agent skips the normal telemetry cycle
@@ -24,7 +28,6 @@ public static class Retirement
   }
   catch(Exception ex)when(ex is HttpRequestException or InvalidOperationException or TaskCanceledException or System.Text.Json.JsonException)
   {log($"Device retirement: local engine unavailable ({ex.GetType().Name}); retrying");return false;}
-  if(retired.Confirmed)return true;
   try
   {
    using var response=await console.PostAsync("/api/v1/agent/retired",null,ct);

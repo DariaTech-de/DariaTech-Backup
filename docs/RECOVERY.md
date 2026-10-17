@@ -58,7 +58,10 @@ The stop is confirmed in one of two ways, and the Console shows which one applie
 - **technically**: the next time the old agent contacts the Console, its heartbeat is answered with
   `410 Gone`. The agent pauses its engine without a time limit (no further scheduled runs), waits until a running
   operation has finished, then calls `POST /api/v1/agent/retired`. Only then is its credential revoked
-  (`device.retire-confirmed`). It keeps re-applying the pause after restarts. Local job databases are kept.
+  (`device.retire-confirmed`). From then on the agent no longer starts its bundled engine at all (the engine
+  does not keep a pause across restarts, and a restarted scheduler would catch up a missed run). Local job
+  databases are kept. Until the confirmation the pause is re-applied every cycle; an engine crash in that short
+  window could still start one catch-up run. Agents with an external engine (`ManageEngine=false`) can only pause.
 - **manually**, for an old device that will never be online again (wiped, broken, lost): an administrator
   confirms that on the new device's page (`device.retire-manually-confirmed`). This is a statement, not a proof.
   The old credential is deliberately left valid: if the device does come back, it is still told to stop.

@@ -131,7 +131,8 @@ public sealed class RetirementTests
    Assert.That(await Retirement.Enforce(console,adapter,state,CancellationToken.None,log.Add),Is.False,"an undelivered confirmation is retried");
    fake.ConfirmAnswer=HttpStatusCode.NoContent;fake.Paused=false; // e.g. the engine restarted
    Assert.That(await Retirement.Enforce(console,adapter,state,CancellationToken.None,log.Add),Is.True);Assert.That(fake.Paused,Is.True,"the pause is re-applied");
-   Assert.That(await Retirement.Enforce(console,adapter,state,CancellationToken.None,log.Add),Is.True);Assert.That(fake.Confirmations,Is.EqualTo(2),"confirmed once delivered, then only the pause is kept");
+   Assert.That(Retirement.Confirmed(state),Is.True,"from now on the managed engine is not started any more");
+   fake.Paused=false;Assert.That(await Retirement.Enforce(console,adapter,state,CancellationToken.None,log.Add),Is.True);Assert.That(fake.Confirmations,Is.EqualTo(2),"confirmed once delivered");
   }
   finally{Directory.Delete(directory,true);}
  }
