@@ -35,7 +35,7 @@ public sealed class Monitoring(IServiceScopeFactory scopes,Microsoft.Extensions.
   var recoveryCopies=managed.Where(x=>x.RestoreOnly&&x.LocalJobId!=null).Select(x=>(x.DeviceId,x.LocalJobId)).ToHashSet();
   jobs=jobs.Where(j=>!recoveryCopies.Contains((j.DeviceId,j.LocalId))).ToList();
   var managedByJob=managed.Where(x=>!x.RestoreOnly&&x.LocalJobId!=null).GroupBy(x=>(x.DeviceId,x.LocalJobId!)).ToDictionary(x=>x.Key,x=>x.First());
-  var facts=await JobFacts.Load(db,jobs.Select(x=>x.Id).ToList(),ct);
+  var facts=await JobFacts.Load(db,jobs.Select(x=>x.Id).ToList(),ct);var jobsByDevice=jobs.ToLookup(x=>x.DeviceId);var managedByDevice=managed.Where(x=>!x.RestoreOnly).ToLookup(x=>x.DeviceId);
   var agents=await db.Agents.ToListAsync(ct);var alerts=await db.Alerts.ToListAsync(ct);
   // Latest update attempt per device: a failed or rejected one stays visible until a newer attempt replaces it.
   var deployments=(await db.UpdateDeployments.ToListAsync(ct)).GroupBy(x=>x.DeviceId).ToDictionary(g=>g.Key,g=>g.OrderByDescending(x=>x.Approved).First());
@@ -51,7 +51,7 @@ public sealed class Monitoring(IServiceScopeFactory scopes,Microsoft.Extensions.
    // The engine state is only known from a recent heartbeat; an offline device is reported as offline only.
    if(!offline&&!d.EngineReachable)problems["engine"]=("Critical","EngineUnavailable");
    if(!offline&&d.InventoryIncompleteSince is not null)problems["inventory"]=("Warning","InventoryIncomplete");
-   var dj=jobs.Where(x=>x.DeviceId==d.Id).ToArray();if(dj.Length==0)problems["no-jobs"]=("Warning","NoBackupJobs");
+   var dj=jobsByDevice[d.Id].ToArray();if(dj.Length==0)problems["no-jobs"]=("Warning","NoBackupJobs");
    foreach(var j in dj)
    {
     var fact=facts[j.Id];var last=fact.Last;var m=managedByJob.GetValueOrDefault((d.Id,j.LocalId));
@@ -69,7 +69,7 @@ public sealed class Monitoring(IServiceScopeFactory scopes,Microsoft.Extensions.
     if(fact.Verification=="Failed")problems[$"verification:{j.Id}"]=("Critical","BackupVerificationFailed");
     if(last?.Status is RunStatus.Cancelled or RunStatus.Unknown)problems[$"incomplete:{j.Id}"]=("Warning","BackupNotSuccessful");
    }
-   foreach(var m in managed.Where(x=>x.DeviceId==d.Id&&!x.RestoreOnly))
+   foreach(var m in managedByDevice[d.Id])
    {
     // Distribution failed, or an applied job is gone from the device's complete job list.
     if(m.Status is "Failed" or "Rejected")problems[$"config:{m.Id}"]=("Critical","ConfigurationFailed");
