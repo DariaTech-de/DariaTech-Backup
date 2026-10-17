@@ -92,3 +92,47 @@ public sealed class LoginLockTests
   DariaTech.Console.Pages.LoginLock.Failed(user,start.AddMinutes(31));Assert.That(user.LockedUntil,Is.Null,"one failure after the lock does not lock again");
  }
 }
+
+public sealed class RetirementTests
+{
+ sealed class FakeEngineAndConsole:HttpMessageHandler
+ {
+  public bool Paused;public bool Running=true;public int Confirmations;public HttpStatusCode ConfirmAnswer=HttpStatusCode.NoContent;
+  protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct)
+  {
+   var path=request.RequestUri!.AbsolutePath;HttpResponseMessage Json(object o)=>new(HttpStatusCode.OK){Content=JsonContent.Create(o)};
+   return Task.FromResult(path switch
+   {
+    "/api/v1/auth/login"=>Json(new{AccessToken="test-only-token"}),
+    "/api/v1/backups"=>Json(Array.Empty<object>()),
+    "/api/v1/serverstate"=>Json(new{ProgramState=Paused?"Paused":"Running",EstimatedPauseEnd="0001-01-01T00:00:00Z",ProposedSchedule=Array.Empty<object>()}),
+    "/api/v1/serverstate/pause"=>Pause(),
+    "/api/v1/progressstate"=>Running?Json(new{BackupID="1",TaskID=4,OverallProgress=0.5}):new HttpResponseMessage(HttpStatusCode.NotFound),
+    "/api/v1/agent/retired"=>Confirm(),
+    _=>new HttpResponseMessage(HttpStatusCode.NotFound)
+   });
+   HttpResponseMessage Pause(){Paused=request.RequestUri!.Query.Contains("duration=")?false:true;return new(HttpStatusCode.OK);}
+   HttpResponseMessage Confirm(){Confirmations++;return new(ConfirmAnswer);}
+  }
+ }
+ [Test]public async Task AReplacedDevicePausesIndefinitelyAndConfirmsOnlyWhenNothingRuns()
+ {
+  var directory=Path.Combine(Path.GetTempPath(),"dt-retire-"+Guid.NewGuid());Directory.CreateDirectory(directory);
+  try
+  {
+   var key=Path.Combine(directory,"agent.key");File.WriteAllText(key,Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
+   if(!OperatingSystem.IsWindows())File.SetUnixFileMode(key,UnixFileMode.UserRead|UnixFileMode.UserWrite);
+   var options=new AgentOptions{StateDirectory=Path.Combine(directory,"state"),LinuxKeyFile=key,EngineUrl="https://127.0.0.1:9"};var state=new ProtectedState(options);state.Write("engine-credential.bin","test-only-engine-password");
+   var fake=new FakeEngineAndConsole();using var adapter=new DuplicatiAdapter(options,state,fake);using var console=new HttpClient(fake,false){BaseAddress=new Uri("https://console.test-only.invalid")};
+   var log=new List<string>();
+   Assert.That(await Retirement.Enforce(console,adapter,state,CancellationToken.None,log.Add),Is.False,"a running backup finishes before the stop is confirmed");
+   Assert.That(fake.Paused,Is.True,"new scheduled runs are prevented at once, without a time limit");Assert.That(fake.Confirmations,Is.Zero);Assert.That(Retirement.Active(state),Is.True);
+   fake.Running=false;fake.ConfirmAnswer=HttpStatusCode.ServiceUnavailable;
+   Assert.That(await Retirement.Enforce(console,adapter,state,CancellationToken.None,log.Add),Is.False,"an undelivered confirmation is retried");
+   fake.ConfirmAnswer=HttpStatusCode.NoContent;fake.Paused=false; // e.g. the engine restarted
+   Assert.That(await Retirement.Enforce(console,adapter,state,CancellationToken.None,log.Add),Is.True);Assert.That(fake.Paused,Is.True,"the pause is re-applied");
+   Assert.That(await Retirement.Enforce(console,adapter,state,CancellationToken.None,log.Add),Is.True);Assert.That(fake.Confirmations,Is.EqualTo(2),"confirmed once delivered, then only the pause is kept");
+  }
+  finally{Directory.Delete(directory,true);}
+ }
+}

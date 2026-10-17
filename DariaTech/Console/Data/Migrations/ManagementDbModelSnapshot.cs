@@ -497,6 +497,22 @@ namespace DariaTech.Console.Data.Migrations
                     b.Property<long>("ProgressFiles")
                         .HasColumnType("bigint");
 
+                    b.Property<Guid?>("ReplacedByDeviceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("RetireConfirmed")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("RetireManuallyConfirmed")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RetireManuallyConfirmedBy")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset?>("RetireRequested")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid>("SiteId")
                         .HasColumnType("uuid");
 
@@ -555,6 +571,9 @@ namespace DariaTech.Console.Data.Migrations
                         .HasColumnType("bigint");
 
                     b.Property<Guid>("DeviceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("HandoverFromDeviceId")
                         .HasColumnType("uuid");
 
                     b.Property<long>("LastReportedRevision")

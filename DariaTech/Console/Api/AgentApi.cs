@@ -33,6 +33,8 @@ public static class AgentApi
    // The only cross-scope read: credential and device ID must BOTH match before assigning scope.
    var a=await db.Agents.IgnoreQueryFilters().SingleOrDefaultAsync(x=>x.DeviceId==id&&x.CredentialHash==hash&&!x.Revoked);
    if(a is null)return Results.Unauthorized();scope.AgentTenant=a.TenantId;
+   // A replaced or decommissioned device is told to pause its own schedules (also when the customer is archived).
+   if(await db.Devices.AnyAsync(x=>x.Id==id&&x.RetireRequested!=null))return Results.StatusCode(StatusCodes.Status410Gone);
    if(!await db.Customers.AnyAsync(x=>x.TenantId==scope.AgentTenant&&x.Active))return Results.Unauthorized();
    // A single implausible run or progress value must not keep the whole device offline: only the
    // envelope is fatal, invalid job details are dropped and the heartbeat is still recorded.
@@ -66,6 +68,22 @@ public static class AgentApi
      stored.Status=run.Status;stored.Completed=run.Completed;stored.Bytes=run.Bytes;stored.Files=run.Files;stored.StorageBytes=run.StorageBytes;stored.Progress=run.Progress;stored.ErrorCode=run.ErrorCode;stored.QuotaFreeBytes=run.QuotaFreeBytes;stored.QuotaTotalBytes=run.QuotaTotalBytes;stored.QuotaWarning=run.QuotaWarning;stored.QuotaError=run.QuotaError;stored.RetentionError=run.RetentionError;
     }
    }
+   await db.SaveChangesAsync();await tx.CommitAsync();return Results.NoContent();
+  }).RequireRateLimiting("Agent");
+  // The agent confirms that its engine is paused indefinitely and nothing is running. Only then is the
+  // credential revoked and the takeover released to the new device.
+  app.MapPost("/api/v1/agent/retired",async(ManagementDb db,TenantScope scope,HttpContext ctx)=>
+  {
+   var auth=ctx.Request.Headers.Authorization.ToString();
+   if(!auth.StartsWith("Bearer ",StringComparison.Ordinal)||auth.Length!=71||!Guid.TryParse(ctx.Request.Headers["X-Device-Id"].ToString(),out var id))return Results.Unauthorized();
+   var hash=Tokens.Hash(auth[7..]);
+   var a=await db.Agents.IgnoreQueryFilters().SingleOrDefaultAsync(x=>x.DeviceId==id&&x.CredentialHash==hash&&!x.Revoked);
+   if(a is null)return Results.Unauthorized();scope.AgentTenant=a.TenantId;
+   await using var tx=await db.Database.BeginTransactionAsync();
+   await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({BitConverter.ToInt64(id.ToByteArray())})");
+   var d=await db.Devices.SingleOrDefaultAsync(x=>x.Id==id);if(d?.RetireRequested is null)return Results.Conflict();
+   d.RetireConfirmed=DateTimeOffset.UtcNow;d.Active=false;a.Revoked=true;
+   db.Audit.Add(new AuditEvent{TenantId=d.TenantId,Actor=id.ToString(),Action="device.retire-confirmed",Resource=id.ToString()});
    await db.SaveChangesAsync();await tx.CommitAsync();return Results.NoContent();
   }).RequireRateLimiting("Agent");
  }

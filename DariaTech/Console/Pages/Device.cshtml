@@ -49,10 +49,30 @@
   <span class="sub">@if(Model.Suggested is {} s){<text>„@s.Device.Name“ (zuletzt online @Ui.Ago(s.Device.LastHeartbeat)) hat denselben Namen. Ist dies eine Neuinstallation oder ein Ersatzgerät, übernimmt dieses Gerät die Backups mit Ziel, Passphrase und Zeitplan und sichert in derselben Versionskette weiter.</text>}else{<text>Ersetzt dieses Gerät ein anderes Gerät des Kunden, übernimmt es dessen Backups mit Ziel, Passphrase und Zeitplan und sichert in derselben Versionskette weiter.</text>}</span></div></div>
  <form method="post" asp-page-handler="Replace" asp-route-id="@d.Id" class="form-grid">
   <div class="field"><label for="oldDeviceId">Altes Gerät</label><select name="oldDeviceId" id="oldDeviceId">@foreach(var c in Model.Candidates){<option value="@c.Device.Id" selected="@(c==Model.Suggested)">@c.Device.Name · @c.Jobs Backup@(c.Jobs==1?"":"s") · @(c.Device.Active?$"zuletzt online {Ui.Ago(c.Device.LastHeartbeat)}":"deaktiviert")</option>}</select></div>
-  <label class="check"><input type="checkbox" name="confirm" value="true" /> Das alte Gerät sichert nicht mehr (ausgeschaltet, neu aufgesetzt oder Agent deinstalliert). Es wird in der Console deaktiviert.</label>
+  <p class="hint">@Ui.Icon("info")Das alte Gerät wird in der Console deaktiviert und beim nächsten Kontakt angewiesen, seine Zeitpläne anzuhalten. Dieses Gerät beginnt erst, wenn das alte den Stopp bestätigt hat – oder Sie bestätigen, dass es nie wieder online kommt. So schreiben nie zwei Geräte gleichzeitig in dieselbe Backup-Kette.</p>
+  <label class="check"><input type="checkbox" name="confirm" value="true" /> Dieses Gerät ersetzt das ausgewählte Gerät dauerhaft.</label>
   <div><button type="submit" class="button">Backups übernehmen</button></div>
  </form>
 </section>
+}
+@foreach(var h in Model.PendingHandovers){
+<section class="banner warning" role="status">
+ <span class="banner-icon">@Ui.Icon("alert")</span>
+ <div><strong>Übernahme wartet: „@h.Old.Name“ hat den Stopp noch nicht bestätigt</strong>
+  <span>@h.Jobs Backup@(h.Jobs==1?"":"s") werden erst auf dieses Gerät verteilt, wenn das alte Gerät seine Zeitpläne angehalten hat. Angefordert @Ui.Ago(h.Old.RetireRequested) · zuletzt online @Ui.Ago(h.Old.LastHeartbeat).
+  Kommt das alte Gerät nie wieder online (neu installiert, defekt, verloren), können Sie das hier bestätigen. Das ist dann keine technische Bestätigung: Agent dort deinstallieren bzw. Gerät löschen und – falls möglich – den Speicherzugang des alten Geräts ändern.</span>
+  @if(User.IsInRole("SuperAdmin")||User.IsInRole("Administrator")){
+  <form method="post" asp-page-handler="ConfirmStopped" asp-route-id="@d.Id" class="form-grid">
+   <input type="hidden" name="oldDeviceId" value="@h.Old.Id" />
+   <label class="check"><input type="checkbox" name="confirm" value="true" /> „@h.Old.Name“ sichert nicht mehr und wird nicht wieder eingeschaltet.</label>
+   <button type="submit" class="button">Manuell bestätigen</button>
+  </form>}
+ </div>
+</section>
+}
+@if(d.RetireRequested is not null){
+<section class="banner warning" role="status"><span class="banner-icon">@Ui.Icon("alert")</span>
+ <div><strong>Stilllegung angefordert @Ui.Ago(d.RetireRequested)</strong><span>Das Gerät hält seine Zeitpläne beim nächsten Kontakt an und bestätigt das; bis dahin ist der Stopp nicht bestätigt.</span></div></section>
 }
 @foreach(var a in Model.Alerts.Take(3)){
 <section class="banner @Ui.SeverityClass(a.Severity)" role="alert">
@@ -119,3 +139,17 @@
   </article>
  </div>
 </section>
+@if((User.IsInRole("SuperAdmin")||User.IsInRole("Administrator"))&&d.RetireRequested is null){
+<section class="card" id="decommission">
+ <div class="card-head"><div><h2>Gerät stilllegen</h2><span class="sub">Für ein Gerät, das nicht mehr gesichert werden soll und nicht ersetzt wird. Ersetzt ein neues Gerät dieses, stattdessen am neuen Gerät „Gerät ersetzen“ verwenden.</span></div></div>
+ <ul class="steps-list">
+  <li>Das Gerät hält beim nächsten Kontakt seine Zeitpläne an und bestätigt das. Erst dann wird sein Zugang gesperrt. Ist es offline, bleibt der Stopp bis dahin unbestätigt.</li>
+  <li>Die Backups bleiben unverändert im Speicherziel und lassen sich auf einem anderen Gerät des Kunden wiederherstellen. Es wird nichts gelöscht.</li>
+  <li>Der direkte Zugang des Geräts zum Speicher wird dadurch nicht entzogen. Dafür die Zugangsdaten am Speicher ändern.</li>
+ </ul>
+ <form method="post" asp-page-handler="Decommission" asp-route-id="@d.Id" class="form-grid">
+  <label class="check"><input type="checkbox" name="confirm" value="true" /> „@d.Name“ soll nicht mehr sichern.</label>
+  <div><button type="submit" class="button secondary">Gerät stilllegen</button></div>
+ </form>
+</section>
+}

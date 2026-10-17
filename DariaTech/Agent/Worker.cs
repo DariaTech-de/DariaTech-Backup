@@ -25,12 +25,16 @@ public sealed class Worker(AgentOptions options,ProtectedState state,ILogger<Wor
    if(DateTimeOffset.UtcNow-lastCycle<TimeSpan.FromSeconds(options.HeartbeatSeconds))
    {
     var update=state.Read<UpdateJournal>("update.bin");if(update is {Status:"Applying"}&&update.Manifest.Version!=options.Version)continue;
+    if(Retirement.Active(state))continue;
     try{await RemoteCommands.Synchronize(client,adapter,options,state,identity.DeviceId,ct,m=>log.LogWarning("{Message}",m));}
     catch(OperationCanceledException)when(ct.IsCancellationRequested){break;}
     catch(Exception ex){log.LogDebug("Remote command poll failed ({Type})",ex.GetType().Name);}
     continue;
    }
    lastCycle=DateTimeOffset.UtcNow;
+   // A replaced or decommissioned device only keeps its engine paused and confirms the stop; it no longer
+   // applies configurations, runs commands or reports backups.
+   if(Retirement.Active(state)){try{await Retirement.Enforce(client,adapter,state,ct,m=>log.LogWarning("{Message}",m));}catch(OperationCanceledException)when(ct.IsCancellationRequested){break;}continue;}
    try
    {
     JobReport[] jobs=[];ProgressReport? progress=null;var reachable=true;
@@ -67,6 +71,7 @@ public sealed class Worker(AgentOptions options,ProtectedState state,ILogger<Wor
     while(queue.Count>0)
     {
      using var result=await client.PostAsJsonAsync("/api/v1/agent/heartbeat",queue[0],ct);
+     if(Retirement.Requested(result.StatusCode)){log.LogWarning("Console reports this device as replaced or decommissioned; pausing its scheduled backups");await Retirement.Enforce(client,adapter,state,ct,m=>log.LogWarning("{Message}",m));break;}
      // A snapshot the Console refuses as malformed will never be accepted; drop it instead of letting it
      // block every newer heartbeat (the device would stay offline forever). Other failures are retried.
      if(result.StatusCode==System.Net.HttpStatusCode.BadRequest){log.LogWarning("Console rejected a telemetry snapshot as invalid; discarded");queue.RemoveAt(0);state.Write("outbox.bin",queue);continue;}

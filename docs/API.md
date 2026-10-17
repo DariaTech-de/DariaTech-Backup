@@ -11,10 +11,10 @@ GET `/api/v1/management/csrf` returns a token. POST/PUT/DELETE management reques
 | Route | Method | Behavior |
 |---|---|---|
 | /api/v1/management/customers | GET / POST | Scoped list / admin creates tenant and customer |
-| /api/v1/management/customers/{id} | PUT / DELETE | Admin updates / archives customer and revokes tenant access |
+| /api/v1/management/customers/{id} | PUT / DELETE | Admin updates / archives customer: ends management access and monitoring; does not stop local schedules, revoke storage access or delete archives |
 | /api/v1/management/sites | GET / POST | Scoped sites / operator creates within customer |
 | /api/v1/management/devices | GET | Scoped devices |
-| /api/v1/management/devices/{id} | GET / PUT / DELETE | Detail/history / operator renames or moves within tenant / admin revokes and archives |
+| /api/v1/management/devices/{id} | GET / PUT / DELETE | Detail/history / operator renames or moves within tenant / admin decommissions: the device is told to pause its schedules and is revoked once it confirms |
 | /api/v1/management/enrollment-tokens | POST | Operator issues tenant/site-bound token, returned once |
 | /api/v1/management/alerts | GET | Scoped unresolved alerts |
 | /api/v1/management/audit | GET | Latest 500 scoped audit events |
@@ -28,6 +28,8 @@ Enrollment issue body: TenantId, SiteId, ValidMinutes (5..1440). Customer fields
 POST `/api/v1/agent/enroll`: Token, Hostname, OperatingSystem, AgentVersion. Returns DeviceId and a newly generated Credential once; persists only its hash. Token redemption is atomic, expiring and single-use. No cookie authenticates a device.
 
 POST `/api/v1/agent/heartbeat`: Authorization: Bearer <credential>, X-Device-Id: <DeviceId>. Both must match the same active agent. Body follows DariaTech/Contracts/Telemetry.cs: AgentVersion, OperatingSystem, EngineReachable, Jobs, optional ActiveOperation. Each job has LocalId, Name, NextRun and optional LastRun. LastRun contains a stable LocalRunId, UTC Started/Completed, status, nullable nonnegative Bytes/Files/StorageBytes, optional bounded Progress and an allowlisted ErrorCode. Current enums are serialized as numeric .NET values.
+
+Heartbeat answers: `204` recorded (invalid run, job or progress details are dropped, the rest is recorded; a job list that had to be shortened never deactivates known jobs and sets `InventoryIncompleteSince`), `400` invalid envelope, `401` unknown/revoked credential or archived customer, `410 Gone` the device was replaced or decommissioned: the agent pauses its engine indefinitely and confirms with POST `/api/v1/agent/retired` (`204`; the credential is revoked then). Command receipts the Console permanently refuses (`400/404/409`) are kept in the agent's journal for replay protection and no longer block later commands; contradicting receipts are audited as `command.receipt-conflict-*`.
 
 Returns 204 when accepted; 400 invalid input; 401 invalid/revoked identity or expired/used enrollment; 429 rate limit. Retry transient errors with bounded backoff; replaying a valid run is idempotent. Never send sources, targets, encryption options, passwords or raw logs.
 

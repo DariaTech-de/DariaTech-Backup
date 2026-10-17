@@ -48,9 +48,28 @@ the same name is suggested first. Taking over:
 
 - moves every file backup job of the old device to the new device as a new revision with the same destination,
   passphrase, sources and schedule, marked `Adopted=true`;
-- deactivates the old device and revokes its agent credential, so two devices never write into one destination
-  (the operator confirms that the old device no longer backs up);
+- deactivates the old device and requests its **stop** (`RetireRequested`); the moved jobs carry
+  `HandoverFromDeviceId` and are **not delivered to the new device** until the old device's stop is confirmed,
+  so two devices never write into one destination at the same time;
 - leaves SaaS and Proxmox jobs on the old device; they are set up again on the new host.
+
+The stop is confirmed in one of two ways, and the Console shows which one applied:
+
+- **technically**: the next time the old agent contacts the Console, its heartbeat is answered with
+  `410 Gone`. The agent pauses its engine without a time limit (no further scheduled runs), waits until a running
+  operation has finished, then calls `POST /api/v1/agent/retired`. Only then is its credential revoked
+  (`device.retire-confirmed`). It keeps re-applying the pause after restarts. Local job databases are kept.
+- **manually**, for an old device that will never be online again (wiped, broken, lost): an administrator
+  confirms that on the new device's page (`device.retire-manually-confirmed`). This is a statement, not a proof.
+  The old credential is deliberately left valid: if the device does come back, it is still told to stop.
+
+Revoking an agent does not stop its local schedules, and none of this removes the old device's own access to the
+storage. Where that matters (stolen device, untrusted former owner), change the storage credentials at the
+storage provider and update the job on the new device with them. Agents of version 0.3.1 and older do not understand
+`410 Gone` and keep backing up until they are updated or uninstalled; the stop stays unconfirmed for them.
+
+"Gerät stilllegen" (device page, or `DELETE /api/v1/management/devices/{id}`) requests the same stop without a
+replacement. The backups stay at the destination and can be restored on another device of the customer.
 
 On the new device the agent creates the engine job **without a schedule**, removes any local database of that
 job and runs the engine's repair, which recreates the database from the destination. Until that has succeeded

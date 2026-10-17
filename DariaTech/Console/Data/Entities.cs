@@ -26,6 +26,14 @@ public sealed class Device : TenantEntity
  public long? ActiveTaskId { get; set; } public long ProgressBytes { get; set; } public long ProgressFiles { get; set; }
  // Set while the device's job list arrives incomplete (invalid or duplicate entries had to be dropped).
  public DateTimeOffset? InventoryIncompleteSince { get; set; }
+ // Retirement (replaced or decommissioned): requested by an administrator; confirmed by the agent once it has
+ // paused its scheduled backups, or - for a device that will never come back - confirmed manually by an
+ // administrator (no technical proof). Until the agent confirms, its credential stays valid so it can still
+ // learn about the retirement the next time it is online.
+ public DateTimeOffset? RetireRequested { get; set; } public DateTimeOffset? RetireConfirmed { get; set; }
+ public DateTimeOffset? RetireManuallyConfirmed { get; set; } public string? RetireManuallyConfirmedBy { get; set; }
+ public Guid? ReplacedByDeviceId { get; set; }
+ public bool RetirementPending=>RetireRequested is not null&&RetireConfirmed is null&&RetireManuallyConfirmed is null;
 }
 public sealed class Agent : TenantEntity
 {
@@ -97,6 +105,9 @@ public sealed class ManagedJob : TenantEntity
  public string? LocalJobId { get; set; } public string Status { get; set; } = "Pending";
  // Recovery copy of another device's job: same destination and passphrase, never backs up.
  public bool RestoreOnly { get; set; } public Guid? SourceManagedJobId { get; set; }
+ // Taken over from this device: the configuration is held back until that device's stop is confirmed, so the
+ // old and the new device never write into the same backup chain at the same time.
+ public Guid? HandoverFromDeviceId { get; set; }
 }
 public sealed class ConfigurationRevision : TenantEntity
 {

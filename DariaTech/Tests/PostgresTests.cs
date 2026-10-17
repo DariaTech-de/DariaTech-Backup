@@ -662,8 +662,16 @@ Assert.That(html,Does.Contain("Agent 0.2.0 · Pilot").And.Contain(url).And.Conta
   var moved=await db.ManagedJobs.AsNoTracking().SingleAsync(x=>x.Id==job.Id);
   Assert.That(moved.DeviceId,Is.EqualTo(newId.DeviceId));Assert.That(moved.LatestRevision,Is.EqualTo(2));Assert.That(moved.LocalJobId,Is.Null);
   Assert.That(await db.Devices.AsNoTracking().Where(x=>x.Id==oldId.DeviceId).Select(x=>x.Active).SingleAsync(),Is.False);
-  Assert.That(await db.Agents.AsNoTracking().Where(x=>x.DeviceId==oldId.DeviceId).Select(x=>x.Revoked).SingleAsync(),Is.True);
   using(var revoked=await oldMac.GetAsync("/api/v1/agent/configurations"))Assert.That(revoked.StatusCode,Is.EqualTo(HttpStatusCode.Unauthorized),"the old device can no longer take part");
+  // Until the old device confirms that its schedules are paused, the new device does not get the backups.
+  Assert.That(await db.Agents.AsNoTracking().Where(x=>x.DeviceId==oldId.DeviceId).Select(x=>x.Revoked).SingleAsync(),Is.False,"revoking first would leave the old device backing up unnoticed");
+  Assert.That(await newMac.GetFromJsonAsync<ConfigurationAssignment[]>("/api/v1/agent/configurations"),Is.Empty);
+  Assert.That(WebUtility.HtmlDecode(await admin.GetStringAsync($"/Device?id={newId.DeviceId}")),Does.Contain("hat den Stopp noch nicht bestätigt"));
+  using(var told=await oldMac.PostAsJsonAsync("/api/v1/agent/heartbeat",new HeartbeatRequest("0.3.0","Darwin 25.0.0",true,[])))Assert.That(told.StatusCode,Is.EqualTo(HttpStatusCode.Gone));
+  using(var stopped=await oldMac.PostAsync("/api/v1/agent/retired",null))Assert.That(stopped.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  Assert.That(await db.Agents.AsNoTracking().Where(x=>x.DeviceId==oldId.DeviceId).Select(x=>x.Revoked).SingleAsync(),Is.True,"revoked once the stop is confirmed");
+  Assert.That(await db.Devices.AsNoTracking().Where(x=>x.Id==oldId.DeviceId).Select(x=>x.RetireConfirmed).SingleAsync(),Is.Not.Null);
+  Assert.That(WebUtility.HtmlDecode(await admin.GetStringAsync($"/Device?id={newId.DeviceId}")),Does.Not.Contain("hat den Stopp noch nicht bestätigt"));
   // Same destination, passphrase and schedule; the agent rebuilds its database before the first backup.
   var assignment=(await newMac.GetFromJsonAsync<ConfigurationAssignment[]>("/api/v1/agent/configurations"))!.Single();
   Assert.That(assignment.JobId,Is.EqualTo(job.Id));Assert.That(assignment.Definition.Adopted,Is.True);Assert.That(assignment.Definition.TargetUrl,Is.EqualTo(definition.TargetUrl));
@@ -701,6 +709,48 @@ Assert.That(html,Does.Contain("Agent 0.2.0 · Pilot").And.Contain(url).And.Conta
   using(var bogus=await newMac.PostAsJsonAsync($"/api/v1/agent/commands/{command.Id}/receipt",new CommandReceipt("Failed",77,"Access to the path is denied")))Assert.That(bogus.StatusCode,Is.EqualTo(HttpStatusCode.BadRequest),"raw engine text is never accepted");
   using(var failed=await newMac.PostAsJsonAsync($"/api/v1/agent/commands/{command.Id}/receipt",new CommandReceipt("Failed",77,"SourceAccessDenied")))Assert.That(failed.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
   Assert.That(WebUtility.HtmlDecode(await admin.GetStringAsync($"/JobActions?id={backup.Id}")),Does.Contain("Festplattenvollzugriff"));
+  }
+ }
+ [Test]public async Task AnOfflineOldDeviceNeedsAnExplicitManualStatementAndIsStillStoppedIfItReturns()
+ {
+  var(t,site)=await Customer();
+  async Task<(HttpClient Client,EnrollmentResponse Identity)> Enroll(string name)
+  {
+   var client=factory.CreateClient(new(){BaseAddress=new Uri("https://localhost")});
+   using var e=await client.PostAsJsonAsync("/api/v1/agent/enroll",new EnrollmentRequest(await Token(t,site),name,"Windows 11","0.3.0","win-x64"));var identity=(await e.Content.ReadFromJsonAsync<EnrollmentResponse>())!;
+   client.DefaultRequestHeaders.Authorization=new("Bearer",identity.Credential);client.DefaultRequestHeaders.Add("X-Device-Id",identity.DeviceId.ToString());return (client,identity);
+  }
+  var (oldPc,oldId)=await Enroll("PC-Empfang");var (newPc,newId)=await Enroll("PC-Empfang-neu");var (spare,spareId)=await Enroll("PC-Lager");
+  using(oldPc)using(newPc)using(spare){
+  using var admin=await Login(UserRole.SuperAdmin);using var csrf=System.Text.Json.JsonDocument.Parse(await admin.GetStringAsync("/api/v1/management/csrf"));admin.DefaultRequestHeaders.Add("X-CSRF-Token",csrf.RootElement.GetProperty("token").GetString());
+  var definition=new ManagedBackupDefinition("Dokumente",["C:\\Users\\Empfang\\Documents"],"webdav://storage.example/dav/k1/empfang","offline-passphrase-13579",new(){{"use-ssl","true"},{"auth-username","u"},{"auth-password","p"}},30,[],new(DateTimeOffset.UtcNow.AddHours(1),24,Enum.GetValues<DayOfWeek>()));
+  using var created=await admin.PostAsJsonAsync($"/api/v1/management/devices/{oldId.DeviceId}/managed-jobs",new ConfigurationInput(0,definition));var job=(await created.Content.ReadFromJsonAsync<ManagedJob>())!;
+  using(var applied=await oldPc.PostAsJsonAsync($"/api/v1/agent/configurations/{job.Id}/receipt",new ConfigurationReceipt(1,"3","Applied")))Assert.That(applied.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  string Form(string html){var m=Regex.Match(html,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");Assert.That(m.Success,Is.True);return WebUtility.HtmlDecode(m.Groups[1].Value);}
+  async Task<string> Post(Guid device,string handler,Dictionary<string,string> fields)
+  {
+   fields["__RequestVerificationToken"]=Form(await admin.GetStringAsync($"/Device?id={device}"));
+   using var response=await admin.PostAsync($"/Device?id={device}&handler={handler}",new FormUrlEncodedContent(fields));Assert.That(response.StatusCode,Is.EqualTo(HttpStatusCode.Redirect));
+   return WebUtility.HtmlDecode(await admin.GetStringAsync(response.Headers.Location!.ToString()));
+  }
+  await Post(newId.DeviceId,"Replace",new(){{"oldDeviceId",oldId.DeviceId.ToString()},{"confirm","true"}});
+  Assert.That(await newPc.GetFromJsonAsync<ConfigurationAssignment[]>("/api/v1/agent/configurations"),Is.Empty);
+  // Without ticking the statement nothing changes; with it, the new device starts and the page says it is not a technical proof.
+  Assert.That(await Post(newId.DeviceId,"ConfirmStopped",new(){{"oldDeviceId",oldId.DeviceId.ToString()}}),Does.Contain("Bitte bestätigen"));
+  Assert.That(await newPc.GetFromJsonAsync<ConfigurationAssignment[]>("/api/v1/agent/configurations"),Is.Empty);
+  Assert.That(await Post(newId.DeviceId,"ConfirmStopped",new(){{"oldDeviceId",oldId.DeviceId.ToString()},{"confirm","true"}}),Does.Contain("nicht technisch bestätigt"));
+  Assert.That((await newPc.GetFromJsonAsync<ConfigurationAssignment[]>("/api/v1/agent/configurations"))!.Single().JobId,Is.EqualTo(job.Id));
+  await using var db=Db();
+  Assert.That(await db.Audit.AnyAsync(x=>x.Action=="device.retire-manually-confirmed"&&x.Resource==oldId.DeviceId.ToString()),Is.True);
+  // The old PC is switched on again later: it is still told to stop.
+  using(var told=await oldPc.PostAsJsonAsync("/api/v1/agent/heartbeat",new HeartbeatRequest("0.3.0","Windows 11",true,[])))Assert.That(told.StatusCode,Is.EqualTo(HttpStatusCode.Gone));
+  // Decommission without replacement keeps the device's access until it confirms.
+  Assert.That(await Post(spareId.DeviceId,"Decommission",new(){{"confirm","true"}}),Does.Contain("Stilllegung angefordert"));
+  using(var told=await spare.PostAsJsonAsync("/api/v1/agent/heartbeat",new HeartbeatRequest("0.3.0","Windows 11",true,[])))Assert.That(told.StatusCode,Is.EqualTo(HttpStatusCode.Gone));
+  Assert.That(await db.Devices.AsNoTracking().Where(x=>x.Id==spareId.DeviceId).Select(x=>x.Active).SingleAsync(),Is.True,"still listed until the stop is confirmed");
+  using(var stopped=await spare.PostAsync("/api/v1/agent/retired",null))Assert.That(stopped.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  var spareDevice=await db.Devices.AsNoTracking().SingleAsync(x=>x.Id==spareId.DeviceId);Assert.That(spareDevice.Active,Is.False);Assert.That(spareDevice.RetireConfirmed,Is.Not.Null);
+  using(var again=await spare.PostAsync("/api/v1/agent/retired",null))Assert.That(again.StatusCode,Is.EqualTo(HttpStatusCode.Unauthorized));
   }
  }
  [Test]public async Task GuidedRestoreAndMonthlyCheckUseSignedCommands()
