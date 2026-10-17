@@ -31,6 +31,7 @@ public sealed class CustomerModel(ManagementDb db,IOptions<MonitoringOptions> op
   var c=await db.Customers.SingleOrDefaultAsync(x=>x.Id==id);if(c is null)return NotFound();Customer=c;Sites=await db.Sites.Where(x=>x.TenantId==c.TenantId).ToListAsync();Rows=(await Overview.Load(db,options.Value)).Where(x=>x.Device.TenantId==c.TenantId).ToList();
   await LoadBackups();Setup=await Onboarding.Load(db,c,options.Value);
   Tokens=await db.EnrollmentTokens.Where(x=>x.TenantId==c.TenantId).OrderByDescending(x=>x.Created).Take(20).ToListAsync();
+  Stops=await ContractEnd.Devices(db,c);
   if(recovery is {} r&&Backups.SingleOrDefault(x=>x.Job.Id==r) is {} created)RecoveryMessage=$"„{created.Job.Name}“ wird auf {created.DeviceName} eingerichtet. Sobald das Gerät die Verbindung bestätigt, dort „Wiederherstellen“ öffnen.";
   return Page();
  }
@@ -86,6 +87,16 @@ public sealed class CustomerModel(ManagementDb db,IOptions<MonitoringOptions> op
   Tokens=await db.EnrollmentTokens.Where(x=>x.TenantId==Customer.TenantId).OrderByDescending(x=>x.Created).Take(20).ToListAsync();Setup=await Onboarding.Load(db,Customer,options.Value);
   Response.Headers.CacheControl="no-store";return Page();
  }
+ public List<ContractEnd.DeviceStop> Stops {get;private set;}=[];
+ public async Task<IActionResult> OnPostContractAsync(Guid id,string step,DateOnly? contractEnd,DateOnly? retainUntil,string? handoverNote,bool confirm)
+ {
+  if(!IsAdmin)return Forbid();var c=await db.Customers.SingleOrDefaultAsync(x=>x.Id==id);if(c is null)return NotFound();
+  if(!confirm&&step!="dates"){ContractMessage="Bitte den Schritt ausdrücklich bestätigen.";ContractFailed=true;}
+  else if(await ContractEnd.Run(step,c,db,HttpContext,contractEnd,retainUntil,handoverNote) is {} error){ContractMessage=error;ContractFailed=true;}
+  if(ContractFailed){await OnGetAsync(id);return Page();}
+  return RedirectToPage(null,null,new{id},"contract");
+ }
+ public string? ContractMessage {get;private set;}public bool ContractFailed {get;private set;}
  public async Task<IActionResult> OnPostExpectedAsync(Guid id,int? expectedDevices)
  {
   if(!CanManage)return Forbid();var c=await db.Customers.SingleOrDefaultAsync(x=>x.Id==id);if(c is null)return NotFound();

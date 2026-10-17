@@ -355,6 +355,9 @@ namespace DariaTech.Console.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset?>("AccessLocked")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("Active")
                         .HasColumnType("boolean");
 
@@ -363,10 +366,23 @@ namespace DariaTech.Console.Data.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
+                    b.Property<DateTimeOffset?>("ArchiveDeletionApproved")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ArchiveDeletionApprovedBy")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset?>("Closed")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Contact")
                         .IsRequired()
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
+
+                    b.Property<DateOnly?>("ContractEnd")
+                        .HasColumnType("date");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -375,6 +391,11 @@ namespace DariaTech.Console.Data.Migrations
 
                     b.Property<int?>("ExpectedDevices")
                         .HasColumnType("integer");
+
+                    b.Property<string>("HandoverNote")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -393,6 +414,16 @@ namespace DariaTech.Console.Data.Migrations
 
                     b.Property<string>("Phone")
                         .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateOnly?>("RetainArchivesUntil")
+                        .HasColumnType("date");
+
+                    b.Property<DateTimeOffset?>("StorageAccessRevoked")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("StorageAccessRevokedBy")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 

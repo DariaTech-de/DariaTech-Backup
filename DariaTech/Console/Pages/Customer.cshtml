@@ -148,5 +148,31 @@
  <ul class="site-list">@foreach(var e in Model.Tokens){var used=e.Used is not null;var expired=!used&&e.Expires<=DateTimeOffset.UtcNow;
   <li>@Ui.Icon("key")<span><strong>@(used?"Verwendet":expired?"Abgelaufen, nicht verwendet":"Offen – Registrierung ausstehend")</strong><span class="sub">ausgestellt @Ui.Ago(e.Created) · @(used?$"registriert {Ui.Ago(e.Used)}":$"gültig bis {Ui.Date(e.Expires)}")</span></span>@if(e.DeviceId is {} dev){<a href="/Device?id=@dev">Gerät</a>}</li>}</ul>
 </section>}
+@if(Model.IsAdmin){
+<section class="card" id="contract">
+ <div class="card-head"><div><h2>Vertragsende</h2><span class="sub">Getrennte Schritte – keiner führt automatisch einen anderen aus. Die Software löscht keine Backup-Archive am Speicher.</span></div>@if(c.Closed is not null){<span class="status healthy">Abgeschlossen @Ui.Date(c.Closed)</span>}</div>
+ @if(Model.ContractMessage is not null){<p class="@(Model.ContractFailed?"form-error":"notice-inline good")" role="alert">@Model.ContractMessage</p>}
+ <ol class="steps-list">
+  <li><strong>Enddatum und Aufbewahrung:</strong> @(c.ContractEnd is {} end?$"Vertragsende {end:dd.MM.yyyy}, Archive aufbewahren bis {c.RetainArchivesUntil:dd.MM.yyyy}":"noch nicht festgelegt")@(string.IsNullOrEmpty(c.HandoverNote)?"":" · Übergabe: "+c.HandoverNote)
+   <form method="post" asp-page-handler="Contract" class="inline-form"><input type="hidden" name="id" value="@c.Id"><input type="hidden" name="step" value="dates">
+    <div class="field"><label for="contractEnd">Vertragsende</label><input id="contractEnd" type="date" name="contractEnd" value="@c.ContractEnd?.ToString("yyyy-MM-dd")"></div>
+    <div class="field"><label for="retainUntil">Archive aufbewahren bis</label><input id="retainUntil" type="date" name="retainUntil" value="@c.RetainArchivesUntil?.ToString("yyyy-MM-dd")"></div>
+    <div class="field"><label for="handoverNote">Übergabe / Export</label><input id="handoverNote" name="handoverNote" maxlength="1000" value="@c.HandoverNote" placeholder="z. B. Passphrasen und Ziel an Kunden übergeben am …"></div>
+    <button class="button secondary">Speichern</button></form></li>
+  <li><strong>Lokale Sicherungen stoppen:</strong> jedes Gerät hält beim nächsten Kontakt seine Zeitpläne an und bestätigt das. Offline-Geräte bleiben unbestätigt.
+   <ul>@foreach(var stop in Model.Stops){<li>@stop.Device.Name – @stop.State</li>}</ul>
+   @if(Model.Stops.Any(x=>x.Device.RetireRequested is null)){<form method="post" asp-page-handler="Contract" class="inline-form"><input type="hidden" name="id" value="@c.Id"><input type="hidden" name="step" value="stop"><label class="check"><input type="checkbox" name="confirm" value="true"> Alle Geräte sollen aufhören zu sichern.</label><button class="button secondary">Lokale Sicherungen stoppen</button></form>}</li>
+  <li><strong>Verwaltungszugang sperren</strong> (Kunden-Benutzer der Console): @(c.AccessLocked is {} locked?$"gesperrt {Ui.Date(locked)}":"aktiv")
+   @if(c.AccessLocked is null){<form method="post" asp-page-handler="Contract" class="inline-form"><input type="hidden" name="id" value="@c.Id"><input type="hidden" name="step" value="lock"><label class="check"><input type="checkbox" name="confirm" value="true"> Kunden-Benutzer sperren.</label><button class="button secondary">Zugang sperren</button></form>}</li>
+  <li><strong>Kunde archivieren:</strong> @(c.Active?"aktiv – wird überwacht":"archiviert – keine Überwachung, keine neuen Geräte")
+   <form method="post" asp-page-handler="Contract" class="inline-form"><input type="hidden" name="id" value="@c.Id"><input type="hidden" name="step" value="@(c.Active?"archive":"reactivate")"><label class="check"><input type="checkbox" name="confirm" value="true"> @(c.Active?"Archivieren. Das stoppt keine lokalen Sicherungen und löscht nichts.":"Wieder aktivieren (z. B. für eine Wiederherstellung).")</label><button class="button secondary">@(c.Active?"Archivieren":"Reaktivieren")</button></form></li>
+  <li><strong>Speicherzugriff entziehen:</strong> nur beim Speicheranbieter möglich (Zugangsdaten bzw. Freigabe widerrufen). @(c.StorageAccessRevoked is {} revoked?$"Manuell bestätigt {Ui.Date(revoked)} von {c.StorageAccessRevokedBy}":"noch nicht bestätigt")
+   @if(c.StorageAccessRevoked is null){<form method="post" asp-page-handler="Contract" class="inline-form"><input type="hidden" name="id" value="@c.Id"><input type="hidden" name="step" value="storage"><label class="check"><input type="checkbox" name="confirm" value="true"> Am Speicher widerrufen (manuelle Bestätigung).</label><button class="button secondary">Bestätigen</button></form>}</li>
+  <li><strong>Backup-Archive löschen:</strong> erst nach dem Aufbewahrungsende und nur am Speicher selbst. @(c.ArchiveDeletionApproved is {} approved?$"Löschung freigegeben {Ui.Date(approved)} von {c.ArchiveDeletionApprovedBy} – am Speicher durchführen":"nicht freigegeben – Archive bleiben erhalten")
+   @if(c.ArchiveDeletionApproved is null){<form method="post" asp-page-handler="Contract" class="inline-form"><input type="hidden" name="id" value="@c.Id"><input type="hidden" name="step" value="deletion"><label class="check"><input type="checkbox" name="confirm" value="true"> Löschung der Archive freigeben.</label><button class="button secondary">Freigeben</button></form>}</li>
+  <li><strong>Abschluss protokollieren:</strong> @(c.Closed is {} closed?$"abgeschlossen {Ui.Date(closed)}":"offen") · Verwaltungsdaten werden nur mit dem gesonderten Löschbefehl (<span class="code">--erase-customer</span>) entfernt.
+   @if(c.Closed is null){<form method="post" asp-page-handler="Contract" class="inline-form"><input type="hidden" name="id" value="@c.Id"><input type="hidden" name="step" value="close"><label class="check"><input type="checkbox" name="confirm" value="true"> Vertragsende abschließen.</label><button class="button secondary">Abschließen</button></form>}</li>
+ </ol>
+</section>}
 @if(Model.CanManage&&!string.IsNullOrWhiteSpace(c.Notes)){<section class="card"><h2>Interne Notizen</h2><p class="prewrap">@c.Notes</p></section>}
 <partial name="_Errors" model='""' />

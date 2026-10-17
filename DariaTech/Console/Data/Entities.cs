@@ -16,6 +16,11 @@ public sealed class Customer : TenantEntity
  public string Notes { get; set; } = ""; public bool Active { get; set; } = true;
  // Number of devices the contract covers; null: the devices registered so far.
  public int? ExpectedDevices { get; set; }
+ // Contract end. Each step is recorded on its own; none implies another. Archives at the storage are never
+ // deleted by this software: ArchiveDeletionApproved only records the approval for a manual deletion.
+ public DateOnly? ContractEnd { get; set; } public DateOnly? RetainArchivesUntil { get; set; } public string HandoverNote { get; set; } = "";
+ public DateTimeOffset? AccessLocked { get; set; } public DateTimeOffset? StorageAccessRevoked { get; set; } public string? StorageAccessRevokedBy { get; set; }
+ public DateTimeOffset? ArchiveDeletionApproved { get; set; } public string? ArchiveDeletionApprovedBy { get; set; } public DateTimeOffset? Closed { get; set; }
 }
 public sealed class Site : TenantEntity { public string Name { get; set; } = ""; public string Address { get; set; } = ""; }
 public sealed class Device : TenantEntity

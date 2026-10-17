@@ -156,6 +156,47 @@ public sealed class PostgresTests
   var stored=await db.ManagedJobs.AsNoTracking().SingleAsync(x=>x.Id==jobs[0].Id);Assert.That(stored.LatestRevision,Is.EqualTo(2));Assert.That(stored.AppliedRevision,Is.Zero,"saved is not applied");
   Assert.That(stored.ScheduleRepeatHours,Is.EqualTo(24));Assert.That(stored.KeepVersions,Is.EqualTo(90));
  }
+ [Test]public async Task ContractEndStepsAreSeparateAndArchivesStayUntilDeletionIsApproved()
+ {
+  var(t,site)=await Customer();await using var db=Db();var customer=await db.Customers.IgnoreQueryFilters().SingleAsync(x=>x.TenantId==t.Id);
+  var pc=factory.CreateClient(new(){BaseAddress=new Uri("https://localhost")});
+  using(var e=await pc.PostAsJsonAsync("/api/v1/agent/enroll",new EnrollmentRequest(await Token(t,site),"PC-Ende","Windows 11","0.3.1","win-x64")))
+  {var identity=(await e.Content.ReadFromJsonAsync<EnrollmentResponse>())!;pc.DefaultRequestHeaders.Authorization=new("Bearer",identity.Credential);pc.DefaultRequestHeaders.Add("X-Device-Id",identity.DeviceId.ToString());}
+  var deviceId=Guid.Parse(pc.DefaultRequestHeaders.GetValues("X-Device-Id").Single());
+  using var admin=await Login(UserRole.SuperAdmin);using var portal=await Login(UserRole.CustomerAdmin,t.Id);
+  using var csrf=System.Text.Json.JsonDocument.Parse(await admin.GetStringAsync("/api/v1/management/csrf"));admin.DefaultRequestHeaders.Add("X-CSRF-Token",csrf.RootElement.GetProperty("token").GetString());
+  using(var created=await admin.PostAsJsonAsync($"/api/v1/management/devices/{deviceId}/managed-jobs",new ConfigurationInput(0,new ManagedBackupDefinition("Daten",["C:\\Daten"],"webdav://storage.example/dav/ende","contract-end-passphrase-1",new(){{"use-ssl","true"},{"auth-username","u"},{"auth-password","p"}},30,[],null))))Assert.That(created.StatusCode,Is.EqualTo(HttpStatusCode.Created));
+  string Form(string html){var m=Regex.Match(html,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");Assert.That(m.Success,Is.True);return WebUtility.HtmlDecode(m.Groups[1].Value);}
+  var url=$"/Customer?id={customer.Id}";
+  async Task<string> Step(string step,bool confirm=true,Dictionary<string,string>? extra=null)
+  {
+   var fields=new Dictionary<string,string>{{"id",customer.Id.ToString()},{"step",step},{"__RequestVerificationToken",Form(await admin.GetStringAsync(url))}};if(confirm)fields["confirm"]="true";foreach(var (k,v) in extra??[])fields[k]=v;
+   using var response=await admin.PostAsync(url+"&handler=Contract",new FormUrlEncodedContent(fields));
+   return WebUtility.HtmlDecode(response.StatusCode==HttpStatusCode.Redirect?await admin.GetStringAsync(response.Headers.Location!.ToString()):await response.Content.ReadAsStringAsync());
+  }
+  HeartbeatRequest Beat()=>new("0.3.1","Windows 11",true,[],null,"win-x64");
+  // Archiving ends monitoring and portal access to new devices, but neither stops the device nor deletes anything.
+  Assert.That(await Step("archive",confirm:false),Does.Contain("ausdrücklich bestätigen"));
+  var page=await Step("archive");Assert.That(page,Does.Contain("archiviert – keine Überwachung").And.Contain("PC-Ende – sichert weiter"));
+  using(var hb=await pc.PostAsJsonAsync("/api/v1/agent/heartbeat",Beat()))Assert.That(hb.StatusCode,Is.EqualTo(HttpStatusCode.Unauthorized),"archived: no management, local schedules untouched");
+  Assert.That(await db.Agents.AsNoTracking().Where(x=>x.DeviceId==deviceId).Select(x=>x.Revoked).SingleAsync(),Is.False);
+  // Stopping local backups is its own step and reaches the archived customer's device.
+  page=await Step("stop");Assert.That(page,Does.Contain("Stopp angefordert – noch nicht bestätigt"));
+  using(var hb=await pc.PostAsJsonAsync("/api/v1/agent/heartbeat",Beat()))Assert.That(hb.StatusCode,Is.EqualTo(HttpStatusCode.Gone));
+  using(var ok=await pc.PostAsync("/api/v1/agent/retired",null))Assert.That(ok.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  Assert.That(await Step("lock"),Does.Contain("gesperrt"));
+  using(var locked=await portal.GetAsync("/"))Assert.That(locked.StatusCode,Is.Not.EqualTo(HttpStatusCode.OK),"customer users are locked out");
+  // Deletion of archives can only be approved after the agreed retention, and the software deletes nothing itself.
+  var today=DateOnly.FromDateTime(DateTime.UtcNow);
+  await Step("dates",extra:new(){{"contractEnd",today.AddDays(-1).ToString("yyyy-MM-dd")},{"retainUntil",today.AddDays(90).ToString("yyyy-MM-dd")}});
+  Assert.That(await Step("deletion"),Does.Contain("erst nach dem vereinbarten Aufbewahrungsende"));
+  Assert.That(await Step("storage"),Does.Contain("Manuell bestätigt"));
+  page=await Step("close");Assert.That(page,Does.Contain("Abgeschlossen").And.Contain("nicht freigegeben – Archive bleiben erhalten"));
+  Assert.That(await db.ManagedJobs.AnyAsync(x=>x.TenantId==t.Id),Is.True,"backup definitions stay recoverable");
+  foreach(var action in new[]{"contract.archive","contract.stop","contract.lock","contract.dates","contract.storage","contract.close"})Assert.That(await db.Audit.AnyAsync(x=>x.TenantId==t.Id&&x.Action==action),Is.True,action);
+  Assert.That(await db.Audit.AnyAsync(x=>x.TenantId==t.Id&&x.Action=="contract.deletion"),Is.False);
+  pc.Dispose();
+ }
  private async Task<HttpClient> Login(UserRole role,Guid? tenant=null,bool includeMfa=true,TestFactory? isolatedFactory=null)
  {
   var host=isolatedFactory??factory;using var scope=host.Services.CreateScope();var secrets=scope.ServiceProvider.GetRequiredService<ISecretStore>();await using var db=Db();
