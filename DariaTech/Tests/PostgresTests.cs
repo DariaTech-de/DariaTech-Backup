@@ -180,6 +180,10 @@ public sealed class PostgresTests
   var page=await Step("archive");Assert.That(page,Does.Contain("archiviert – keine Überwachung").And.Contain("PC-Ende – sichert weiter"));
   using(var hb=await pc.PostAsJsonAsync("/api/v1/agent/heartbeat",Beat()))Assert.That(hb.StatusCode,Is.EqualTo(HttpStatusCode.Unauthorized),"archived: no management, local schedules untouched");
   Assert.That(await db.Agents.AsNoTracking().Where(x=>x.DeviceId==deviceId).Select(x=>x.Revoked).SingleAsync(),Is.False);
+  // Reactivating brings the devices that archiving switched off back into management.
+  await Step("reactivate");Assert.That(await db.Devices.AsNoTracking().Where(x=>x.Id==deviceId).Select(x=>x.Active).SingleAsync(),Is.True);
+  using(var hb=await pc.PostAsJsonAsync("/api/v1/agent/heartbeat",Beat()))Assert.That(hb.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  await Step("archive");
   // Stopping local backups is its own step and reaches the archived customer's device.
   page=await Step("stop");Assert.That(page,Does.Contain("Stopp angefordert – noch nicht bestätigt"));
   using(var hb=await pc.PostAsJsonAsync("/api/v1/agent/heartbeat",Beat()))Assert.That(hb.StatusCode,Is.EqualTo(HttpStatusCode.Gone));
@@ -990,10 +994,14 @@ Assert.That(html,Does.Contain("Agent 0.2.0 · Pilot").And.Contain(url).And.Conta
   // Without ticking the statement nothing changes; with it, the new device starts and the page says it is not a technical proof.
   Assert.That(await Post(newId.DeviceId,"ConfirmStopped",new(){{"oldDeviceId",oldId.DeviceId.ToString()}}),Does.Contain("Bitte bestätigen"));
   Assert.That(await newPc.GetFromJsonAsync<ConfigurationAssignment[]>("/api/v1/agent/configurations"),Is.Empty);
-  Assert.That(await Post(newId.DeviceId,"ConfirmStopped",new(){{"oldDeviceId",oldId.DeviceId.ToString()},{"confirm","true"}}),Does.Contain("nicht technisch bestätigt"));
+  // The old PC runs an agent that does not understand the stop: only a confirmed removal is accepted.
+  Assert.That(await Post(newId.DeviceId,"ConfirmStopped",new(){{"oldDeviceId",oldId.DeviceId.ToString()},{"confirm","true"}}),Does.Contain("kann sich nicht selbst stoppen"));
+  Assert.That(await newPc.GetFromJsonAsync<ConfigurationAssignment[]>("/api/v1/agent/configurations"),Is.Empty);
+  Assert.That(await Post(newId.DeviceId,"ConfirmStopped",new(){{"oldDeviceId",oldId.DeviceId.ToString()},{"confirm","true"},{"removed","true"}}),Does.Contain("nicht technisch bestätigt"));
   Assert.That((await newPc.GetFromJsonAsync<ConfigurationAssignment[]>("/api/v1/agent/configurations"))!.Single().JobId,Is.EqualTo(job.Id));
   await using var db=Db();
   Assert.That(await db.Audit.AnyAsync(x=>x.Action=="device.retire-manually-confirmed"&&x.Resource==oldId.DeviceId.ToString()),Is.True);
+  Assert.That(await db.Audit.AnyAsync(x=>x.Action=="device.agent-removal-confirmed"&&x.Resource==oldId.DeviceId.ToString()),Is.True);
   // The old PC is switched on again later: it is still told to stop.
   using(var told=await oldPc.PostAsJsonAsync("/api/v1/agent/heartbeat",new HeartbeatRequest("0.3.0","Windows 11",true,[])))Assert.That(told.StatusCode,Is.EqualTo(HttpStatusCode.Gone));
   // Decommission without replacement keeps the device's access until it confirms.

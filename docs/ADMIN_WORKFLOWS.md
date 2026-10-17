@@ -96,7 +96,8 @@ problem with a concrete next step, and work state *Offen* / *In Bearbeitung* (wh
 
 Overdue is judged per job (impl., auto):
 
-- allowed age = longest regular gap of the job's schedule + 6 h (Mon–Fri daily: Friday→Monday = 72 h), or the job's
+- allowed age = longest regular gap of the job's schedule + 6 h, simulated like the engine's scheduler from the
+  job's start (Mon–Fri daily: Friday→Monday = 72 h; every 48 h Mon–Fri: Mon, Wed, Fri, Mon = 72 h), or the job's
   explicit allowed age; locally managed jobs keep `Monitoring:BackupAgeHours` (default 24 h);
 - **planned absence** per device (end date + note): offline and overdue are not alerted until then, failures still
   are; afterwards normal monitoring resumes by itself; offline devices show *Abwesend*;
@@ -162,7 +163,9 @@ Guided restore (job → "Aktionen / Restore"): load versions → choose version 
   old device is told on its next contact (`410 Gone`) to pause its schedules; it confirms once nothing runs, its
   agent credential is revoked then, and from then on its engine is no longer started. The new device receives the
   jobs only after that confirmation — or after an administrator states that the old device will never come back
-  (recorded as manual, not technical). If such a device does come back, it is still stopped. Revoking alone never
+  (recorded as manual, not technical); for an old device with an agent older than 0.4 that statement must be that
+  the agent was removed or the device wiped, because such agents do not understand the stop. If such a device does
+  come back, it is still told to stop. Revoking alone never
   stops local schedules and never removes the old device's direct access to the storage; change the storage
   credentials where that matters. Before the new device resumes, check its sources and schedule on its device page.
   (impl., auto; open: real old device coming back online, agents ≤ 0.3.1 do not understand the stop.)

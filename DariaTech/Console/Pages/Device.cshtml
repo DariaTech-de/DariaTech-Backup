@@ -80,7 +80,9 @@
   @if(User.IsInRole("SuperAdmin")||User.IsInRole("Administrator")){
   <form method="post" asp-page-handler="ConfirmStopped" asp-route-id="@d.Id" class="form-grid">
    <input type="hidden" name="oldDeviceId" value="@h.Old.Id" />
+   @if(!h.StopsItself){<p class="form-error" role="alert">Das alte Gerät hat Agent @(string.IsNullOrEmpty(h.AgentVersion)?"(Version unbekannt)":h.AgentVersion). Diese Version versteht den Stopp nicht und sichert nach dem Einschalten weiter in dieselbe Kette. Entweder dort das Agent-Update auf 0.4 freigeben und das Gerät einmal einschalten – oder den Agenten dort entfernen (Anleitung „Agent entfernen“) bzw. das Gerät neu aufsetzen und das hier bestätigen.</p>}
    <label class="check"><input type="checkbox" name="confirm" value="true" /> „@h.Old.Name“ sichert nicht mehr und wird nicht wieder eingeschaltet.</label>
+   @if(!h.StopsItself){<label class="check"><input type="checkbox" name="removed" value="true" /> Der Agent wurde auf „@h.Old.Name“ deinstalliert bzw. das Gerät neu aufgesetzt oder entsorgt.</label>}
    <button type="submit" class="button">Manuell bestätigen</button>
   </form>}
  </div>

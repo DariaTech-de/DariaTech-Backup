@@ -65,6 +65,9 @@ The stop is confirmed in one of two ways, and the Console shows which one applie
 - **manually**, for an old device that will never be online again (wiped, broken, lost): an administrator
   confirms that on the new device's page (`device.retire-manually-confirmed`). This is a statement, not a proof.
   The old credential is deliberately left valid: if the device does come back, it is still told to stop.
+  For an old device with an agent older than 0.4 (which does not understand the stop) the Console additionally
+  requires the statement that the agent was uninstalled there or the device was wiped
+  (`device.agent-removal-confirmed`); otherwise approve the agent update and switch the device on once.
 
 Revoking an agent does not stop its local schedules, and none of this removes the old device's own access to the
 storage. Where that matters (stolen device, untrusted former owner), change the storage credentials at the

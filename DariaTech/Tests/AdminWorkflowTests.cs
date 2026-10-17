@@ -142,6 +142,14 @@ public sealed class BackupAgeTests
 {
  [TestCase(24,127,24)][TestCase(24,0b0111110,72)][TestCase(168,127,168)][TestCase(6,0b0111110,72)][TestCase(48,0b0111110,96)][TestCase(24,0b0000010,168)]
  public void TheLongestScheduledGapCoversDaysWithoutRuns(int repeat,int days,double hours)=>Assert.That(DariaTech.Console.Services.BackupAge.LongestGapHours(repeat,days),Is.EqualTo(hours));
+ // Engine recurrence: 48 h Mon-Fri from a Monday runs Mon, Wed, Fri, Mon (longest gap Friday to Monday).
+ [TestCase(48,0b0111110,72)][TestCase(24,0b0111110,72)][TestCase(6,0b0111110,54)][TestCase(24,0b0000010,168)][TestCase(168,0b0111110,168)]
+ public void TheGapFollowsTheEngineRecurrenceFromTheStart(int repeat,int days,double hours)
+ {
+  if(DariaTech.Console.Services.Ui.Zone==TimeZoneInfo.Utc)Assert.Ignore("No time zone database on this machine");
+  var monday=DariaTech.Console.Services.Ui.FromLocal(new DateTime(2026,11,2,0,0,0));
+  Assert.That(DariaTech.Console.Services.BackupAge.LongestGapHours(repeat,days,monday),Is.EqualTo(hours).Within(1),"within one hour for a daylight-saving change");
+ }
  [Test]public void ManualJobsAndExplicitLimitsAreDistinguished()
  {
   var o=new DariaTech.Console.Services.MonitoringOptions();

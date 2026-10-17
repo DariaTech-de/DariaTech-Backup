@@ -664,6 +664,9 @@ namespace DariaTech.Console.Data.Migrations
                     b.Property<int?>("ScheduleRepeatHours")
                         .HasColumnType("integer");
 
+                    b.Property<DateTimeOffset?>("ScheduleStart")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid?>("SourceManagedJobId")
                         .HasColumnType("uuid");
 

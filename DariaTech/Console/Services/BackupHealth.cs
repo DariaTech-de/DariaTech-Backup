@@ -36,7 +36,25 @@ public static class BackupAge
   if(managed?.MaxBackupAgeHours is int explicitHours)return explicitHours;
   if(managed is not {ScheduleRecorded:true})return Math.Clamp(o.BackupAgeHours,1,8760); // locally managed or not yet recorded
   if(managed.ScheduleRepeatHours is not int repeat)return null;
-  return LongestGapHours(repeat,managed.ScheduleDays)+GraceHours;
+  return LongestGapHours(repeat,managed.ScheduleDays,managed.ScheduleStart)+GraceHours;
+ }
+ // Longest gap between two runs as the engine schedules them (Duplicati Scheduler.GetNextValidTime): advance
+ // by the repeat interval; a run on a day without runs moves day by day (interval of a day or more) or by
+ // further intervals (shorter intervals) to the next allowed day. Days are evaluated in German local time;
+ // the start determines the alignment. Without a known start the conservative estimate below is used.
+ public static double LongestGapHours(int repeatHours,int days,DateTimeOffset? start)
+ {
+  if(start is not {} first||days is 0 or 127)return LongestGapHours(repeatHours,days);
+  bool Allowed(DateTimeOffset t)=>(days&1<<(int)TimeZoneInfo.ConvertTime(t,Ui.Zone).DayOfWeek)!=0;
+  DateTimeOffset Roll(DateTimeOffset t)
+  {
+   if(repeatHours>=24){for(var n=0;n<8&&!Allowed(t);n++)t=t.AddDays(1);}
+   else for(var n=0;n<200&&!Allowed(t);n++)t=t.AddHours(repeatHours);
+   return t;
+  }
+  var run=Roll(first);var end=run.AddDays(28);double longest=0;
+  for(var i=0;i<10000&&run<end;i++){var next=Roll(run.AddHours(repeatHours));longest=Math.Max(longest,(next-run).TotalHours);run=next;}
+  return longest>0?longest:LongestGapHours(repeatHours,days);
  }
  // Longest regular interval between two scheduled runs: the repeat interval, stretched over days without runs
  // (Mon-Fri daily: Friday to Monday is 72 hours, so a Monday morning is not overdue).

@@ -128,12 +128,19 @@ public static class ConfigurationApi
  // For a device that will never be online again (wiped, broken, lost): an administrator states that it no
  // longer backs up. This is recorded as a manual statement, not as a technical confirmation; if the device does
  // come back online it is still told to stop.
- public static async Task<string?> ConfirmRetirementManually(Guid deviceId,ManagementDb db,HttpContext ctx)
+ // Agents from 0.4 understand the stop (410 Gone) and pause themselves; older agents keep running their local
+ // schedules when they come back, so for them only a confirmed local removal is an acceptable statement.
+ public static readonly Version FirstRetirementCapableAgent=new(0,4,0);
+ public static bool RetirementCapable(string? agentVersion)=>Version.TryParse(agentVersion,out var v)&&v>=FirstRetirementCapableAgent;
+ public static async Task<string?> ConfirmRetirementManually(Guid deviceId,ManagementDb db,HttpContext ctx,bool agentRemoved=false)
  {
   if(!ctx.User.IsInRole("SuperAdmin")&&!ctx.User.IsInRole("Administrator"))return "Keine Berechtigung.";
   var device=await db.Devices.SingleOrDefaultAsync(x=>x.Id==deviceId);
   if(device is null||device.RetireRequested is null)return "Für dieses Gerät wurde kein Stopp angefordert.";
   if(device.RetireConfirmed is not null||device.RetireManuallyConfirmed is not null)return null;
+  var version=await db.Agents.Where(x=>x.DeviceId==deviceId).Select(x=>x.Version).FirstOrDefaultAsync();
+  if(!agentRemoved&&!RetirementCapable(version))return $"Der Agent des alten Geräts (Version {(string.IsNullOrEmpty(version)?"unbekannt":version)}) kann sich nicht selbst stoppen und würde nach dem Einschalten weiter sichern. Bitte bestätigen, dass der Agent dort deinstalliert oder das Gerät neu aufgesetzt bzw. entsorgt wurde.";
+  if(agentRemoved)ManagementApi.Audit(db,ctx,device.TenantId,"device.agent-removal-confirmed",device.Id);
   device.RetireManuallyConfirmed=DateTimeOffset.UtcNow;device.RetireManuallyConfirmedBy=ctx.User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value??"";device.Active=false;
   ManagementApi.Audit(db,ctx,device.TenantId,"device.retire-manually-confirmed",device.Id);await db.SaveChangesAsync();return null;
  }
@@ -154,7 +161,7 @@ public static class ConfigurationApi
  }
  public static void RecordSchedule(ManagedJob job,ManagedBackupDefinition definition)
  {
-  job.ScheduleRecorded=true;job.ScheduleRepeatHours=definition.Schedule?.RepeatHours;job.KeepVersions=definition.KeepVersions;
+  job.ScheduleRecorded=true;job.ScheduleRepeatHours=definition.Schedule?.RepeatHours;job.KeepVersions=definition.KeepVersions;job.ScheduleStart=definition.Schedule?.Start;
   job.ScheduleDays=definition.Schedule?.Days.Aggregate(0,(mask,day)=>mask|1<<(int)day)??0;
  }
  public static ManagedBackupDefinition Read(ISecretStore secrets,ConfigurationRevision r)=>JsonSerializer.Deserialize<ManagedBackupDefinition>(secrets.Unprotect(r.TenantId,$"configuration:{r.ManagedJobId}:{r.Revision}",r.EncryptedConfiguration))!;

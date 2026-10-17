@@ -95,11 +95,12 @@ public sealed class Monitoring(IServiceScopeFactory scopes,Microsoft.Extensions.
  // Copies the schedule of jobs created before ManagedJob kept a plain copy of it (one-time, idempotent).
  public static async Task<int> RecordSchedules(ManagementDb db,Security.ISecretStore secrets,CancellationToken ct=default)
  {
-  var pending=await db.ManagedJobs.Where(x=>!x.ScheduleRecorded).Take(500).ToListAsync(ct);
+  var pending=await db.ManagedJobs.Where(x=>!x.ScheduleRecorded||x.ScheduleRepeatHours!=null&&x.ScheduleStart==null).Take(500).ToListAsync(ct);
   foreach(var job in pending)
   {
    var revision=await db.ConfigurationRevisions.SingleOrDefaultAsync(x=>x.ManagedJobId==job.Id&&x.Revision==job.LatestRevision,ct);
-   if(revision is not null)Api.ConfigurationApi.RecordSchedule(job,Api.ConfigurationApi.Read(secrets,revision));else job.ScheduleRecorded=true;
+   if(revision is not null)Api.ConfigurationApi.RecordSchedule(job,Api.ConfigurationApi.Read(secrets,revision));
+   else{job.ScheduleRecorded=true;job.ScheduleRepeatHours=null;}
   }
   await db.SaveChangesAsync(ct);return pending.Count;
  }

@@ -32,7 +32,10 @@ public static class ContractEnd
    case "archive":
     c.Active=false;foreach(var d in await db.Devices.Where(x=>x.TenantId==c.TenantId).ToListAsync())d.Active=false;break;
    case "reactivate":
-    if(c.Closed is not null)return "Der Vertrag ist abgeschlossen.";c.Active=true;break;
+    if(c.Closed is not null)return "Der Vertrag ist abgeschlossen.";c.Active=true;
+    // Devices that archiving switched off come back; retired, replaced or revoked devices stay off.
+    foreach(var d in await db.Devices.Where(x=>x.TenantId==c.TenantId&&!x.Active&&x.RetireRequested==null&&x.ReplacedByDeviceId==null&&db.Agents.Any(a=>a.DeviceId==x.Id&&!a.Revoked)).ToListAsync())d.Active=true;
+    break;
    case "storage":
     c.StorageAccessRevoked??=DateTimeOffset.UtcNow;c.StorageAccessRevokedBy??=Actor(ctx);break;
    case "deletion":

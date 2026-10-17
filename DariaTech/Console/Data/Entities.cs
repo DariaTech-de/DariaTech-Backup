@@ -125,6 +125,7 @@ public sealed class ManagedJob : TenantEntity
  // Plain copy of the latest revision's schedule for monitoring (the revision itself is encrypted).
  // ScheduleRecorded=false: not yet copied (job created before this column existed). Days: bit per DayOfWeek.
  public bool ScheduleRecorded { get; set; } public int? ScheduleRepeatHours { get; set; } public int ScheduleDays { get; set; } public int KeepVersions { get; set; }
+ public DateTimeOffset? ScheduleStart { get; set; }
  // Allowed age of the last successful backup in hours. null: derived from the schedule.
  public int? MaxBackupAgeHours { get; set; }
 }
