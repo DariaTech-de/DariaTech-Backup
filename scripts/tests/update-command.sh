@@ -20,17 +20,22 @@ case "$*" in
  'compose exec -T postgres '*) [[ ${FAIL_STAGE:-} == backup ]] && exit 42; echo 'test database dump' ;;
  'compose --profile maintenance run --rm migrate') [[ ${FAIL_STAGE:-} == migrate ]] && exit 42 ;;
  'compose up -d --wait --wait-timeout 120 console') [[ ${FAIL_STAGE:-} == health ]] && exit 42 ;;
+ 'compose config --format json')
+  # 203.0.113.0/24 (TEST-NET-3) is reserved for documentation and never assigned to a test machine.
+  address=127.0.0.1; [[ ${FAIL_STAGE:-} == address ]] && address=203.0.113.123
+  printf '{"services":{"console":{"ports":[{"host_ip":"%s","target":8080,"published":"8080"}]},"proxy":{"ports":[{"target":80,"published":"80"}]}}}\n' "$address" ;;
 esac
 exit 0
 SH
 chmod +x "$fixture/bin/"*
 export PATH="$fixture/bin:$PATH"
-for FAIL_STAGE in fetch build backup migrate health; do
+for FAIL_STAGE in address fetch build backup migrate health; do
  export FAIL_STAGE
  : > "$UPDATE_TEST_LOG"
  if bash "$root/scripts/dariatech-backup-update" > "$fixture/output" 2>&1; then echo "Unexpected success: $FAIL_STAGE" >&2; exit 1; fi
  if [[ $FAIL_STAGE != health ]] && grep -q 'compose up ' "$UPDATE_TEST_LOG"; then echo 'Restart after failure' >&2; exit 1; fi
  if [[ $FAIL_STAGE == fetch ]] && grep -q 'compose build ' "$UPDATE_TEST_LOG"; then exit 1; fi
+ if [[ $FAIL_STAGE == address ]] && { grep -q '^git pull' "$UPDATE_TEST_LOG" || ! grep -q '203.0.113.123:8080' "$fixture/output"; }; then echo 'Missing bind address not reported before any change' >&2; exit 1; fi
  if [[ $FAIL_STAGE == build || $FAIL_STAGE == backup ]] && grep -q ' run --rm migrate' "$UPDATE_TEST_LOG"; then exit 1; fi
  if grep -q 'erfolgreich aktualisiert' "$fixture/output"; then exit 1; fi
 done
@@ -39,4 +44,4 @@ bash "$root/scripts/dariatech-backup-update" > "$fixture/output" 2>&1
 grep -q 'erfolgreich aktualisiert' "$fixture/output"
 grep -q 'compose --profile maintenance run --rm migrate' "$UPDATE_TEST_LOG"
 [[ -n $(find "$fixture/backups" -name '*-database.sql' -print -quit) ]]
-echo 'Updater: success and five failure paths passed.'
+echo 'Updater: success and six failure paths passed.'

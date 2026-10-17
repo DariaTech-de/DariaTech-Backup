@@ -13,11 +13,41 @@ flock -n 9 || { echo 'Ein Update läuft bereits.' >&2; exit 1; }
 trap 'echo "Update abgebrochen. Prüfe die Fehlermeldung oben; bestehende Daten bleiben erhalten." >&2' ERR
 [[ -z $(git status --porcelain --untracked-files=no) ]] || { echo 'Lokale Änderungen im Repository. Update abgebrochen.' >&2; exit 1; }
 docker compose version >/dev/null
+# Every host address a published port is bound to must exist on this server. Otherwise the replaced Console
+# could not start (for example after the server got a new IP via DHCP), and the running one would already be gone.
+check_bind_addresses() {
+  local missing rc=0
+  missing=$(docker compose config --format json | python3 -c '
+import json,socket,sys
+missing=[]
+for name,service in (json.load(sys.stdin).get("services") or {}).items():
+  for port in service.get("ports") or []:
+    address=(port.get("host_ip") or "") if isinstance(port,dict) else ""
+    if address in ("","0.0.0.0","::"):continue
+    probe=socket.socket(socket.AF_INET6 if ":" in address else socket.AF_INET,socket.SOCK_STREAM)
+    try:probe.bind((address,0))
+    except OSError:missing.append(name+": "+address+":"+str(port.get("published","")))
+    finally:probe.close()
+print("\n".join(missing))
+sys.exit(3 if missing else 0)') || rc=$?
+  if [[ $rc == 3 ]]; then
+    echo 'Diese Adressen sind in der Compose-Konfiguration als Bindung eingetragen, existieren auf diesem Server aber nicht:' >&2
+    echo "$missing" >&2
+    echo "Aktuelle Adressen: $(hostname -I 2>/dev/null || true)" >&2
+    echo 'Dem Server die feste IP zurückgeben oder die Adresse z. B. in compose.override.yaml anpassen. Die laufende Console wurde nicht verändert.' >&2
+    return 1
+  elif [[ $rc != 0 ]]; then
+    echo 'Die Compose-Konfiguration konnte nicht geprüft werden (docker compose config / python3). Die laufende Console wurde nicht verändert.' >&2
+    return 1
+  fi
+}
+check_bind_addresses
 echo '1/3: Änderungen von GitHub laden …'
 git pull --ff-only
 echo '2/3: Neues Console-Image bauen; laufende Console bleibt währenddessen verfügbar …'
 docker compose build console
 echo '3/3: Datenbanksicherung, Migrationen und Console starten …'
+check_bind_addresses
 backup_dir=${DARIATECH_BACKUP_BACKUP_DIR:-/var/backups/dariatech-backup}
 install -d -m 0700 "$backup_dir"
 umask 077
