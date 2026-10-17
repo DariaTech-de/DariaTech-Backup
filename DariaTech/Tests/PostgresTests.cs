@@ -197,6 +197,28 @@ public sealed class PostgresTests
   Assert.That(await db.Audit.AnyAsync(x=>x.TenantId==t.Id&&x.Action=="contract.deletion"),Is.False);
   pc.Dispose();
  }
+ [Test]public async Task RotatedTemplateCredentialsReachOnlySelectedJobsBelowTheTemplate()
+ {
+  var(t,site)=await Customer();await using var db=Db();var customer=await db.Customers.IgnoreQueryFilters().SingleAsync(x=>x.TenantId==t.Id);
+  var a=new Device{TenantId=t.Id,SiteId=site.Id,Name="PC-Rot"};db.Devices.Add(a);
+  var secrets=factory.Services.GetRequiredService<ISecretStore>();
+  var template=new DestinationTemplate{TenantId=t.Id,Name="Kunden-Nextcloud "+Guid.NewGuid().ToString("N")[..6],TargetUrl="webdav://cloud.kunde.example/dav/backup"};
+  DestinationTemplates.SetOptions(secrets,template,new(){{"use-ssl","true"},{"auth-username","backup"},{"auth-password","rotated-password-2"}});db.DestinationTemplates.Add(template);await db.SaveChangesAsync();
+  using var admin=await Login(UserRole.Administrator);using var csrf=System.Text.Json.JsonDocument.Parse(await admin.GetStringAsync("/api/v1/management/csrf"));admin.DefaultRequestHeaders.Add("X-CSRF-Token",csrf.RootElement.GetProperty("token").GetString());
+  var opts=new Dictionary<string,string>{{"use-ssl","true"},{"auth-username","backup"},{"auth-password","old-password-1"}};
+  var below=new ManagedBackupDefinition("Unter Vorlage",["C:\\Daten"],"webdav://cloud.kunde.example/dav/backup/K1/PC-Rot/Daten-abc123","rotation-passphrase-1",opts,30,[],null);
+  var elsewhere=below with{Name="Anderes Ziel",TargetUrl="webdav://other.example/dav/x"};
+  var ids=new List<Guid>();foreach(var d in new[]{below,elsewhere}){using var created=await admin.PostAsJsonAsync($"/api/v1/management/devices/{a.Id}/managed-jobs",new ConfigurationInput(0,d));ids.Add((await created.Content.ReadFromJsonAsync<ManagedJob>())!.Id);}
+  string Form(string html){var m=Regex.Match(html,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");Assert.That(m.Success,Is.True);return WebUtility.HtmlDecode(m.Groups[1].Value);}
+  var url=$"/SharedSettings?id={customer.Id}";var page=await admin.GetStringAsync(url);
+  var fields=new List<KeyValuePair<string,string>>{new("id",customer.Id.ToString()),new("JobIds",ids[0].ToString()),new("JobIds",ids[1].ToString()),new("ChangeCredentials","true"),new("TemplateId",template.Id.ToString()),new("Confirm","true"),new("__RequestVerificationToken",Form(page))};
+  using(var applied=await admin.PostAsync(url+"&handler=Apply",new FormUrlEncodedContent(fields)))
+  {var html=WebUtility.HtmlDecode(await applied.Content.ReadAsStringAsync());Assert.That(html,Does.Contain("Unter Vorlage: gespeichert").And.Not.Contain("Anderes Ziel: gespeichert").And.Not.Contain("rotated-password-2"));}
+  ManagedBackupDefinition Latest(Guid id){var r=db.ConfigurationRevisions.AsNoTracking().Where(x=>x.ManagedJobId==id).OrderByDescending(x=>x.Revision).First();return DariaTech.Console.Api.ConfigurationApi.Read(secrets,r);}
+  Assert.That(Latest(ids[0]).BackendOptions["auth-password"],Is.EqualTo("rotated-password-2"));Assert.That(Latest(ids[0]).TargetUrl,Is.EqualTo(below.TargetUrl),"the job keeps its own folder");
+  Assert.That(Latest(ids[1]).BackendOptions["auth-password"],Is.EqualTo("old-password-1"),"a job outside the template is not touched");
+  db.DestinationTemplates.Remove(await db.DestinationTemplates.SingleAsync(x=>x.Id==template.Id));await db.SaveChangesAsync();
+ }
  private async Task<HttpClient> Login(UserRole role,Guid? tenant=null,bool includeMfa=true,TestFactory? isolatedFactory=null)
  {
   var host=isolatedFactory??factory;using var scope=host.Services.CreateScope();var secrets=scope.ServiceProvider.GetRequiredService<ISecretStore>();await using var db=Db();

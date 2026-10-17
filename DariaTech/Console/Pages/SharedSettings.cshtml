@@ -4,7 +4,7 @@
 @{ ViewData["Title"] = "Gemeinsame Einstellungen"; var c = Model.Customer; }
 <nav class="breadcrumb" aria-label="Brotkrümel"><a href="/Customers">Kunden</a><span aria-hidden="true">/</span><a href="/Customer?id=@c.Id">@c.Name</a><span aria-hidden="true">/</span><span aria-current="page">Gemeinsame Einstellungen</span></nav>
 <div class="page-heading"><div><span class="eyebrow">Backups konfigurieren</span><h1>Gemeinsame Einstellungen</h1>
- <p class="lead">Zeitplan, Aufbewahrung oder zulässiges Backup-Alter für mehrere Backups auf einmal setzen. Nur die angehakten Einstellungen ändern sich; Quellen, Ausschlüsse, Speicherziel und Passphrase jedes Backups bleiben unverändert.</p></div></div>
+ <p class="lead">Zeitplan, Aufbewahrung, zulässiges Backup-Alter oder Speicher-Zugangsdaten für mehrere Backups auf einmal setzen. Nur die angehakten Einstellungen ändern sich; Quellen, Ausschlüsse, Speicherziel und Passphrase jedes Backups bleiben unverändert.</p></div></div>
 @if(Model.Error is not null){<p class="form-error" role="alert">@Model.Error</p>}
 @if(Model.Results.Count>0){<section class="card"><h2>Ergebnis</h2><ul class="steps-list">@foreach(var r in Model.Results){<li>@r</li>}</ul><p class="sub">Gespeichert heißt noch nicht angewendet: den Stand pro Gerät zeigt die Geräteseite („Auf dem Gerät angewendet“).</p></section>}
 <form method="post">
@@ -27,6 +27,9 @@
   <div class="form-grid"><div class="field"><label asp-for="KeepVersions">Aufzubewahrende Versionen (nicht Tage)</label><input asp-for="KeepVersions" type="number" min="1" max="10000" /></div></div>
   <label class="check"><input type="checkbox" asp-for="ChangeMaxAge" /> Zulässiges Backup-Alter</label>
   <div class="form-grid"><div class="field"><label asp-for="MaxBackupAgeHours"><span>Stunden</span><span class="label-hint">leer = aus dem Zeitplan</span></label><input asp-for="MaxBackupAgeHours" type="number" min="1" max="8760" /></div></div>
+  <label class="check"><input type="checkbox" asp-for="ChangeCredentials" /> Speicher-Zugangsdaten aus Vorlage übernehmen</label>
+  <div class="form-grid"><div class="field"><label asp-for="TemplateId">Vorlage</label><select asp-for="TemplateId"><option value="">–</option>@foreach(var t in Model.Templates){<option value="@t.Id">@t.Name · @DestinationForm.Describe(t.TargetUrl)</option>}</select></div></div>
+  <p class="hint">@Ui.Icon("info")Für rotierte Zugangsdaten: Änderungen an einer Vorlage gelten sonst nur für neue Jobs. Übernommen wird nur in ausgewählte Backups dieses Kunden, die unterhalb der Vorlage speichern; Zielordner und Passphrase bleiben gleich. Erst ändern, wenn die neuen Zugangsdaten am Speicher gültig sind, und danach den Verbindungstest auf einem Gerät ausführen. Ein Wechsel des Speicheranbieters ist kein Zugangsdatenwechsel, sondern ein neuer Backup-Job (siehe Dokumentation „Speicher wechseln“).</p>
   <div class="form-actions"><button type="submit" asp-page-handler="Preview" class="button secondary">Vorschau</button></div>
  </section>
  @if(Model.Preview.Count>0){
