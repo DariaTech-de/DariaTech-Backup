@@ -37,7 +37,7 @@ public static class AgentApi
    // A single implausible run or progress value must not keep the whole device offline: only the
    // envelope is fatal, invalid job details are dropped and the heartbeat is still recorded.
    if(Sanitize(r) is not {} clean||r.Platform is not null&&a.Platform!=""&&r.Platform!=a.Platform)return Results.BadRequest();
-   r=clean;
+   var complete=CompleteInventory(r,clean);r=clean;
    await using var tx=await db.Database.BeginTransactionAsync();
    await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({BitConverter.ToInt64(id.ToByteArray())})");
    var d=await db.Devices.SingleOrDefaultAsync(x=>x.Id==id&&x.Active);if(d is null)return Results.Unauthorized();
@@ -46,7 +46,13 @@ public static class AgentApi
    if(r.EngineReachable)
    {
     var jobs=await db.Jobs.Where(x=>x.DeviceId==id).ToListAsync();
-    foreach(var job in jobs)job.Active=false;
+    // Only a complete job list proves that a job no longer exists on the device. When jobs had to be dropped
+    // from the report, known jobs stay monitored and the device is marked as reporting an incomplete inventory.
+    var reportedIds=r.Jobs.Select(x=>x.LocalId).ToHashSet(StringComparer.Ordinal);
+    if(complete)
+     foreach(var job in jobs.Where(x=>x.Active&&!reportedIds.Contains(x.LocalId)))
+     {job.Active=false;db.Audit.Add(new AuditEvent{TenantId=d.TenantId,Actor=id.ToString(),Action="job.removed-from-device",Resource=job.Id.ToString()});}
+    if(complete)d.InventoryIncompleteSince=null;else d.InventoryIncompleteSince??=DateTimeOffset.UtcNow;
     foreach(var report in r.Jobs)
     {
      var job=jobs.SingleOrDefault(x=>x.LocalId==report.LocalId);
@@ -71,6 +77,8 @@ public static class AgentApi
   if(r.ActiveOperation is {} progress&&!ValidProgress(r,progress))return false;
   return r.EngineReachable||r.Jobs.Length==0;
  }
+ // The sanitized report still lists every job of the original report (only run details may have been dropped).
+ public static bool CompleteInventory(HeartbeatRequest original,HeartbeatRequest clean)=>original.Jobs is not null&&original.Jobs.Length<=500&&clean.Jobs.Length==original.Jobs.Length;
  /// <summary>Returns the heartbeat with invalid job details removed, or null when the envelope itself is invalid.</summary>
  public static HeartbeatRequest? Sanitize(HeartbeatRequest r)
  {

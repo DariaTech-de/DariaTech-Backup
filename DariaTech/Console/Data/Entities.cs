@@ -24,6 +24,8 @@ public sealed class Device : TenantEntity
  public bool Active { get; set; } = true;
  public string? ActiveJobLocalId { get; set; } public double? Progress { get; set; }
  public long? ActiveTaskId { get; set; } public long ProgressBytes { get; set; } public long ProgressFiles { get; set; }
+ // Set while the device's job list arrives incomplete (invalid or duplicate entries had to be dropped).
+ public DateTimeOffset? InventoryIncompleteSince { get; set; }
 }
 public sealed class Agent : TenantEntity
 {

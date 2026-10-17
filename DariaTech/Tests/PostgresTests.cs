@@ -78,6 +78,21 @@ public sealed class PostgresTests
   var before=DateTimeOffset.UtcNow;using var tolerated=await c.PostAsJsonAsync("/api/v1/agent/heartbeat",skewed);Assert.That(tolerated.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
   await using var db=Db();var job=await db.Jobs.SingleAsync(x=>x.DeviceId==identity.DeviceId);Assert.That(await db.Runs.CountAsync(x=>x.JobId==job.Id),Is.EqualTo(1));
   Assert.That((await db.Devices.SingleAsync(x=>x.Id==identity.DeviceId)).LastHeartbeat,Is.GreaterThanOrEqualTo(before.AddSeconds(-1)));
+  // A report whose job list had to be shortened is no proof that a job was removed: known jobs stay monitored.
+  using var two=await c.PostAsJsonAsync("/api/v1/agent/heartbeat",heartbeat with{Jobs=[new("1","Daily",null,run),new("2","Weekly",null,null)]});Assert.That(two.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  using var duplicated=await c.PostAsJsonAsync("/api/v1/agent/heartbeat",heartbeat with{Jobs=[new("1","Daily",null,run),new("2","Weekly",null,null),new("2","Weekly copy",null,null)]});Assert.That(duplicated.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  await using(var check=Db())
+  {
+   Assert.That(await check.Jobs.Where(x=>x.DeviceId==identity.DeviceId&&x.Active).Select(x=>x.LocalId).OrderBy(x=>x).ToListAsync(),Is.EqualTo(new[]{"1","2"}));
+   Assert.That((await check.Devices.SingleAsync(x=>x.Id==identity.DeviceId)).InventoryIncompleteSince,Is.Not.Null);
+  }
+  using var removed=await c.PostAsJsonAsync("/api/v1/agent/heartbeat",heartbeat);Assert.That(removed.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  await using(var check=Db())
+  {
+   var weekly=await check.Jobs.SingleAsync(x=>x.DeviceId==identity.DeviceId&&x.LocalId=="2");Assert.That(weekly.Active,Is.False,"a complete report without the job shows it was removed on the device");
+   Assert.That(await check.Audit.AnyAsync(x=>x.Action=="job.removed-from-device"&&x.Resource==weekly.Id.ToString()),Is.True);
+   Assert.That((await check.Devices.SingleAsync(x=>x.Id==identity.DeviceId)).InventoryIncompleteSince,Is.Null);
+  }
   var agent=await db.Agents.SingleAsync(x=>x.DeviceId==identity.DeviceId);agent.Revoked=true;await db.SaveChangesAsync();using var revoked=await c.PostAsJsonAsync("/api/v1/agent/heartbeat",heartbeat);Assert.That(revoked.StatusCode,Is.EqualTo(HttpStatusCode.Unauthorized));
  }
  [Test]public async Task MonitoringDeduplicatesAndResolvesAlerts()
