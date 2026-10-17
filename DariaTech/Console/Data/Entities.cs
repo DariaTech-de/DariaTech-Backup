@@ -14,6 +14,13 @@ public sealed class Customer : TenantEntity
  public string Contact { get; set; } = ""; public string Email { get; set; } = "";
  public string Phone { get; set; } = ""; public string Address { get; set; } = "";
  public string Notes { get; set; } = ""; public bool Active { get; set; } = true;
+ // Number of devices the contract covers; null: the devices registered so far.
+ public int? ExpectedDevices { get; set; }
+ // Contract end. Each step is recorded on its own; none implies another. Archives at the storage are never
+ // deleted by this software: ArchiveDeletionApproved only records the approval for a manual deletion.
+ public DateOnly? ContractEnd { get; set; } public DateOnly? RetainArchivesUntil { get; set; } public string HandoverNote { get; set; } = "";
+ public DateTimeOffset? AccessLocked { get; set; } public DateTimeOffset? StorageAccessRevoked { get; set; } public string? StorageAccessRevokedBy { get; set; }
+ public DateTimeOffset? ArchiveDeletionApproved { get; set; } public string? ArchiveDeletionApprovedBy { get; set; } public DateTimeOffset? Closed { get; set; }
 }
 public sealed class Site : TenantEntity { public string Name { get; set; } = ""; public string Address { get; set; } = ""; }
 public sealed class Device : TenantEntity
@@ -24,6 +31,19 @@ public sealed class Device : TenantEntity
  public bool Active { get; set; } = true;
  public string? ActiveJobLocalId { get; set; } public double? Progress { get; set; }
  public long? ActiveTaskId { get; set; } public long ProgressBytes { get; set; } public long ProgressFiles { get; set; }
+ // Set while the device's job list arrives incomplete (invalid or duplicate entries had to be dropped).
+ public DateTimeOffset? InventoryIncompleteSince { get; set; }
+ // Retirement (replaced or decommissioned): requested by an administrator; confirmed by the agent once it has
+ // paused its scheduled backups, or - for a device that will never come back - confirmed manually by an
+ // administrator (no technical proof). Until the agent confirms, its credential stays valid so it can still
+ // learn about the retirement the next time it is online.
+ public DateTimeOffset? RetireRequested { get; set; } public DateTimeOffset? RetireConfirmed { get; set; }
+ public DateTimeOffset? RetireManuallyConfirmed { get; set; } public string? RetireManuallyConfirmedBy { get; set; }
+ public Guid? ReplacedByDeviceId { get; set; }
+ // Planned absence (holiday, device in storage): offline and overdue are not alerted until this time; failures
+ // still are. After it ends normal monitoring applies again without any further action.
+ public DateTimeOffset? AbsentUntil { get; set; } public string AbsenceNote { get; set; } = "";
+ public bool RetirementPending=>RetireRequested is not null&&RetireConfirmed is null&&RetireManuallyConfirmed is null;
 }
 public sealed class Agent : TenantEntity
 {
@@ -51,6 +71,7 @@ public sealed class EnrollmentToken : TenantEntity
 {
  public Guid SiteId { get; set; } public string TokenHash { get; set; } = "";
  public DateTimeOffset Expires { get; set; } public DateTimeOffset? Used { get; set; }
+ public DateTimeOffset Created { get; set; } = DateTimeOffset.UtcNow; public Guid? DeviceId { get; set; }
 }
 public enum UserRole { SuperAdmin, Administrator, Technician, ReadOnly, CustomerAdmin, CustomerReadOnly }
 public sealed class Role { public UserRole Id { get; set; } public string Name { get; set; } = ""; }
@@ -70,6 +91,9 @@ public sealed class Alert : TenantEntity
  public DateTimeOffset Opened { get; set; } = DateTimeOffset.UtcNow;
  public DateTimeOffset LastSeen { get; set; } = DateTimeOffset.UtcNow;
  public DateTimeOffset? Resolved { get; set; }
+ // Work state: someone took the alert over ("In Bearbeitung"). It is resolved only by monitoring, when the
+ // problem is no longer detected ("behoben" is technical evidence); a new occurrence starts unassigned.
+ public string? AssignedTo { get; set; } public DateTimeOffset? InProgressSince { get; set; }
 }
 public sealed class AuditEvent
 {
@@ -95,6 +119,15 @@ public sealed class ManagedJob : TenantEntity
  public string? LocalJobId { get; set; } public string Status { get; set; } = "Pending";
  // Recovery copy of another device's job: same destination and passphrase, never backs up.
  public bool RestoreOnly { get; set; } public Guid? SourceManagedJobId { get; set; }
+ // Taken over from this device: the configuration is held back until that device's stop is confirmed, so the
+ // old and the new device never write into the same backup chain at the same time.
+ public Guid? HandoverFromDeviceId { get; set; }
+ // Plain copy of the latest revision's schedule for monitoring (the revision itself is encrypted).
+ // ScheduleRecorded=false: not yet copied (job created before this column existed). Days: bit per DayOfWeek.
+ public bool ScheduleRecorded { get; set; } public int? ScheduleRepeatHours { get; set; } public int ScheduleDays { get; set; } public int KeepVersions { get; set; }
+ public DateTimeOffset? ScheduleStart { get; set; }
+ // Allowed age of the last successful backup in hours. null: derived from the schedule.
+ public int? MaxBackupAgeHours { get; set; }
 }
 public sealed class ConfigurationRevision : TenantEntity
 {
@@ -111,6 +144,9 @@ public sealed class RemoteCommand : TenantEntity
  public RemoteAction Action { get; set; } public DateTimeOffset Expires { get; set; }
  public string Status { get; set; } = "Pending"; public long? TaskId { get; set; }
  public string? ErrorCode { get; set; } public string? Detail { get; set; }
+ // Restore only: an administrator opened the restored files and confirmed that they are usable. This is a
+ // manual statement on top of the technical result (Status Completed) and is recorded separately.
+ public string? CheckedBy { get; set; } public DateTimeOffset? Checked { get; set; }
 }
 
 public sealed class NotificationDelivery : TenantEntity

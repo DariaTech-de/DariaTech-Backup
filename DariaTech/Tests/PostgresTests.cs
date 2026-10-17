@@ -78,6 +78,21 @@ public sealed class PostgresTests
   var before=DateTimeOffset.UtcNow;using var tolerated=await c.PostAsJsonAsync("/api/v1/agent/heartbeat",skewed);Assert.That(tolerated.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
   await using var db=Db();var job=await db.Jobs.SingleAsync(x=>x.DeviceId==identity.DeviceId);Assert.That(await db.Runs.CountAsync(x=>x.JobId==job.Id),Is.EqualTo(1));
   Assert.That((await db.Devices.SingleAsync(x=>x.Id==identity.DeviceId)).LastHeartbeat,Is.GreaterThanOrEqualTo(before.AddSeconds(-1)));
+  // A report whose job list had to be shortened is no proof that a job was removed: known jobs stay monitored.
+  using var two=await c.PostAsJsonAsync("/api/v1/agent/heartbeat",heartbeat with{Jobs=[new("1","Daily",null,run),new("2","Weekly",null,null)]});Assert.That(two.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  using var duplicated=await c.PostAsJsonAsync("/api/v1/agent/heartbeat",heartbeat with{Jobs=[new("1","Daily",null,run),new("2","Weekly",null,null),new("2","Weekly copy",null,null)]});Assert.That(duplicated.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  await using(var check=Db())
+  {
+   Assert.That(await check.Jobs.Where(x=>x.DeviceId==identity.DeviceId&&x.Active).Select(x=>x.LocalId).OrderBy(x=>x).ToListAsync(),Is.EqualTo(new[]{"1","2"}));
+   Assert.That((await check.Devices.SingleAsync(x=>x.Id==identity.DeviceId)).InventoryIncompleteSince,Is.Not.Null);
+  }
+  using var removed=await c.PostAsJsonAsync("/api/v1/agent/heartbeat",heartbeat);Assert.That(removed.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  await using(var check=Db())
+  {
+   var weekly=await check.Jobs.SingleAsync(x=>x.DeviceId==identity.DeviceId&&x.LocalId=="2");Assert.That(weekly.Active,Is.False,"a complete report without the job shows it was removed on the device");
+   Assert.That(await check.Audit.AnyAsync(x=>x.Action=="job.removed-from-device"&&x.Resource==weekly.Id.ToString()),Is.True);
+   Assert.That((await check.Devices.SingleAsync(x=>x.Id==identity.DeviceId)).InventoryIncompleteSince,Is.Null);
+  }
   var agent=await db.Agents.SingleAsync(x=>x.DeviceId==identity.DeviceId);agent.Revoked=true;await db.SaveChangesAsync();using var revoked=await c.PostAsJsonAsync("/api/v1/agent/heartbeat",heartbeat);Assert.That(revoked.StatusCode,Is.EqualTo(HttpStatusCode.Unauthorized));
  }
  [Test]public async Task MonitoringDeduplicatesAndResolvesAlerts()
@@ -88,6 +103,156 @@ public sealed class PostgresTests
   Assert.That(await db.Alerts.CountAsync(x=>x.DeviceId==d.Id&&x.Key=="offline"),Is.EqualTo(1));
   d.LastHeartbeat=now;db.Runs.Add(new BackupRun{TenantId=t.Id,JobId=job.Id,LocalRunId="ok",Started=now.AddMinutes(-10),Completed=now,Status=RunStatus.Success});await db.SaveChangesAsync();await Monitoring.Evaluate(db,new(),now.AddSeconds(2));
   Assert.That(await db.Alerts.CountAsync(x=>x.DeviceId==d.Id&&x.Resolved==null),Is.EqualTo(0));
+ }
+ [Test]public async Task WorkListShowsAgeNextStepAndWhoIsOnItAndOnlyMonitoringResolves()
+ {
+  var(t,s)=await Customer();await using var db=Db();var now=DateTimeOffset.UtcNow;
+  var d=new Device{TenantId=t.Id,SiteId=s.Id,Name="Buchhaltung-PC",EngineReachable=true,LastHeartbeat=now};db.Devices.Add(d);db.Agents.Add(new DariaTech.Console.Data.Agent{TenantId=t.Id,DeviceId=d.Id,CredentialHash=Tokens.Hash(Tokens.Create())});
+  var job=new BackupJob{TenantId=t.Id,DeviceId=d.Id,Name="Backup",LocalId="1",NextRun=now.AddHours(3)};db.Jobs.Add(job);
+  db.Runs.Add(new BackupRun{TenantId=t.Id,JobId=job.Id,LocalRunId="ok",Started=now.AddDays(-3),Completed=now.AddDays(-3).AddMinutes(5),Status=RunStatus.Success});
+  db.Runs.Add(new BackupRun{TenantId=t.Id,JobId=job.Id,LocalRunId="full",Started=now.AddHours(-1),Completed=now.AddMinutes(-50),Status=RunStatus.Failed,ErrorCode="BackupFailed",QuotaTotalBytes=100,QuotaFreeBytes=0,QuotaError=true});
+  await db.SaveChangesAsync();await Monitoring.Evaluate(db,new(),now);
+  using var admin=await Login(UserRole.Technician);
+  string Form(string html){var m=Regex.Match(html,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");Assert.That(m.Success,Is.True);return WebUtility.HtmlDecode(m.Groups[1].Value);}
+  var page=WebUtility.HtmlDecode(await admin.GetStringAsync("/Alerts"));
+  Assert.That(page,Does.Contain("Buchhaltung-PC").And.Contain("Backup fehlgeschlagen").And.Contain("Speicher kritisch voll").And.Contain("Speicher erweitern").And.Contain("vor 2 Tagen").And.Contain("Offen"));
+  var alert=await db.Alerts.AsNoTracking().SingleAsync(x=>x.DeviceId==d.Id&&x.Code=="StorageCapacityCritical");
+  using(var take=await admin.PostAsync("/Alerts?handler=Take",new FormUrlEncodedContent(new Dictionary<string,string>{{"alertId",alert.Id.ToString()},{"__RequestVerificationToken",Form(page)}})))Assert.That(take.StatusCode,Is.EqualTo(HttpStatusCode.Redirect));
+  Assert.That(WebUtility.HtmlDecode(await admin.GetStringAsync("/Alerts")),Does.Contain("In Bearbeitung"));
+  Assert.That(await db.Alerts.AsNoTracking().Where(x=>x.Id==alert.Id).Select(x=>x.Resolved).SingleAsync(),Is.Null,"taking an alert does not resolve it");
+  // The storage is extended and the next backup succeeds: monitoring resolves the alerts; they show as fixed.
+  db.Runs.Add(new BackupRun{TenantId=t.Id,JobId=job.Id,LocalRunId="fixed",Started=now,Completed=now.AddMinutes(5),Status=RunStatus.Success,QuotaTotalBytes=100,QuotaFreeBytes=60,QuotaError=false});await db.SaveChangesAsync();
+  await Monitoring.Evaluate(db,new(),now.AddMinutes(6));
+  page=WebUtility.HtmlDecode(await admin.GetStringAsync("/Alerts"));
+  Assert.That(page,Does.Contain("Behoben (letzte 7 Tage)").And.Contain("behoben"));
+ }
+ [Test]public async Task SharedSettingsChangeOnlyTheTickedSettingsAfterAPreview()
+ {
+  var(t,site)=await Customer();await using var db=Db();var customer=await db.Customers.IgnoreQueryFilters().SingleAsync(x=>x.TenantId==t.Id);
+  var a=new Device{TenantId=t.Id,SiteId=site.Id,Name="PC-A"};var b=new Device{TenantId=t.Id,SiteId=site.Id,Name="PC-B"};db.Devices.AddRange(a,b);await db.SaveChangesAsync();
+  using var admin=await Login(UserRole.Administrator);using var csrf=System.Text.Json.JsonDocument.Parse(await admin.GetStringAsync("/api/v1/management/csrf"));admin.DefaultRequestHeaders.Add("X-CSRF-Token",csrf.RootElement.GetProperty("token").GetString());
+  ManagedBackupDefinition Def(string source,string passphrase)=>new("Dokumente",[source],"webdav://storage.example/dav/k/"+passphrase[..4],passphrase,new(){{"use-ssl","true"},{"auth-username","u"},{"auth-password","p"}},30,[new(false,"*.tmp")],null);
+  var jobs=new List<ManagedJob>();
+  foreach(var (device,def) in new[]{(a,Def("C:\\Users\\Anna\\Documents","anna-passphrase-12345")),(b,Def("C:\\Users\\Ben\\Desktop","benb-passphrase-12345"))})
+  {using var created=await admin.PostAsJsonAsync($"/api/v1/management/devices/{device.Id}/managed-jobs",new ConfigurationInput(0,def));jobs.Add((await created.Content.ReadFromJsonAsync<ManagedJob>())!);}
+  string Form(string html){var m=Regex.Match(html,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");Assert.That(m.Success,Is.True);return WebUtility.HtmlDecode(m.Groups[1].Value);}
+  var url=$"/SharedSettings?id={customer.Id}";var page=WebUtility.HtmlDecode(await admin.GetStringAsync(url));Assert.That(page,Does.Contain("PC-A").And.Contain("PC-B").And.Contain("Manuell"));
+  List<KeyValuePair<string,string>> Fields(bool confirm){var f=new List<KeyValuePair<string,string>>{new("id",customer.Id.ToString()),new("JobIds",jobs[0].Id.ToString()),new("JobIds",jobs[1].Id.ToString()),new("ChangeSchedule","true"),new("FirstRun","2026-11-02T22:00"),new("RepeatHours","24"),new("StaggerMinutes","30"),new("ChangeRetention","true"),new("KeepVersions","90"),new("__RequestVerificationToken",Form(page))};
+   foreach(var day in new[]{"Monday","Tuesday","Wednesday","Thursday","Friday"})f.Add(new("Days",day));if(confirm)f.Add(new("Confirm","true"));return f;}
+  using(var preview=await admin.PostAsync(url+"&handler=Preview",new FormUrlEncodedContent(Fields(false))))
+  {
+   var html=WebUtility.HtmlDecode(await preview.Content.ReadAsStringAsync());Assert.That(html,Does.Contain("Vorschau – diese Backups ändern sich").And.Contain("2 Backups auf 2 Gerät(en)").And.Contain("90 Versionen"));
+  }
+  Assert.That(await db.ConfigurationRevisions.CountAsync(x=>x.ManagedJobId==jobs[0].Id),Is.EqualTo(1),"a preview changes nothing");
+  using(var unconfirmed=await admin.PostAsync(url+"&handler=Apply",new FormUrlEncodedContent(Fields(false))))Assert.That(WebUtility.HtmlDecode(await unconfirmed.Content.ReadAsStringAsync()),Does.Contain("Bitte die Änderung"));
+  using(var applied=await admin.PostAsync(url+"&handler=Apply",new FormUrlEncodedContent(Fields(true))))Assert.That(WebUtility.HtmlDecode(await applied.Content.ReadAsStringAsync()),Does.Contain("wird beim nächsten Kontakt des Geräts angewendet"));
+  var secrets=factory.Services.GetRequiredService<ISecretStore>();
+  ManagedBackupDefinition Latest(Guid id){var r=db.ConfigurationRevisions.AsNoTracking().Where(x=>x.ManagedJobId==id).OrderByDescending(x=>x.Revision).First();return DariaTech.Console.Api.ConfigurationApi.Read(secrets,r);}
+  var first=Latest(jobs[0].Id);var second=Latest(jobs[1].Id);
+  Assert.That(first.Sources,Is.EqualTo(new[]{"C:\\Users\\Anna\\Documents"}));Assert.That(second.Sources,Is.EqualTo(new[]{"C:\\Users\\Ben\\Desktop"}),"individual sources are kept");
+  Assert.That(second.Passphrase,Is.EqualTo("benb-passphrase-12345"));Assert.That(first.Filters.Single().Expression,Is.EqualTo("*.tmp"));Assert.That(first.KeepVersions,Is.EqualTo(90));
+  Assert.That(first.Schedule!.Days,Has.Length.EqualTo(5));Assert.That(second.Schedule!.Start-first.Schedule.Start,Is.EqualTo(TimeSpan.FromMinutes(30)),"start times are staggered");
+  if(DariaTech.Console.Services.Ui.Zone!=TimeZoneInfo.Utc)Assert.That(first.Schedule.Start,Is.EqualTo(new DateTimeOffset(2026,11,2,21,0,0,TimeSpan.Zero)),"22:00 German winter time");
+  var stored=await db.ManagedJobs.AsNoTracking().SingleAsync(x=>x.Id==jobs[0].Id);Assert.That(stored.LatestRevision,Is.EqualTo(2));Assert.That(stored.AppliedRevision,Is.Zero,"saved is not applied");
+  Assert.That(stored.ScheduleRepeatHours,Is.EqualTo(24));Assert.That(stored.KeepVersions,Is.EqualTo(90));
+ }
+ [Test]public async Task ContractEndStepsAreSeparateAndArchivesStayUntilDeletionIsApproved()
+ {
+  var(t,site)=await Customer();await using var db=Db();var customer=await db.Customers.IgnoreQueryFilters().SingleAsync(x=>x.TenantId==t.Id);
+  var pc=factory.CreateClient(new(){BaseAddress=new Uri("https://localhost")});
+  using(var e=await pc.PostAsJsonAsync("/api/v1/agent/enroll",new EnrollmentRequest(await Token(t,site),"PC-Ende","Windows 11","0.3.1","win-x64")))
+  {var identity=(await e.Content.ReadFromJsonAsync<EnrollmentResponse>())!;pc.DefaultRequestHeaders.Authorization=new("Bearer",identity.Credential);pc.DefaultRequestHeaders.Add("X-Device-Id",identity.DeviceId.ToString());}
+  var deviceId=Guid.Parse(pc.DefaultRequestHeaders.GetValues("X-Device-Id").Single());
+  using var admin=await Login(UserRole.SuperAdmin);using var portal=await Login(UserRole.CustomerAdmin,t.Id);
+  using var csrf=System.Text.Json.JsonDocument.Parse(await admin.GetStringAsync("/api/v1/management/csrf"));admin.DefaultRequestHeaders.Add("X-CSRF-Token",csrf.RootElement.GetProperty("token").GetString());
+  using(var created=await admin.PostAsJsonAsync($"/api/v1/management/devices/{deviceId}/managed-jobs",new ConfigurationInput(0,new ManagedBackupDefinition("Daten",["C:\\Daten"],"webdav://storage.example/dav/ende","contract-end-passphrase-1",new(){{"use-ssl","true"},{"auth-username","u"},{"auth-password","p"}},30,[],null))))Assert.That(created.StatusCode,Is.EqualTo(HttpStatusCode.Created));
+  string Form(string html){var m=Regex.Match(html,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");Assert.That(m.Success,Is.True);return WebUtility.HtmlDecode(m.Groups[1].Value);}
+  var url=$"/Customer?id={customer.Id}";
+  async Task<string> Step(string step,bool confirm=true,Dictionary<string,string>? extra=null)
+  {
+   var fields=new Dictionary<string,string>{{"id",customer.Id.ToString()},{"step",step},{"__RequestVerificationToken",Form(await admin.GetStringAsync(url))}};if(confirm)fields["confirm"]="true";foreach(var (k,v) in extra??[])fields[k]=v;
+   using var response=await admin.PostAsync(url+"&handler=Contract",new FormUrlEncodedContent(fields));
+   return WebUtility.HtmlDecode(response.StatusCode==HttpStatusCode.Redirect?await admin.GetStringAsync(response.Headers.Location!.ToString()):await response.Content.ReadAsStringAsync());
+  }
+  HeartbeatRequest Beat()=>new("0.3.1","Windows 11",true,[],null,"win-x64");
+  // Archiving ends monitoring and portal access to new devices, but neither stops the device nor deletes anything.
+  Assert.That(await Step("archive",confirm:false),Does.Contain("ausdrücklich bestätigen"));
+  var page=await Step("archive");Assert.That(page,Does.Contain("archiviert – keine Überwachung").And.Contain("PC-Ende – sichert weiter"));
+  using(var hb=await pc.PostAsJsonAsync("/api/v1/agent/heartbeat",Beat()))Assert.That(hb.StatusCode,Is.EqualTo(HttpStatusCode.Unauthorized),"archived: no management, local schedules untouched");
+  Assert.That(await db.Agents.AsNoTracking().Where(x=>x.DeviceId==deviceId).Select(x=>x.Revoked).SingleAsync(),Is.False);
+  // Reactivating brings the devices that archiving switched off back into management.
+  await Step("reactivate");Assert.That(await db.Devices.AsNoTracking().Where(x=>x.Id==deviceId).Select(x=>x.Active).SingleAsync(),Is.True);
+  using(var hb=await pc.PostAsJsonAsync("/api/v1/agent/heartbeat",Beat()))Assert.That(hb.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  await Step("archive");
+  // Stopping local backups is its own step and reaches the archived customer's device.
+  page=await Step("stop");Assert.That(page,Does.Contain("Stopp angefordert – noch nicht bestätigt"));
+  using(var hb=await pc.PostAsJsonAsync("/api/v1/agent/heartbeat",Beat()))Assert.That(hb.StatusCode,Is.EqualTo(HttpStatusCode.Gone));
+  using(var ok=await pc.PostAsync("/api/v1/agent/retired",null))Assert.That(ok.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  Assert.That(await Step("lock"),Does.Contain("gesperrt"));
+  using(var locked=await portal.GetAsync("/"))Assert.That(locked.StatusCode,Is.Not.EqualTo(HttpStatusCode.OK),"customer users are locked out");
+  // Deletion of archives can only be approved after the agreed retention, and the software deletes nothing itself.
+  var today=DateOnly.FromDateTime(DateTime.UtcNow);
+  await Step("dates",extra:new(){{"contractEnd",today.AddDays(-1).ToString("yyyy-MM-dd")},{"retainUntil",today.AddDays(90).ToString("yyyy-MM-dd")}});
+  Assert.That(await Step("deletion"),Does.Contain("erst nach dem vereinbarten Aufbewahrungsende"));
+  Assert.That(await Step("storage"),Does.Contain("Manuell bestätigt"));
+  page=await Step("close");Assert.That(page,Does.Contain("Abgeschlossen").And.Contain("nicht freigegeben – Archive bleiben erhalten"));
+  Assert.That(await db.ManagedJobs.AnyAsync(x=>x.TenantId==t.Id),Is.True,"backup definitions stay recoverable");
+  foreach(var action in new[]{"contract.archive","contract.stop","contract.lock","contract.dates","contract.storage","contract.close"})Assert.That(await db.Audit.AnyAsync(x=>x.TenantId==t.Id&&x.Action==action),Is.True,action);
+  Assert.That(await db.Audit.AnyAsync(x=>x.TenantId==t.Id&&x.Action=="contract.deletion"),Is.False);
+  pc.Dispose();
+ }
+ [Test]public async Task RotatedTemplateCredentialsReachOnlySelectedJobsBelowTheTemplate()
+ {
+  var(t,site)=await Customer();await using var db=Db();var customer=await db.Customers.IgnoreQueryFilters().SingleAsync(x=>x.TenantId==t.Id);
+  var a=new Device{TenantId=t.Id,SiteId=site.Id,Name="PC-Rot"};db.Devices.Add(a);
+  var secrets=factory.Services.GetRequiredService<ISecretStore>();
+  var template=new DestinationTemplate{TenantId=t.Id,Name="Kunden-Nextcloud "+Guid.NewGuid().ToString("N")[..6],TargetUrl="webdav://cloud.kunde.example/dav/backup"};
+  DestinationTemplates.SetOptions(secrets,template,new(){{"use-ssl","true"},{"auth-username","backup"},{"auth-password","rotated-password-2"}});db.DestinationTemplates.Add(template);await db.SaveChangesAsync();
+  using var admin=await Login(UserRole.Administrator);using var csrf=System.Text.Json.JsonDocument.Parse(await admin.GetStringAsync("/api/v1/management/csrf"));admin.DefaultRequestHeaders.Add("X-CSRF-Token",csrf.RootElement.GetProperty("token").GetString());
+  var opts=new Dictionary<string,string>{{"use-ssl","true"},{"auth-username","backup"},{"auth-password","old-password-1"}};
+  var below=new ManagedBackupDefinition("Unter Vorlage",["C:\\Daten"],"webdav://cloud.kunde.example/dav/backup/K1/PC-Rot/Daten-abc123","rotation-passphrase-1",opts,30,[],null);
+  var elsewhere=below with{Name="Anderes Ziel",TargetUrl="webdav://other.example/dav/x"};
+  var ids=new List<Guid>();foreach(var d in new[]{below,elsewhere}){using var created=await admin.PostAsJsonAsync($"/api/v1/management/devices/{a.Id}/managed-jobs",new ConfigurationInput(0,d));ids.Add((await created.Content.ReadFromJsonAsync<ManagedJob>())!.Id);}
+  string Form(string html){var m=Regex.Match(html,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");Assert.That(m.Success,Is.True);return WebUtility.HtmlDecode(m.Groups[1].Value);}
+  var url=$"/SharedSettings?id={customer.Id}";var page=await admin.GetStringAsync(url);
+  var fields=new List<KeyValuePair<string,string>>{new("id",customer.Id.ToString()),new("JobIds",ids[0].ToString()),new("JobIds",ids[1].ToString()),new("ChangeCredentials","true"),new("TemplateId",template.Id.ToString()),new("Confirm","true"),new("__RequestVerificationToken",Form(page))};
+  using(var applied=await admin.PostAsync(url+"&handler=Apply",new FormUrlEncodedContent(fields)))
+  {var html=WebUtility.HtmlDecode(await applied.Content.ReadAsStringAsync());Assert.That(html,Does.Contain("Unter Vorlage: gespeichert").And.Not.Contain("Anderes Ziel: gespeichert").And.Not.Contain("rotated-password-2"));}
+  ManagedBackupDefinition Latest(Guid id){var r=db.ConfigurationRevisions.AsNoTracking().Where(x=>x.ManagedJobId==id).OrderByDescending(x=>x.Revision).First();return DariaTech.Console.Api.ConfigurationApi.Read(secrets,r);}
+  Assert.That(Latest(ids[0]).BackendOptions["auth-password"],Is.EqualTo("rotated-password-2"));Assert.That(Latest(ids[0]).TargetUrl,Is.EqualTo(below.TargetUrl),"the job keeps its own folder");
+  Assert.That(Latest(ids[1]).BackendOptions["auth-password"],Is.EqualTo("old-password-1"),"a job outside the template is not touched");
+  db.DestinationTemplates.Remove(await db.DestinationTemplates.SingleAsync(x=>x.Id==template.Id));await db.SaveChangesAsync();
+ }
+ [Test]public async Task AgentRemovalIsGuidedPerPlatformAndAnUnconfirmedStopCanBeConfirmedManually()
+ {
+  var(t,site)=await Customer();await using var db=Db();var customer=await db.Customers.IgnoreQueryFilters().SingleAsync(x=>x.TenantId==t.Id);
+  var mac=factory.CreateClient(new(){BaseAddress=new Uri("https://localhost")});
+  using(var e=await mac.PostAsJsonAsync("/api/v1/agent/enroll",new EnrollmentRequest(await Token(t,site),"Mac-Empfang","Darwin 25.0.0","0.3.1","osx-arm64")))
+  {var identity=(await e.Content.ReadFromJsonAsync<EnrollmentResponse>())!;mac.DefaultRequestHeaders.Authorization=new("Bearer",identity.Credential);mac.DefaultRequestHeaders.Add("X-Device-Id",identity.DeviceId.ToString());}
+  var id=Guid.Parse(mac.DefaultRequestHeaders.GetValues("X-Device-Id").Single());
+  using var admin=await Login(UserRole.Administrator);using var technician=await Login(UserRole.Technician);using var portal=await Login(UserRole.CustomerAdmin,t.Id);
+  string Form(string html){var m=Regex.Match(html,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");Assert.That(m.Success,Is.True);return WebUtility.HtmlDecode(m.Groups[1].Value);}
+  var page=WebUtility.HtmlDecode(await admin.GetStringAsync($"/Device?id={id}"));
+  Assert.That(page,Does.Contain("Agent vom Gerät entfernen").And.Contain("launchctl bootout system/de.dariatech.dariatechbackupagent").And.Contain("Festplattenvollzugriff").And.Not.Contain("unins000.exe"));
+  var all=WebUtility.HtmlDecode(await technician.GetStringAsync("/AgentRemoval"));
+  Assert.That(all,Does.Contain("unins000.exe").And.Contain("systemctl disable --now DariaTechBackupAgent.service").And.Contain("launchctl bootout").And.Contain("zuerst in der Console stilllegen"));
+  using(var denied=await portal.GetAsync("/AgentRemoval"))Assert.That(denied.StatusCode,Is.EqualTo(HttpStatusCode.Forbidden));
+  async Task<HttpResponseMessage> Post(string handler,bool confirm)
+  {
+   var fields=new Dictionary<string,string>{{"__RequestVerificationToken",Form(await admin.GetStringAsync($"/Device?id={id}"))}};if(confirm)fields["confirm"]="true";
+   return await admin.PostAsync($"/Device?id={id}&handler={handler}",new FormUrlEncodedContent(fields));
+  }
+  using(await Post("Decommission",true)){}
+  // The Mac is already switched off, so it cannot confirm its stop; the administrator confirms the removal.
+  page=WebUtility.HtmlDecode(await admin.GetStringAsync($"/Device?id={id}"));Assert.That(page,Does.Contain("angefordert, vom Gerät noch nicht bestätigt").And.Contain("Entfernung bestätigen"));
+  using(var confirmed=await Post("ConfirmRemoved",true))
+  {
+   Assert.That(confirmed.StatusCode,Is.EqualTo(HttpStatusCode.Redirect));Assert.That(confirmed.Headers.Location!.ToString(),Does.Contain($"/Customer?id={customer.Id}"));
+  }
+  var device=await db.Devices.AsNoTracking().SingleAsync(x=>x.Id==id);Assert.That(device.Active,Is.False);Assert.That(device.RetireManuallyConfirmed,Is.Not.Null);Assert.That(device.RetireConfirmed,Is.Null,"manual, not technical");
+  Assert.That(await db.Audit.AnyAsync(x=>x.Action=="device.retire-manually-confirmed"&&x.Resource==id.ToString()),Is.True);
+  using(var back=await mac.PostAsJsonAsync("/api/v1/agent/heartbeat",new HeartbeatRequest("0.3.1","Darwin 25.0.0",true,[])))Assert.That(back.StatusCode,Is.EqualTo(HttpStatusCode.Gone),"if the agent was not really removed it is still stopped");
+  mac.Dispose();
  }
  private async Task<HttpClient> Login(UserRole role,Guid? tenant=null,bool includeMfa=true,TestFactory? isolatedFactory=null)
  {
@@ -192,6 +357,16 @@ public sealed class PostgresTests
   var stored=DariaTech.Console.Api.ConfigurationApi.Read(factory.Services.GetRequiredService<ISecretStore>(),r);
   Assert.That(stored.TargetUrl,Does.Match($"^ssh://storage\\.dariatech\\.example:2222/backups/{Regex.Escape(number)}/Template-worker/Server-t-glich-[0-9a-f]{{6}}$"));
   Assert.That(stored.BackendOptions["auth-password"],Is.EqualTo("template-secret-321"));Assert.That(stored.BackendOptions["ssh-fingerprint"],Is.EqualTo("ssh-ed25519 256 11:22:33"));
+  // The connection test of a template runs on the device against the customer/device folder the job writes into.
+  using(var tested=await admin.PostAsync("/BackupEdit?handler=TestDestination&createFolder=true",new FormUrlEncodedContent(new Dictionary<string,string>{
+   {"DeviceId",device.Id.ToString()},{"DestinationMode","template"},{"TemplateId",template.Id.ToString()},{"__RequestVerificationToken",Token(form)}})))
+  {
+   using var answer=System.Text.Json.JsonDocument.Parse(await tested.Content.ReadAsStringAsync());var commandId=answer.RootElement.GetProperty("id").GetGuid();
+   var record=await db.Commands.AsNoTracking().SingleAsync(x=>x.Id==commandId);Assert.That(record.DeviceId,Is.EqualTo(device.Id));
+   var payload=factory.Services.GetRequiredService<ISecretStore>().Unprotect(t.Id,$"command:{commandId}",record.EncryptedPayload);
+   var command=System.Text.Json.JsonSerializer.Deserialize<DeviceCommand>(Convert.FromBase64String(payload))!;
+   Assert.That(command.Test!.TargetUrl,Is.EqualTo($"ssh://storage.dariatech.example:2222/backups/{number}/Template-worker"));Assert.That(command.Test.CreateFolder,Is.True);
+  }
   using var customer=await Login(UserRole.CustomerAdmin,t.Id);using var denied=await customer.GetAsync("/Targets");Assert.That(denied.StatusCode,Is.EqualTo(HttpStatusCode.Forbidden));
   db.DestinationTemplates.Remove(await db.DestinationTemplates.SingleAsync(x=>x.Id==template.Id));await db.SaveChangesAsync();
  }
@@ -356,7 +531,8 @@ public sealed class PostgresTests
   using var receipt=await agent.PostAsJsonAsync($"/api/v1/agent/commands/{id}/receipt",new CommandReceipt("Accepted",19,null));Assert.That(receipt.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
   using var complete=await agent.PostAsJsonAsync($"/api/v1/agent/commands/{id}/receipt",new CommandReceipt("Completed",19,null));Assert.That(complete.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
   using var replay=await agent.PostAsJsonAsync($"/api/v1/agent/commands/{id}/receipt",new CommandReceipt("Accepted",19,null));Assert.That(replay.StatusCode,Is.EqualTo(HttpStatusCode.Conflict));
-  Assert.That(await db.Audit.CountAsync(x=>x.Resource==id.ToString()),Is.EqualTo(4));
+  Assert.That(await db.Audit.CountAsync(x=>x.Resource==id.ToString()),Is.EqualTo(5));
+  Assert.That(await db.Audit.AnyAsync(x=>x.Resource==id.ToString()&&x.Action=="command.receipt-conflict-accepted"),Is.True,"a contradicting receipt is visible in the command history");
   using var catalogRequest=await admin.PostAsJsonAsync("/api/v1/management/commands",new CommandInput(job.Id,RemoteAction.ListRestoreFiles,null,15,new(DateTimeOffset.UtcNow.AddDays(-1),null)));using var catalogDoc=System.Text.Json.JsonDocument.Parse(await catalogRequest.Content.ReadAsStringAsync());var catalogId=catalogDoc.RootElement.GetProperty("id").GetGuid();
   var catalog=new RestoreCatalog([],[new("C:\\Private\\patient.txt",10,false)],false);
   using var catalogReceipt=await agent.PostAsJsonAsync($"/api/v1/agent/commands/{catalogId}/receipt",new CommandReceipt("Completed",null,null,catalog));Assert.That(catalogReceipt.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
@@ -493,6 +669,98 @@ public sealed class PostgresTests
   db.Runs.Add(new BackupRun{TenantId=t.Id,JobId=job.Id,LocalRunId="recovered",Started=now,Completed=now.AddMinutes(1),Status=RunStatus.Success,QuotaTotalBytes=100,QuotaFreeBytes=90,QuotaError=false,RetentionError=false});db.Commands.Add(new RemoteCommand{TenantId=t.Id,DeviceId=d.Id,JobId=job.Id,Action=RemoteAction.VerifyBackup,Expires=now.AddMinutes(1),Status="Completed"});await db.SaveChangesAsync();await Monitoring.Evaluate(db,new(),now.AddMinutes(2));
   Assert.That(await db.Alerts.CountAsync(x=>x.DeviceId==d.Id&&x.Resolved==null),Is.EqualTo(0));
  }
+ [Test]public async Task OverdueFollowsTheScheduleAbsenceAndManagedJobState()
+ {
+  var(t,site)=await Customer();await using var db=Db();
+  // Monday 08:00 UTC; the last successful run was Friday 22:05.
+  var monday=new DateTimeOffset(2026,10,19,8,0,0,TimeSpan.Zero);var friday=monday.AddDays(-3).AddHours(14).AddMinutes(5);
+  Device Pc(string name){var d=new Device{TenantId=t.Id,SiteId=site.Id,Name=name,EngineReachable=true,LastHeartbeat=monday};db.Devices.Add(d);db.Agents.Add(new DariaTech.Console.Data.Agent{TenantId=t.Id,DeviceId=d.Id,CredentialHash=Tokens.Hash(Tokens.Create())});return d;}
+  (BackupJob Job,ManagedJob Managed) Job(Device d,string local,int? repeat,int days,DateTimeOffset? success)
+  {
+   var job=new BackupJob{TenantId=t.Id,DeviceId=d.Id,LocalId=local,Name="Dokumente",Ownership="Managed"};db.Jobs.Add(job);
+   var managed=new ManagedJob{TenantId=t.Id,DeviceId=d.Id,Name="Dokumente",LatestRevision=1,AppliedRevision=1,LastReportedRevision=1,LocalJobId=local,Status="Applied",ScheduleRecorded=true,ScheduleRepeatHours=repeat,ScheduleDays=days};db.ManagedJobs.Add(managed);
+   if(success is {} at)db.Runs.Add(new BackupRun{TenantId=t.Id,JobId=job.Id,LocalRunId="ok-"+local,Started=at.AddMinutes(-5),Completed=at,Status=RunStatus.Success});
+   return (job,managed);
+  }
+  const int weekdays=0b0111110;
+  var office=Pc("Büro-1");Job(office,"1",24,weekdays,friday);                 // Mon-Fri daily: not overdue on Monday morning
+  var daily=Pc("Büro-2");Job(daily,"1",24,127,friday);                       // every day: overdue on Monday
+  var manual=Pc("Büro-3");Job(manual,"1",null,0,null);                       // no schedule, never backed up
+  var away=Pc("Laptop");away.LastHeartbeat=monday.AddDays(-5);away.AbsentUntil=monday.AddDays(3);Job(away,"1",24,127,monday.AddDays(-5));
+  var broken=Pc("Büro-4");var (_,failed)=Job(broken,"1",24,127,monday.AddHours(-2));failed.Status="Failed";
+  var (_,gone)=Job(broken,"2",24,127,null);db.Jobs.Remove(db.Jobs.Local.Single(x=>x.DeviceId==broken.Id&&x.LocalId=="2"));
+  await db.SaveChangesAsync();await Monitoring.Evaluate(db,new(),monday);
+  async Task<string[]> Codes(Device d)=>await db.Alerts.Where(x=>x.DeviceId==d.Id&&x.Resolved==null).Select(x=>x.Code).OrderBy(x=>x).ToArrayAsync();
+  Assert.That(await Codes(office),Is.Empty,"a weekend without scheduled runs is not overdue");
+  Assert.That(await Codes(daily),Is.EqualTo(new[]{"BackupOverdue"}));
+  Assert.That(await Codes(manual),Is.EqualTo(new[]{"BackupManualOnly"}));
+  Assert.That(await Codes(away),Is.Empty,"a planned absence suppresses offline and overdue");
+  Assert.That(await Codes(broken),Is.EqualTo(new[]{"ConfigurationFailed","ManagedJobMissing"}));
+  // A failed agent update stays visible until a newer agent is installed.
+  var release=new ApprovedAgentRelease{Id=Guid.NewGuid(),Sequence=9_000_000+Random.Shared.Next(1_000_000),Version="9.9.9",Platform="osx-x64",Payload="test",Signature="test",Expires=monday.AddDays(400)};db.AgentReleases.Add(release);
+  db.UpdateDeployments.Add(new UpdateDeployment{TenantId=t.Id,DeviceId=office.Id,ReleaseId=release.Id,Status="Failed",ErrorCode="InstallationIndeterminate",Approved=monday});await db.SaveChangesAsync();
+  await Monitoring.Evaluate(db,new(),monday);Assert.That(await Codes(office),Is.EqualTo(new[]{"AgentUpdateFailed"}));
+  db.UpdateDeployments.Remove(db.UpdateDeployments.Local.Single(x=>x.DeviceId==office.Id));db.AgentReleases.Remove(release);await db.SaveChangesAsync();
+  // After the absence ends, normal monitoring applies again by itself.
+  await Monitoring.Evaluate(db,new(),monday.AddDays(3).AddMinutes(1));
+  Assert.That(await Codes(away),Is.EqualTo(new[]{"BackupOverdue","DeviceOffline"}));
+  Assert.That(await Codes(office),Is.EqualTo(new[]{"BackupOverdue","DeviceOffline"}),"Thursday without a run since Friday is overdue");
+ }
+ [Test]public async Task FivePcCustomerIsInSetupUntilEveryDeviceIsProvenAndARestoreIsConfirmed()
+ {
+  var(t,site)=await Customer();await using var db=Db();var customer=await db.Customers.IgnoreQueryFilters().SingleAsync(x=>x.TenantId==t.Id);
+  using var admin=await Login(UserRole.SuperAdmin);
+  string Form(string html){var m=Regex.Match(html,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");Assert.That(m.Success,Is.True);return WebUtility.HtmlDecode(m.Groups[1].Value);}
+  async Task<string> Post(string url,Dictionary<string,string> fields,string formPage)
+  {
+   fields["__RequestVerificationToken"]=Form(await admin.GetStringAsync(formPage));using var response=await admin.PostAsync(url,new FormUrlEncodedContent(fields));
+   Assert.That((int)response.StatusCode,Is.LessThan(400));return WebUtility.HtmlDecode(response.StatusCode==HttpStatusCode.Redirect?await admin.GetStringAsync(response.Headers.Location!.ToString()):await response.Content.ReadAsStringAsync());
+  }
+  var customerPage=$"/Customer?id={customer.Id}";
+  await Post($"{customerPage}&handler=Expected",new(){{"id",customer.Id.ToString()},{"expectedDevices","5"}},customerPage);
+  // Five single-use codes in one step, each with its own command.
+  var issued=await Post($"{customerPage}&handler=Enroll",new(){{"id",customer.Id.ToString()},{"siteId",site.Id.ToString()},{"validMinutes","60"},{"platform","win-x64"},{"allowManaged","true"},{"allowRemote","true"},{"count","5"}},customerPage);
+  var codes=Regex.Matches(issued,"<code class=\"token\">([^<]{64})</code>").Select(x=>x.Groups[1].Value).ToList();
+  Assert.That(codes.Distinct().Count(),Is.EqualTo(5));Assert.That(issued,Does.Contain("5 Einmal-Codes").And.Contain("genau <strong>ein</strong> Gerät"));
+  var pcs=new List<(HttpClient Client,EnrollmentResponse Id)>();
+  foreach(var code in codes.Take(4))
+  {
+   var client=factory.CreateClient(new(){BaseAddress=new Uri("https://localhost")});
+   using var e=await client.PostAsJsonAsync("/api/v1/agent/enroll",new EnrollmentRequest(code,$"PC-{pcs.Count+1}","Windows 11","0.3.1","win-x64"));Assert.That(e.StatusCode,Is.EqualTo(HttpStatusCode.OK));
+   var identity=(await e.Content.ReadFromJsonAsync<EnrollmentResponse>())!;client.DefaultRequestHeaders.Authorization=new("Bearer",identity.Credential);client.DefaultRequestHeaders.Add("X-Device-Id",identity.DeviceId.ToString());pcs.Add((client,identity));
+  }
+  // A code is used up: a second installation with the same code is refused.
+  using(var again=factory.CreateClient(new(){BaseAddress=new Uri("https://localhost")}))using(var reuse=await again.PostAsJsonAsync("/api/v1/agent/enroll",new EnrollmentRequest(codes[0],"PC-1-copy","Windows 11","0.3.1","win-x64")))Assert.That(reuse.StatusCode,Is.EqualTo(HttpStatusCode.Unauthorized));
+  using var csrf=System.Text.Json.JsonDocument.Parse(await admin.GetStringAsync("/api/v1/management/csrf"));admin.DefaultRequestHeaders.Add("X-CSRF-Token",csrf.RootElement.GetProperty("token").GetString());
+  var definition=new ManagedBackupDefinition("Dokumente",["C:\\Users\\Public\\Documents"],"webdav://storage.example/dav/kunde/pc","five-pc-passphrase-24680",new(){{"use-ssl","true"},{"auth-username","u"},{"auth-password","p"}},30,[],new(DateTimeOffset.UtcNow.AddHours(2),24,Enum.GetValues<DayOfWeek>()));
+  var managed=new List<ManagedJob>();
+  for(var i=0;i<4;i++)
+  {
+   using var created=await admin.PostAsJsonAsync($"/api/v1/management/devices/{pcs[i].Id.DeviceId}/managed-jobs",new ConfigurationInput(0,definition with{TargetUrl=definition.TargetUrl+(i+1)}));managed.Add((await created.Content.ReadFromJsonAsync<ManagedJob>())!);
+  }
+  var now=DateTimeOffset.UtcNow;
+  // PC-1..3 apply their job; PC-4 is only connected. PC-1 and PC-2 finish a first backup; PC-3's first backup fails.
+  for(var i=0;i<3;i++)using(var applied=await pcs[i].Client.PostAsJsonAsync($"/api/v1/agent/configurations/{managed[i].Id}/receipt",new ConfigurationReceipt(1,"1","Applied")))Assert.That(applied.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  var runs=new RunReport?[]{new("r1",now.AddMinutes(-30),now.AddMinutes(-5),RunStatus.Success,10,1,10,null,null),new("r2",now.AddMinutes(-30),now.AddMinutes(-5),RunStatus.Success,10,1,10,null,null),new("r3",now.AddMinutes(-30),now.AddMinutes(-5),RunStatus.Failed,null,null,null,null,"BackupFailed"),null};
+  for(var i=0;i<4;i++)using(var hb=await pcs[i].Client.PostAsJsonAsync("/api/v1/agent/heartbeat",new HeartbeatRequest("0.3.1","Windows 11",true,i<3?[new("1","Dokumente",now.AddHours(2),runs[i])]:[],null,"win-x64")))Assert.That(hb.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  var page=WebUtility.HtmlDecode(await admin.GetStringAsync(customerPage));
+  Assert.That(page,Does.Contain("In Einrichtung").And.Contain("5 Geräte vorgesehen, 4 verbunden, 3 konfiguriert, 2 erfolgreich gesichert, 0 mit geprüftem Restore").And.Contain("1 vorgesehenes Gerät ist noch nicht registriert").And.Contain("1 Registrierungscode noch offen"));
+  Assert.That(page,Does.Contain("Fehlgeschlagene Erstsicherung prüfen").And.Contain("Backup-Job anlegen bzw. Übernahme abwarten").Or.Contain("Warten, bis das Gerät die Konfiguration übernimmt"));
+  // A completed restore is technical evidence only; the manual check makes it "Restore geprüft".
+  var job1=await db.Jobs.AsNoTracking().SingleAsync(x=>x.DeviceId==pcs[0].Id.DeviceId&&x.LocalId=="1");
+  var restore=new RemoteCommand{TenantId=t.Id,DeviceId=job1.DeviceId,JobId=job1.Id,Action=RemoteAction.Restore,Expires=now.AddMinutes(10),Status="Completed",RequestedBy="test"};db.Commands.Add(restore);await db.SaveChangesAsync();
+  Assert.That(WebUtility.HtmlDecode(await admin.GetStringAsync(customerPage)),Does.Contain("technisch abgeschlossen – Prüfung offen"));
+  var actions=$"/JobActions?id={job1.Id}";
+  Assert.That(await Post($"{actions}&handler=CheckRestore",new(){{"JobId",job1.Id.ToString()},{"commandId",restore.Id.ToString()}},actions),Does.Contain("Bitte bestätigen"));
+  await Post($"{actions}&handler=CheckRestore",new(){{"JobId",job1.Id.ToString()},{"commandId",restore.Id.ToString()},{"confirm","true"}},actions);
+  page=WebUtility.HtmlDecode(await admin.GetStringAsync(customerPage));
+  Assert.That(page,Does.Contain("1 mit geprüftem Restore").And.Contain("In Einrichtung"),"one accepted device does not make the customer operational");
+  Assert.That(await db.Audit.AnyAsync(x=>x.Action=="restore.checked-usable"&&x.Resource==restore.Id.ToString()),Is.True);
+  var device=WebUtility.HtmlDecode(await admin.GetStringAsync($"/Device?id={pcs[0].Id.DeviceId}"));
+  Assert.That(device,Does.Contain("Schutzstatus").And.Contain("abgenommen").And.Contain("Restore-Test bestätigt (manuell)").And.Contain("Speicher vom Gerät erreicht"));
+  Assert.That(WebUtility.HtmlDecode(await admin.GetStringAsync($"/Device?id={pcs[3].Id.DeviceId}")),Does.Contain("noch nicht abgenommen"),"a connection alone is no protection");
+  foreach(var (client,_) in pcs)client.Dispose();
+ }
  [Test]public async Task AddDeviceWizardShowsPlatformPackageAndInstallCommandWithOneTimeToken()
  {
   var(t,site)=await Customer();await using var db=Db();var customer=await db.Customers.IgnoreQueryFilters().SingleAsync(x=>x.TenantId==t.Id);
@@ -608,6 +876,10 @@ Assert.That(html,Does.Contain("Agent 0.2.0 · Pilot").And.Contain(url).And.Conta
   Assert.That(await db.Commands.AnyAsync(x=>x.DeviceId==newId.DeviceId&&x.Action==RemoteAction.RunBackup),Is.False,"no backup into another device's destination");
   using var list=await admin.PostAsync("/JobActions?handler=Request",new FormUrlEncodedContent(new Dictionary<string,string>{{"JobId",backup.Id.ToString()},{"Action","ListRestorePoints"},{"__RequestVerificationToken",Form(actions)}}));
   Assert.That(await db.Commands.AnyAsync(x=>x.DeviceId==newId.DeviceId&&x.Action==RemoteAction.ListRestorePoints),Is.True);
+  // Restoring another device's backup "to the original location" would write that device's paths here.
+  using(var original=await admin.PostAsync("/JobActions?handler=Guide",new FormUrlEncodedContent(new List<KeyValuePair<string,string>>{new("JobId",backup.Id.ToString()),new("step","restore"),new("point",DateTimeOffset.UtcNow.AddDays(-1).ToString("O")),new("paths","C:\\Data\\file.txt"),new("target","original"),new("__RequestVerificationToken",Form(actions))})))
+   Assert.That(WebUtility.HtmlDecode(await original.Content.ReadAsStringAsync()),Does.Contain("nur in einen neuen Ordner wiederherstellen"));
+  Assert.That(await db.Commands.AnyAsync(x=>x.DeviceId==newId.DeviceId&&x.Action==RemoteAction.Restore),Is.False);
   // The recovery flag cannot be removed by editing the job.
   using var edit=await admin.PutAsJsonAsync($"/api/v1/management/managed-jobs/{copy.Id}",new ConfigurationInput(1,assignment.Definition with{RestoreOnly=null}));
   Assert.That(edit.StatusCode,Is.EqualTo(HttpStatusCode.Conflict));
@@ -646,8 +918,16 @@ Assert.That(html,Does.Contain("Agent 0.2.0 · Pilot").And.Contain(url).And.Conta
   var moved=await db.ManagedJobs.AsNoTracking().SingleAsync(x=>x.Id==job.Id);
   Assert.That(moved.DeviceId,Is.EqualTo(newId.DeviceId));Assert.That(moved.LatestRevision,Is.EqualTo(2));Assert.That(moved.LocalJobId,Is.Null);
   Assert.That(await db.Devices.AsNoTracking().Where(x=>x.Id==oldId.DeviceId).Select(x=>x.Active).SingleAsync(),Is.False);
-  Assert.That(await db.Agents.AsNoTracking().Where(x=>x.DeviceId==oldId.DeviceId).Select(x=>x.Revoked).SingleAsync(),Is.True);
   using(var revoked=await oldMac.GetAsync("/api/v1/agent/configurations"))Assert.That(revoked.StatusCode,Is.EqualTo(HttpStatusCode.Unauthorized),"the old device can no longer take part");
+  // Until the old device confirms that its schedules are paused, the new device does not get the backups.
+  Assert.That(await db.Agents.AsNoTracking().Where(x=>x.DeviceId==oldId.DeviceId).Select(x=>x.Revoked).SingleAsync(),Is.False,"revoking first would leave the old device backing up unnoticed");
+  Assert.That(await newMac.GetFromJsonAsync<ConfigurationAssignment[]>("/api/v1/agent/configurations"),Is.Empty);
+  Assert.That(WebUtility.HtmlDecode(await admin.GetStringAsync($"/Device?id={newId.DeviceId}")),Does.Contain("hat den Stopp noch nicht bestätigt"));
+  using(var told=await oldMac.PostAsJsonAsync("/api/v1/agent/heartbeat",new HeartbeatRequest("0.3.0","Darwin 25.0.0",true,[])))Assert.That(told.StatusCode,Is.EqualTo(HttpStatusCode.Gone));
+  using(var stopped=await oldMac.PostAsync("/api/v1/agent/retired",null))Assert.That(stopped.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  Assert.That(await db.Agents.AsNoTracking().Where(x=>x.DeviceId==oldId.DeviceId).Select(x=>x.Revoked).SingleAsync(),Is.True,"revoked once the stop is confirmed");
+  Assert.That(await db.Devices.AsNoTracking().Where(x=>x.Id==oldId.DeviceId).Select(x=>x.RetireConfirmed).SingleAsync(),Is.Not.Null);
+  Assert.That(WebUtility.HtmlDecode(await admin.GetStringAsync($"/Device?id={newId.DeviceId}")),Does.Not.Contain("hat den Stopp noch nicht bestätigt"));
   // Same destination, passphrase and schedule; the agent rebuilds its database before the first backup.
   var assignment=(await newMac.GetFromJsonAsync<ConfigurationAssignment[]>("/api/v1/agent/configurations"))!.Single();
   Assert.That(assignment.JobId,Is.EqualTo(job.Id));Assert.That(assignment.Definition.Adopted,Is.True);Assert.That(assignment.Definition.TargetUrl,Is.EqualTo(definition.TargetUrl));
@@ -685,6 +965,52 @@ Assert.That(html,Does.Contain("Agent 0.2.0 · Pilot").And.Contain(url).And.Conta
   using(var bogus=await newMac.PostAsJsonAsync($"/api/v1/agent/commands/{command.Id}/receipt",new CommandReceipt("Failed",77,"Access to the path is denied")))Assert.That(bogus.StatusCode,Is.EqualTo(HttpStatusCode.BadRequest),"raw engine text is never accepted");
   using(var failed=await newMac.PostAsJsonAsync($"/api/v1/agent/commands/{command.Id}/receipt",new CommandReceipt("Failed",77,"SourceAccessDenied")))Assert.That(failed.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
   Assert.That(WebUtility.HtmlDecode(await admin.GetStringAsync($"/JobActions?id={backup.Id}")),Does.Contain("Festplattenvollzugriff"));
+  }
+ }
+ [Test]public async Task AnOfflineOldDeviceNeedsAnExplicitManualStatementAndIsStillStoppedIfItReturns()
+ {
+  var(t,site)=await Customer();
+  async Task<(HttpClient Client,EnrollmentResponse Identity)> Enroll(string name)
+  {
+   var client=factory.CreateClient(new(){BaseAddress=new Uri("https://localhost")});
+   using var e=await client.PostAsJsonAsync("/api/v1/agent/enroll",new EnrollmentRequest(await Token(t,site),name,"Windows 11","0.3.0","win-x64"));var identity=(await e.Content.ReadFromJsonAsync<EnrollmentResponse>())!;
+   client.DefaultRequestHeaders.Authorization=new("Bearer",identity.Credential);client.DefaultRequestHeaders.Add("X-Device-Id",identity.DeviceId.ToString());return (client,identity);
+  }
+  var (oldPc,oldId)=await Enroll("PC-Empfang");var (newPc,newId)=await Enroll("PC-Empfang-neu");var (spare,spareId)=await Enroll("PC-Lager");
+  using(oldPc)using(newPc)using(spare){
+  using var admin=await Login(UserRole.SuperAdmin);using var csrf=System.Text.Json.JsonDocument.Parse(await admin.GetStringAsync("/api/v1/management/csrf"));admin.DefaultRequestHeaders.Add("X-CSRF-Token",csrf.RootElement.GetProperty("token").GetString());
+  var definition=new ManagedBackupDefinition("Dokumente",["C:\\Users\\Empfang\\Documents"],"webdav://storage.example/dav/k1/empfang","offline-passphrase-13579",new(){{"use-ssl","true"},{"auth-username","u"},{"auth-password","p"}},30,[],new(DateTimeOffset.UtcNow.AddHours(1),24,Enum.GetValues<DayOfWeek>()));
+  using var created=await admin.PostAsJsonAsync($"/api/v1/management/devices/{oldId.DeviceId}/managed-jobs",new ConfigurationInput(0,definition));var job=(await created.Content.ReadFromJsonAsync<ManagedJob>())!;
+  using(var applied=await oldPc.PostAsJsonAsync($"/api/v1/agent/configurations/{job.Id}/receipt",new ConfigurationReceipt(1,"3","Applied")))Assert.That(applied.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  string Form(string html){var m=Regex.Match(html,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");Assert.That(m.Success,Is.True);return WebUtility.HtmlDecode(m.Groups[1].Value);}
+  async Task<string> Post(Guid device,string handler,Dictionary<string,string> fields)
+  {
+   fields["__RequestVerificationToken"]=Form(await admin.GetStringAsync($"/Device?id={device}"));
+   using var response=await admin.PostAsync($"/Device?id={device}&handler={handler}",new FormUrlEncodedContent(fields));Assert.That(response.StatusCode,Is.EqualTo(HttpStatusCode.Redirect));
+   return WebUtility.HtmlDecode(await admin.GetStringAsync(response.Headers.Location!.ToString()));
+  }
+  await Post(newId.DeviceId,"Replace",new(){{"oldDeviceId",oldId.DeviceId.ToString()},{"confirm","true"}});
+  Assert.That(await newPc.GetFromJsonAsync<ConfigurationAssignment[]>("/api/v1/agent/configurations"),Is.Empty);
+  // Without ticking the statement nothing changes; with it, the new device starts and the page says it is not a technical proof.
+  Assert.That(await Post(newId.DeviceId,"ConfirmStopped",new(){{"oldDeviceId",oldId.DeviceId.ToString()}}),Does.Contain("Bitte bestätigen"));
+  Assert.That(await newPc.GetFromJsonAsync<ConfigurationAssignment[]>("/api/v1/agent/configurations"),Is.Empty);
+  // The old PC runs an agent that does not understand the stop: only a confirmed removal is accepted.
+  Assert.That(await Post(newId.DeviceId,"ConfirmStopped",new(){{"oldDeviceId",oldId.DeviceId.ToString()},{"confirm","true"}}),Does.Contain("kann sich nicht selbst stoppen"));
+  Assert.That(await newPc.GetFromJsonAsync<ConfigurationAssignment[]>("/api/v1/agent/configurations"),Is.Empty);
+  Assert.That(await Post(newId.DeviceId,"ConfirmStopped",new(){{"oldDeviceId",oldId.DeviceId.ToString()},{"confirm","true"},{"removed","true"}}),Does.Contain("nicht technisch bestätigt"));
+  Assert.That((await newPc.GetFromJsonAsync<ConfigurationAssignment[]>("/api/v1/agent/configurations"))!.Single().JobId,Is.EqualTo(job.Id));
+  await using var db=Db();
+  Assert.That(await db.Audit.AnyAsync(x=>x.Action=="device.retire-manually-confirmed"&&x.Resource==oldId.DeviceId.ToString()),Is.True);
+  Assert.That(await db.Audit.AnyAsync(x=>x.Action=="device.agent-removal-confirmed"&&x.Resource==oldId.DeviceId.ToString()),Is.True);
+  // The old PC is switched on again later: it is still told to stop.
+  using(var told=await oldPc.PostAsJsonAsync("/api/v1/agent/heartbeat",new HeartbeatRequest("0.3.0","Windows 11",true,[])))Assert.That(told.StatusCode,Is.EqualTo(HttpStatusCode.Gone));
+  // Decommission without replacement keeps the device's access until it confirms.
+  Assert.That(await Post(spareId.DeviceId,"Decommission",new(){{"confirm","true"}}),Does.Contain("Stilllegung angefordert"));
+  using(var told=await spare.PostAsJsonAsync("/api/v1/agent/heartbeat",new HeartbeatRequest("0.3.0","Windows 11",true,[])))Assert.That(told.StatusCode,Is.EqualTo(HttpStatusCode.Gone));
+  Assert.That(await db.Devices.AsNoTracking().Where(x=>x.Id==spareId.DeviceId).Select(x=>x.Active).SingleAsync(),Is.True,"still listed until the stop is confirmed");
+  using(var stopped=await spare.PostAsync("/api/v1/agent/retired",null))Assert.That(stopped.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  var spareDevice=await db.Devices.AsNoTracking().SingleAsync(x=>x.Id==spareId.DeviceId);Assert.That(spareDevice.Active,Is.False);Assert.That(spareDevice.RetireConfirmed,Is.Not.Null);
+  using(var again=await spare.PostAsync("/api/v1/agent/retired",null))Assert.That(again.StatusCode,Is.EqualTo(HttpStatusCode.Unauthorized));
   }
  }
  [Test]public async Task GuidedRestoreAndMonthlyCheckUseSignedCommands()

@@ -33,6 +33,22 @@
 
 @if(Model.Message is not null){<p class="notice-inline good" role="status">@Ui.Icon("check")@Model.Message</p>}
 @if(Model.Failure is not null){<p class="form-error" role="alert">@Model.Failure</p>}
+@if(Model.Protection is {} prot){
+<section class="card" id="protection">
+ <div class="card-head"><div><h2>Schutzstatus @if(prot.Accepted){<span class="status healthy">abgenommen</span>}else{<span class="status warning">noch nicht abgenommen</span>}</h2><span class="sub">Nächster Schritt: @prot.NextAction</span></div></div>
+ <ol class="steps-list">
+  <li><span class="status @(prot.Connected?"healthy":"offline")">@(prot.Connected?"Agent verbunden":"Agent nicht verbunden")</span> · <span class="status @(prot.EngineReady?"healthy":"offline")">@(prot.EngineReady?"Backup-Engine bereit":"Backup-Engine nicht bereit")</span></li>
+  @{var cfg=Onboarding.Label(prot.Configuration,"Konfiguration übernommen","Konfiguration ausstehend","Konfiguration wird übernommen","Konfiguration fehlgeschlagen");}
+  <li><span class="status @cfg.Css">@cfg.Text</span> – gespeichert heißt noch nicht angewendet; maßgeblich ist die Bestätigung des Geräts.</li>
+  <li><span class="status @(prot.StorageReached?"healthy":"offline")">@(prot.StorageReached?"Speicher vom Gerät erreicht":"Speicher-Erreichbarkeit nicht nachgewiesen")</span> – nachgewiesen durch einen Verbindungstest dieses Geräts oder eine erfolgreiche Sicherung. Das Gerät sichert direkt zum Speicher; die Daten laufen nicht über die Console.</li>
+  @{var fb=Onboarding.Label(prot.FirstBackup,"Erstsicherung erfolgreich","Erstsicherung ausstehend","Erstsicherung läuft","Erstsicherung fehlgeschlagen");}
+  <li><span class="status @fb.Css">@fb.Text</span>@if(prot.LastSuccess is {} at){<text> · zuletzt @Ui.Date(at)</text>} – große Erstsicherungen können Tage dauern; nach einer Unterbrechung setzt der nächste Lauf fort, bereits übertragene Blöcke werden nicht erneut hochgeladen.</li>
+  @{var rt=Onboarding.Label(prot.RestoreTest,"Restore-Test bestätigt (manuell)","Restore-Test ausstehend","Restore technisch abgeschlossen – Dateien noch prüfen","Wiederherstellung fehlgeschlagen");}
+  <li><span class="status @rt.Css">@rt.Text</span> – Beispieldatei in einen neuen Ordner wiederherstellen, öffnen und unter „Aktionen / Restore“ bestätigen. Eine Backup-Prüfung ersetzt keinen Restore-Test.</li>
+  <li><span class="status @(prot.NextRun is not null||prot.ManualOnly?"healthy":"offline")">@(prot.ManualOnly?"Nur manuell (kein Zeitplan)":prot.NextRun is {} next?$"Nächster automatischer Lauf {Ui.Date(next)}":"Kein nächster Lauf bekannt")</span></li>
+ </ol>
+</section>
+}
 @if(Model.IsMac){
 <section class="card">
  <div class="card-head"><div><h2>Mac: Festplattenvollzugriff</h2><span class="sub">Ohne diese Freigabe kann macOS Dokumente, Schreibtisch und Downloads nicht sichern lassen.</span></div></div>
@@ -49,10 +65,32 @@
   <span class="sub">@if(Model.Suggested is {} s){<text>„@s.Device.Name“ (zuletzt online @Ui.Ago(s.Device.LastHeartbeat)) hat denselben Namen. Ist dies eine Neuinstallation oder ein Ersatzgerät, übernimmt dieses Gerät die Backups mit Ziel, Passphrase und Zeitplan und sichert in derselben Versionskette weiter.</text>}else{<text>Ersetzt dieses Gerät ein anderes Gerät des Kunden, übernimmt es dessen Backups mit Ziel, Passphrase und Zeitplan und sichert in derselben Versionskette weiter.</text>}</span></div></div>
  <form method="post" asp-page-handler="Replace" asp-route-id="@d.Id" class="form-grid">
   <div class="field"><label for="oldDeviceId">Altes Gerät</label><select name="oldDeviceId" id="oldDeviceId">@foreach(var c in Model.Candidates){<option value="@c.Device.Id" selected="@(c==Model.Suggested)">@c.Device.Name · @c.Jobs Backup@(c.Jobs==1?"":"s") · @(c.Device.Active?$"zuletzt online {Ui.Ago(c.Device.LastHeartbeat)}":"deaktiviert")</option>}</select></div>
-  <label class="check"><input type="checkbox" name="confirm" value="true" /> Das alte Gerät sichert nicht mehr (ausgeschaltet, neu aufgesetzt oder Agent deinstalliert). Es wird in der Console deaktiviert.</label>
+  <p class="hint">@Ui.Icon("info")Das alte Gerät wird in der Console deaktiviert und beim nächsten Kontakt angewiesen, seine Zeitpläne anzuhalten. Dieses Gerät beginnt erst, wenn das alte den Stopp bestätigt hat – oder Sie bestätigen, dass es nie wieder online kommt. So schreiben nie zwei Geräte gleichzeitig in dieselbe Backup-Kette.</p>
+  <label class="check"><input type="checkbox" name="confirm" value="true" /> Dieses Gerät ersetzt das ausgewählte Gerät dauerhaft.</label>
   <div><button type="submit" class="button">Backups übernehmen</button></div>
  </form>
 </section>
+}
+@foreach(var h in Model.PendingHandovers){
+<section class="banner warning" role="status">
+ <span class="banner-icon">@Ui.Icon("alert")</span>
+ <div><strong>Übernahme wartet: „@h.Old.Name“ hat den Stopp noch nicht bestätigt</strong>
+  <span>@h.Jobs Backup@(h.Jobs==1?"":"s") werden erst auf dieses Gerät verteilt, wenn das alte Gerät seine Zeitpläne angehalten hat. Angefordert @Ui.Ago(h.Old.RetireRequested) · zuletzt online @Ui.Ago(h.Old.LastHeartbeat).
+  Kommt das alte Gerät nie wieder online (neu installiert, defekt, verloren), können Sie das hier bestätigen. Das ist dann keine technische Bestätigung: Agent dort deinstallieren bzw. Gerät löschen und – falls möglich – den Speicherzugang des alten Geräts ändern.</span>
+  @if(User.IsInRole("SuperAdmin")||User.IsInRole("Administrator")){
+  <form method="post" asp-page-handler="ConfirmStopped" asp-route-id="@d.Id" class="form-grid">
+   <input type="hidden" name="oldDeviceId" value="@h.Old.Id" />
+   @if(!h.StopsItself){<p class="form-error" role="alert">Das alte Gerät hat Agent @(string.IsNullOrEmpty(h.AgentVersion)?"(Version unbekannt)":h.AgentVersion). Diese Version versteht den Stopp nicht und sichert nach dem Einschalten weiter in dieselbe Kette. Entweder dort das Agent-Update auf 0.4 freigeben und das Gerät einmal einschalten – oder den Agenten dort entfernen (Anleitung „Agent entfernen“) bzw. das Gerät neu aufsetzen und das hier bestätigen.</p>}
+   <label class="check"><input type="checkbox" name="confirm" value="true" /> „@h.Old.Name“ sichert nicht mehr und wird nicht wieder eingeschaltet.</label>
+   @if(!h.StopsItself){<label class="check"><input type="checkbox" name="removed" value="true" /> Der Agent wurde auf „@h.Old.Name“ deinstalliert bzw. das Gerät neu aufgesetzt oder entsorgt.</label>}
+   <button type="submit" class="button">Manuell bestätigen</button>
+  </form>}
+ </div>
+</section>
+}
+@if(d.RetireRequested is not null){
+<section class="banner warning" role="status"><span class="banner-icon">@Ui.Icon("alert")</span>
+ <div><strong>Stilllegung angefordert @Ui.Ago(d.RetireRequested)</strong><span>Das Gerät hält seine Zeitpläne beim nächsten Kontakt an und bestätigt das; bis dahin ist der Stopp nicht bestätigt.</span></div></section>
 }
 @foreach(var a in Model.Alerts.Take(3)){
 <section class="banner @Ui.SeverityClass(a.Severity)" role="alert">
@@ -100,7 +138,7 @@
    <h2 id="backup-jobs">Backup-Jobs</h2>
    @if(Model.Jobs.Count==0){<p class="card-empty">@Ui.Icon("info")Noch keine Jobs eingerichtet.</p>}
    <ul class="job-list">@foreach(var j in Model.Jobs){<li><span class="dot @(j.Active?"healthy":"offline")"></span><span><strong>@j.Name</strong><span class="sub">@Ui.Ownership(j.Ownership) · Nächster Lauf @Ui.In(j.NextRun)</span></span>@if(User.IsInRole("SuperAdmin")||User.IsInRole("Administrator")||User.IsInRole("Technician")){<a asp-page="/JobActions" asp-route-id="@j.Id">Aktionen / Restore</a>}</li>}</ul>
-   @if(User.IsInRole("SuperAdmin")||User.IsInRole("Administrator")){@foreach(var managed in Model.Managed){<div class="managed-job"><strong>@managed.Name</strong><span class="dest-line">@Ui.Icon("cloud")Ziel: @(Model.Destinations.GetValueOrDefault(managed.Id)??"unbekannt")</span><span class="sub">@(managed.Status=="Pending"&&managed.AppliedRevision==0?"Wird eingerichtet":managed.Status) · Revision @managed.AppliedRevision / @managed.LatestRevision · <a asp-page="/BackupEdit" asp-route-deviceId="@d.Id" asp-route-id="@managed.Id">Konfiguration ändern</a></span></div>}}
+   @if(User.IsInRole("SuperAdmin")||User.IsInRole("Administrator")){@foreach(var managed in Model.Managed){<div class="managed-job"><strong>@managed.Name</strong><span class="dest-line">@Ui.Icon("cloud")Ziel: @(Model.Destinations.GetValueOrDefault(managed.Id)??"unbekannt")</span>@{var state=Ui.ConfigState(managed,Model.PendingHandovers.Any(h=>h.Old.Id==managed.HandoverFromDeviceId));}<span class="sub"><span class="status @state.Class">@state.Label</span> · @(managed.RestoreOnly?"Nur Wiederherstellung (sichert nie)":BackupAge.Describe(managed)) @if(!managed.RestoreOnly&&managed.ScheduleRecorded){<text> · @Ui.Retention(managed.KeepVersions,managed.ScheduleRepeatHours,managed.ScheduleDays)</text>} · <a asp-page="/BackupEdit" asp-route-deviceId="@d.Id" asp-route-id="@managed.Id">Konfiguration ändern</a></span></div>}}
    <p class="sub">Lokal verwaltete Jobs werden in der Backup-Engine gepflegt. Zentrale Jobs verwenden versionierte, verschlüsselte Konfigurationen.</p>
   </article>
   <article class="card">
@@ -112,6 +150,7 @@
     <dt>Letzter Heartbeat</dt><dd>@Ui.Date(d.LastHeartbeat)</dd>
     <dt>Agent</dt><dd class="mono">@row.Version</dd>
    </dl>
+   @if(Model.Updates.Count>0){<h3>Agent-Updates</h3><ul class="site-list">@foreach(var (u,version) in Model.Updates){<li><span><strong>@version</strong><span class="sub">@(u.Status switch{"Approved"=>"freigegeben – wartet, bis keine Sicherung läuft","Downloaded"=>"heruntergeladen","Applying"=>"wird installiert","Installed"=>"installiert","Failed"=>"fehlgeschlagen – bisheriger Agent läuft weiter","Rejected"=>"vom Gerät abgelehnt (Signatur/Plattform)",var other=>other})@(u.ErrorCode is null?"":" · "+u.ErrorCode) · @Ui.Ago(u.Approved)</span></span></li>}</ul>}
   </article>
   <article class="card">
    <h2>Logs und Datenschutz</h2>
@@ -119,3 +158,47 @@
   </article>
  </div>
 </section>
+@if(User.IsInRole("SuperAdmin")||User.IsInRole("Administrator")||User.IsInRole("Technician")){
+<section class="card" id="absence">
+ <div class="card-head"><div><h2>Geplante Abwesenheit</h2><span class="sub">Für Urlaub, Lager oder Reparatur: bis zum Enddatum werden „Gerät offline“ und „Backup überfällig“ nicht gemeldet. Fehlgeschlagene Sicherungen und volle Speicher weiterhin. Nach dem Enddatum gilt automatisch wieder die normale Überwachung.</span></div></div>
+ @if(d.AbsentUntil is {} absent&&absent>DateTimeOffset.UtcNow){
+ <p class="notice-inline" role="status">@Ui.Icon("info")Abwesend bis @Ui.Date(absent)@(string.IsNullOrEmpty(d.AbsenceNote)?"":" · "+d.AbsenceNote)</p>
+ <form method="post" asp-page-handler="Absence" asp-route-id="@d.Id"><input type="hidden" name="clear" value="true" /><button type="submit" class="button secondary">Abwesenheit beenden</button></form>
+ }else{
+ <form method="post" asp-page-handler="Absence" asp-route-id="@d.Id" class="form-grid">
+  <div class="field"><label for="absence-until">Abwesend bis einschließlich</label><input id="absence-until" type="date" name="until" /></div>
+  <div class="field"><label for="absence-note">Grund (optional)</label><input id="absence-note" name="note" maxlength="200" /></div>
+  <div><button type="submit" class="button secondary">Abwesenheit eintragen</button></div>
+ </form>}
+</section>
+}
+@if(User.IsInRole("SuperAdmin")||User.IsInRole("Administrator")||User.IsInRole("Technician")){var family=AgentRemoval.Family(Model.Platform);
+<section class="card" id="remove-agent">
+ <div class="card-head"><div><h2>Agent vom Gerät entfernen</h2><span class="sub">Reihenfolge: zuerst stilllegen, dann lokal entfernen. Backups im Speicherziel bleiben erhalten.</span></div><a class="button secondary small" href="/AgentRemoval">Anleitung für alle Systeme</a></div>
+ <ol class="steps-list">
+  <li><strong>Stilllegen:</strong> @(d.RetireConfirmed is not null?"Stopp vom Gerät bestätigt – das Gerät sichert nicht mehr.":d.RetireManuallyConfirmed is not null?"Stopp manuell bestätigt (nicht technisch).":d.RetireRequested is not null?"angefordert, vom Gerät noch nicht bestätigt – das Gerät muss dazu einmal online sein.":"noch nicht – unten „Gerät stilllegen“ verwenden (oder am Nachfolger „Gerät ersetzen“).")</li>
+  <li><strong>Lokal entfernen</strong> mit den Befehlen unten@(family==""?" (Betriebssystem unbekannt – siehe Anleitung für alle Systeme)":"").</li>
+  <li><strong>Bestätigen</strong>, falls das Gerät den Stopp nicht selbst bestätigen konnte (offline, Agent bis 0.3.1).</li>
+ </ol>
+ @if(family!=""){<partial name="_AgentRemoval" model="AgentRemoval.For(family)" />}
+ @if(d.RetirementPending&&(User.IsInRole("SuperAdmin")||User.IsInRole("Administrator"))){
+ <form method="post" asp-page-handler="ConfirmRemoved" asp-route-id="@d.Id" class="form-grid">
+  <label class="check"><input type="checkbox" name="confirm" value="true" /> Der Agent wurde auf „@d.Name“ entfernt bzw. das Gerät ist gelöscht. (Manuelle Bestätigung; kommt das Gerät mit Agent doch wieder online, wird es trotzdem gestoppt.)</label>
+  <div><button type="submit" class="button secondary">Entfernung bestätigen</button></div>
+ </form>}
+</section>
+}
+@if((User.IsInRole("SuperAdmin")||User.IsInRole("Administrator"))&&d.RetireRequested is null){
+<section class="card" id="decommission">
+ <div class="card-head"><div><h2>Gerät stilllegen</h2><span class="sub">Für ein Gerät, das nicht mehr gesichert werden soll und nicht ersetzt wird. Ersetzt ein neues Gerät dieses, stattdessen am neuen Gerät „Gerät ersetzen“ verwenden.</span></div></div>
+ <ul class="steps-list">
+  <li>Das Gerät hält beim nächsten Kontakt seine Zeitpläne an und bestätigt das. Erst dann wird sein Zugang gesperrt. Ist es offline, bleibt der Stopp bis dahin unbestätigt.</li>
+  <li>Die Backups bleiben unverändert im Speicherziel und lassen sich auf einem anderen Gerät des Kunden wiederherstellen. Es wird nichts gelöscht.</li>
+  <li>Der direkte Zugang des Geräts zum Speicher wird dadurch nicht entzogen. Dafür die Zugangsdaten am Speicher ändern.</li>
+ </ul>
+ <form method="post" asp-page-handler="Decommission" asp-route-id="@d.Id" class="form-grid">
+  <label class="check"><input type="checkbox" name="confirm" value="true" /> „@d.Name“ soll nicht mehr sichern.</label>
+  <div><button type="submit" class="button secondary">Gerät stilllegen</button></div>
+ </form>
+</section>
+}

@@ -14,8 +14,30 @@
    @if(!string.IsNullOrEmpty(c.Address)){<li>@Ui.Icon("pin")@c.Address</li>}
   </ul></div>
  </div>
- @if(Model.CanManage){<div class="actions"><a class="button" href="#enroll">@Ui.Icon("plus")Gerät hinzufügen</a></div>}
+ @if(Model.CanManage){<div class="actions"><a class="button" href="#enroll">@Ui.Icon("plus")Gerät hinzufügen</a>@if(Model.IsAdmin){<a class="button secondary" href="/SharedSettings?id=@c.Id">Gemeinsame Einstellungen</a>}</div>}
 </div>
+@{var setup=Model.Setup;}
+<section class="card@(setup.Operational?"":" highlight")" id="setup">
+ <div class="card-head"><div><h2>Einrichtung und Abnahme <span class="status @(setup.Operational?"healthy":"warning")">@(setup.Operational?"Regulärer Betrieb":"In Einrichtung")</span></h2>
+  <span class="sub">@setup.Summary.@if(setup.PendingTokens>0){<text> @setup.PendingTokens Registrierungscode@(setup.PendingTokens==1?"":"s") noch offen.</text>}</span></div>
+  @if(Model.CanManage){<form method="post" asp-page-handler="Expected" class="inline-form"><input type="hidden" name="id" value="@c.Id"><div class="field"><label for="expectedDevices">Vorgesehene Geräte</label><input id="expectedDevices" name="expectedDevices" type="number" min="0" max="10000" value="@c.ExpectedDevices" placeholder="@setup.Registered"></div><button class="button secondary">Speichern</button></form>}</div>
+ <p class="sub">„Regulärer Betrieb“ gilt erst, wenn alle vorgesehenen Geräte registriert sind und jedes Gerät abgenommen ist: Engine bereit, Konfiguration übernommen, Speicher vom Gerät erreicht, Erstsicherung erfolgreich, eine Wiederherstellung technisch abgeschlossen <strong>und</strong> von einem Administrator als nutzbar bestätigt (manuelle Bestätigung), nächster Lauf bekannt. Eine Verbindung allein ist kein Backup-Schutz.</p>
+ @if(setup.Registered<setup.Expected){<p class="notice-inline" role="status">@Ui.Icon("info")@(setup.Expected-setup.Registered) vorgesehene@(setup.Expected-setup.Registered==1?"s Gerät ist":" Geräte sind") noch nicht registriert.</p>}
+ @if(setup.Devices.Count>0){
+ <div class="table-wrap"><table class="table">
+  <thead><tr><th scope="col">Gerät</th><th scope="col">Agent</th><th scope="col">Konfiguration</th><th scope="col">Speicher</th><th scope="col">Erstsicherung</th><th scope="col">Restore geprüft</th><th scope="col">Nächster Lauf</th><th scope="col">Nächster Schritt</th></tr></thead>
+  <tbody>@foreach(var p in setup.Devices){
+   var cfg=Onboarding.Label(p.Configuration,"übernommen","ausstehend","wird übernommen");var fb=Onboarding.Label(p.FirstBackup,"erfolgreich","ausstehend");var rt=Onboarding.Label(p.RestoreTest,"bestätigt","ausstehend","technisch abgeschlossen – Prüfung offen");
+   <tr><td><a href="/Device?id=@p.Device.Id"><strong>@p.Device.Name</strong></a>@if(p.Accepted){<span class="sub">abgenommen</span>}</td>
+   <td><span class="status @(p.EngineReady?"healthy":p.Connected?"warning":"offline")">@(p.EngineReady?"bereit":p.Connected?"Engine nicht bereit":"nicht verbunden")</span></td>
+   <td><span class="status @cfg.Css">@cfg.Text</span></td>
+   <td><span class="status @(p.StorageReached?"healthy":"offline")">@(p.StorageReached?"erreicht":"nicht nachgewiesen")</span></td>
+   <td><span class="status @fb.Css">@fb.Text</span>@if(p.LastSuccess is {} at){<span class="sub">@Ui.Ago(at)</span>}</td>
+   <td><span class="status @rt.Css">@rt.Text</span>@if(p.RestoreCheckedBy is {} who){<span class="sub">manuell bestätigt</span>}</td>
+   <td>@(p.ManualOnly?"Manuell":Ui.In(p.NextRun))</td>
+   <td>@p.NextAction</td></tr>}</tbody>
+ </table></div>}
+</section>
 <section class="kpis five" aria-label="Kennzahlen">
  <article class="kpi"><span class="kpi-label"><span class="dot healthy"></span>Gesund</span><strong>@Model.Rows.Count(x=>x.Status=="Healthy")</strong></article>
  <article class="kpi"><span class="kpi-label"><span class="dot warning"></span>Warnung</span><strong>@Model.Rows.Count(x=>x.Status=="Warning")</strong></article>
@@ -89,14 +111,15 @@
    <div class="inline-form">
     <div class="field"><label for="siteId">Standort</label><select id="siteId" name="siteId">@foreach(var site in Model.Sites){<option value="@site.Id">@site.Name</option>}</select></div>
     <div class="field"><label for="validMinutes">Gültigkeit in Minuten</label><input id="validMinutes" type="number" name="validMinutes" min="5" max="1440" value="60"></div>
-    <button class="button">@Ui.Icon("key")Token und Installationsbefehl erzeugen</button>
+    <div class="field"><label for="count">Anzahl Geräte</label><input id="count" type="number" name="count" min="1" max="25" value="1"></div>
+    <button class="button">@Ui.Icon("key")Einmal-Codes und Befehle erzeugen</button>
    </div>
   </form>}
   @if(Model.Token is not null){
   <div class="token-box" role="status">
-   <span class="token-head">@Ui.Icon("key")Token wird nur einmal angezeigt</span>
-   <code class="token">@Model.Token</code>
-   <span class="sub">Sicher an den Techniker übergeben. Gilt für ein Gerät; nach der Registrierung ist er verbraucht.</span>
+   <span class="token-head">@Ui.Icon("key")@(Model.Issued.Count>1?$"{Model.Issued.Count} Einmal-Codes – werden nur jetzt angezeigt":"Einmal-Code – wird nur jetzt angezeigt")</span>
+   @foreach(var (token,_) in Model.Issued){<code class="token">@token</code>}
+   <span class="sub">Jeder Code (und jeder Befehl unten) gilt für genau <strong>ein</strong> Gerät und nur bis zum Ablauf. Nach der Registrierung ist er verbraucht; ein zweites Gerät oder eine Neuinstallation braucht einen neuen Code. Eine Neuinstallation erscheint als neues Gerät – dort „Gerät ersetzen“ verwenden.</span>
   </div>
   <div class="install-box">
    <div class="install-head"><strong>@DariaTech.Console.Services.AgentReleases.PlatformLabel(Model.Platform)</strong>
@@ -107,7 +130,9 @@
     <li>Befehl kopieren und einfügen. Er lädt das Paket, prüft die Prüfsumme und registriert das Gerät mit diesem Token.@(Model.Platform=="win-x64"?" Im Installer nur noch das Passwort für die lokale Oberfläche (mind. 14 Zeichen) vergeben.":"")</li>
     <li>@(Model.AllowManaged?"Das Gerät erscheint danach unter diesem Kunden; Backup-Jobs legen Sie dann in der Konsole an.":"Das Gerät erscheint danach unter diesem Kunden. Konsolen-Jobs sind nicht freigegeben; Jobs werden lokal auf dem Gerät eingerichtet.")</li>
    </ol>
-   <div class="command"><pre><code data-copy-source>@Model.Command</code></pre><button type="button" class="button secondary" data-copy>Befehl kopieren</button></div>
+   @for(var i=0;i<Model.Issued.Count;i++){
+   @if(Model.Issued.Count>1){<p class="sub"><strong>Gerät @(i+1)</strong> – nur für ein Gerät verwenden</p>}
+   <div class="command"><pre><code data-copy-source>@Model.Issued[i].Command</code></pre><button type="button" class="button secondary" data-copy>Befehl kopieren</button></div>}
    <p class="sub">Alternativ manuell: <a href="@a.Url" rel="noopener">@Ui.Icon("download")@a.File</a> (@((a.Size/1048576.0).ToString("0.0")) MB) · SHA-256 <span class="code hash">@a.Sha256</span>
     @if(Model.Platform=="win-x64"){<text>· Im Installer Konsolen-Adresse und Token eingeben.</text>}else{<text>· Danach <span class="code">sudo ./install.sh --console-url … --enrollment-token-file …</span></text>}</p>
    @if(Model.Platform!="win-x64"&&Model.Platform.StartsWith("osx")){<p class="sub">@Ui.Icon("info")Die macOS-Binärdateien sind noch nicht notarisiert; der Befehl oben funktioniert trotzdem, da er ohne Finder/Gatekeeper-Download auskommt.</p>}
@@ -118,5 +143,36 @@
   </div>}
  </article>}
 </section>
+@if(Model.CanManage&&Model.Tokens.Count>0){
+<section class="card"><div class="card-head"><div><h2>Registrierungscodes</h2><span class="sub">Ausgestellte Einmal-Codes (ohne den Code selbst). Offene Codes bedeuten: Registrierung ausstehend.</span></div></div>
+ <ul class="site-list">@foreach(var e in Model.Tokens){var used=e.Used is not null;var expired=!used&&e.Expires<=DateTimeOffset.UtcNow;
+  <li>@Ui.Icon("key")<span><strong>@(used?"Verwendet":expired?"Abgelaufen, nicht verwendet":"Offen – Registrierung ausstehend")</strong><span class="sub">ausgestellt @Ui.Ago(e.Created) · @(used?$"registriert {Ui.Ago(e.Used)}":$"gültig bis {Ui.Date(e.Expires)}")</span></span>@if(e.DeviceId is {} dev){<a href="/Device?id=@dev">Gerät</a>}</li>}</ul>
+</section>}
+@if(Model.IsAdmin){
+<section class="card" id="contract">
+ <div class="card-head"><div><h2>Vertragsende</h2><span class="sub">Getrennte Schritte – keiner führt automatisch einen anderen aus. Die Software löscht keine Backup-Archive am Speicher.</span></div>@if(c.Closed is not null){<span class="status healthy">Abgeschlossen @Ui.Date(c.Closed)</span>}</div>
+ @if(Model.ContractMessage is not null){<p class="@(Model.ContractFailed?"form-error":"notice-inline good")" role="alert">@Model.ContractMessage</p>}
+ <ol class="steps-list">
+  <li><strong>Enddatum und Aufbewahrung:</strong> @(c.ContractEnd is {} end?$"Vertragsende {end:dd.MM.yyyy}, Archive aufbewahren bis {c.RetainArchivesUntil:dd.MM.yyyy}":"noch nicht festgelegt")@(string.IsNullOrEmpty(c.HandoverNote)?"":" · Übergabe: "+c.HandoverNote)
+   <form method="post" asp-page-handler="Contract" class="inline-form"><input type="hidden" name="id" value="@c.Id"><input type="hidden" name="step" value="dates">
+    <div class="field"><label for="contractEnd">Vertragsende</label><input id="contractEnd" type="date" name="contractEnd" value="@c.ContractEnd?.ToString("yyyy-MM-dd")"></div>
+    <div class="field"><label for="retainUntil">Archive aufbewahren bis</label><input id="retainUntil" type="date" name="retainUntil" value="@c.RetainArchivesUntil?.ToString("yyyy-MM-dd")"></div>
+    <div class="field"><label for="handoverNote">Übergabe / Export</label><input id="handoverNote" name="handoverNote" maxlength="1000" value="@c.HandoverNote" placeholder="z. B. Passphrasen und Ziel an Kunden übergeben am …"></div>
+    <button class="button secondary">Speichern</button></form></li>
+  <li><strong>Lokale Sicherungen stoppen:</strong> jedes Gerät hält beim nächsten Kontakt seine Zeitpläne an und bestätigt das. Offline-Geräte bleiben unbestätigt.
+   <ul>@foreach(var stop in Model.Stops){<li>@stop.Device.Name – @stop.State</li>}</ul>
+   @if(Model.Stops.Any(x=>x.Device.RetireRequested is null)){<form method="post" asp-page-handler="Contract" class="inline-form"><input type="hidden" name="id" value="@c.Id"><input type="hidden" name="step" value="stop"><label class="check"><input type="checkbox" name="confirm" value="true"> Alle Geräte sollen aufhören zu sichern.</label><button class="button secondary">Lokale Sicherungen stoppen</button></form>}</li>
+  <li><strong>Verwaltungszugang sperren</strong> (Kunden-Benutzer der Console): @(c.AccessLocked is {} locked?$"gesperrt {Ui.Date(locked)}":"aktiv")
+   @if(c.AccessLocked is null){<form method="post" asp-page-handler="Contract" class="inline-form"><input type="hidden" name="id" value="@c.Id"><input type="hidden" name="step" value="lock"><label class="check"><input type="checkbox" name="confirm" value="true"> Kunden-Benutzer sperren.</label><button class="button secondary">Zugang sperren</button></form>}</li>
+  <li><strong>Kunde archivieren:</strong> @(c.Active?"aktiv – wird überwacht":"archiviert – keine Überwachung, keine neuen Geräte")
+   <form method="post" asp-page-handler="Contract" class="inline-form"><input type="hidden" name="id" value="@c.Id"><input type="hidden" name="step" value="@(c.Active?"archive":"reactivate")"><label class="check"><input type="checkbox" name="confirm" value="true"> @(c.Active?"Archivieren. Das stoppt keine lokalen Sicherungen und löscht nichts.":"Wieder aktivieren (z. B. für eine Wiederherstellung).")</label><button class="button secondary">@(c.Active?"Archivieren":"Reaktivieren")</button></form></li>
+  <li><strong>Speicherzugriff entziehen:</strong> nur beim Speicheranbieter möglich (Zugangsdaten bzw. Freigabe widerrufen). @(c.StorageAccessRevoked is {} revoked?$"Manuell bestätigt {Ui.Date(revoked)} von {c.StorageAccessRevokedBy}":"noch nicht bestätigt")
+   @if(c.StorageAccessRevoked is null){<form method="post" asp-page-handler="Contract" class="inline-form"><input type="hidden" name="id" value="@c.Id"><input type="hidden" name="step" value="storage"><label class="check"><input type="checkbox" name="confirm" value="true"> Am Speicher widerrufen (manuelle Bestätigung).</label><button class="button secondary">Bestätigen</button></form>}</li>
+  <li><strong>Backup-Archive löschen:</strong> erst nach dem Aufbewahrungsende und nur am Speicher selbst. @(c.ArchiveDeletionApproved is {} approved?$"Löschung freigegeben {Ui.Date(approved)} von {c.ArchiveDeletionApprovedBy} – am Speicher durchführen":"nicht freigegeben – Archive bleiben erhalten")
+   @if(c.ArchiveDeletionApproved is null){<form method="post" asp-page-handler="Contract" class="inline-form"><input type="hidden" name="id" value="@c.Id"><input type="hidden" name="step" value="deletion"><label class="check"><input type="checkbox" name="confirm" value="true"> Löschung der Archive freigeben.</label><button class="button secondary">Freigeben</button></form>}</li>
+  <li><strong>Abschluss protokollieren:</strong> @(c.Closed is {} closed?$"abgeschlossen {Ui.Date(closed)}":"offen") · Verwaltungsdaten werden nur mit dem gesonderten Löschbefehl (<span class="code">--erase-customer</span>) entfernt.
+   @if(c.Closed is null){<form method="post" asp-page-handler="Contract" class="inline-form"><input type="hidden" name="id" value="@c.Id"><input type="hidden" name="step" value="close"><label class="check"><input type="checkbox" name="confirm" value="true"> Vertragsende abschließen.</label><button class="button secondary">Abschließen</button></form>}</li>
+ </ol>
+</section>}
 @if(Model.CanManage&&!string.IsNullOrWhiteSpace(c.Notes)){<section class="card"><h2>Interne Notizen</h2><p class="prewrap">@c.Notes</p></section>}
 <partial name="_Errors" model='""' />

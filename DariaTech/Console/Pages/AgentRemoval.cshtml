@@ -1,0 +1,17 @@
+@page
+@model AgentRemovalModel
+@using DariaTech.Console.Services
+@{ ViewData["Title"] = "Agent entfernen"; }
+<nav class="breadcrumb" aria-label="Brotkrümel"><a href="/Devices">Geräte</a><span aria-hidden="true">/</span><span aria-current="page">Agent entfernen</span></nav>
+<div class="page-heading"><div><span class="eyebrow">Geräte</span><h1>Agent sauber von einem Gerät entfernen</h1>
+ <p class="lead">Für Windows, Linux und macOS. Reihenfolge einhalten: zuerst in der Console stilllegen, dann lokal entfernen.</p></div></div>
+<section class="card">
+ <h2>Ablauf</h2>
+ <ol class="steps-list">
+  <li><strong>In der Console stilllegen:</strong> Geräteseite → „Gerät stilllegen“ (oder beim Nachfolger „Gerät ersetzen“). Das Gerät hält beim nächsten Kontakt seine Zeitpläne an und bestätigt das; die Geräteseite zeigt „Stopp vom Gerät bestätigt“. So sichert es nicht weiter, falls die Entfernung unvollständig bleibt.</li>
+  <li><strong>Auf dem Gerät entfernen</strong> mit den Befehlen unten. Ohne Schritt 2 bleiben Geräte-Identität und lokale Job-Datenbanken erhalten – das ist nur für eine Neuinstallation desselben PCs gedacht.</li>
+  <li><strong>Prüfen:</strong> War das Gerät offline oder hatte es einen alten Agenten (bis 0.3.1), auf der Geräteseite bestätigen, dass der Agent entfernt wurde. Diese Bestätigung ist manuell, nicht technisch.</li>
+  <li><strong>Speicherzugang:</strong> Das Entfernen löscht keine Backups im Speicherziel; sie bleiben über die Kundenseite auf einem anderen Gerät wiederherstellbar. Hatte das Gerät eigene Zugangsdaten zum Speicher, diese beim Anbieter widerrufen, wenn das Gerät nicht mehr vertrauenswürdig ist (Verkauf, Verlust, ehemaliger Mitarbeiter).</li>
+ </ol>
+</section>
+@foreach(var family in AgentRemoval.Families){<section class="card"><partial name="_AgentRemoval" model="AgentRemoval.For(family)" /></section>}

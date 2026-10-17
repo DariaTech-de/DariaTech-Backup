@@ -76,6 +76,10 @@ namespace DariaTech.Console.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("AssignedTo")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(1000)
@@ -83,6 +87,9 @@ namespace DariaTech.Console.Data.Migrations
 
                     b.Property<Guid>("DeviceId")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("InProgressSince")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Key")
                         .IsRequired()
@@ -348,6 +355,9 @@ namespace DariaTech.Console.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset?>("AccessLocked")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("Active")
                         .HasColumnType("boolean");
 
@@ -356,12 +366,33 @@ namespace DariaTech.Console.Data.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
+                    b.Property<DateTimeOffset?>("ArchiveDeletionApproved")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ArchiveDeletionApprovedBy")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset?>("Closed")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Contact")
                         .IsRequired()
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
+                    b.Property<DateOnly?>("ContractEnd")
+                        .HasColumnType("date");
+
                     b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int?>("ExpectedDevices")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("HandoverNote")
                         .IsRequired()
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
@@ -383,6 +414,16 @@ namespace DariaTech.Console.Data.Migrations
 
                     b.Property<string>("Phone")
                         .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateOnly?>("RetainArchivesUntil")
+                        .HasColumnType("date");
+
+                    b.Property<DateTimeOffset?>("StorageAccessRevoked")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("StorageAccessRevokedBy")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
@@ -454,6 +495,14 @@ namespace DariaTech.Console.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("AbsenceNote")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset?>("AbsentUntil")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("Active")
                         .HasColumnType("boolean");
 
@@ -471,6 +520,9 @@ namespace DariaTech.Console.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset?>("InventoryIncompleteSince")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset?>("LastHeartbeat")
                         .HasColumnType("timestamp with time zone");
@@ -494,6 +546,22 @@ namespace DariaTech.Console.Data.Migrations
                     b.Property<long>("ProgressFiles")
                         .HasColumnType("bigint");
 
+                    b.Property<Guid?>("ReplacedByDeviceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("RetireConfirmed")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("RetireManuallyConfirmed")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RetireManuallyConfirmedBy")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset?>("RetireRequested")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid>("SiteId")
                         .HasColumnType("uuid");
 
@@ -511,6 +579,12 @@ namespace DariaTech.Console.Data.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("Created")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeviceId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("Expires")
@@ -554,6 +628,12 @@ namespace DariaTech.Console.Data.Migrations
                     b.Property<Guid>("DeviceId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("HandoverFromDeviceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("KeepVersions")
+                        .HasColumnType("integer");
+
                     b.Property<long>("LastReportedRevision")
                         .HasColumnType("bigint");
 
@@ -564,6 +644,9 @@ namespace DariaTech.Console.Data.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
+                    b.Property<int?>("MaxBackupAgeHours")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(1000)
@@ -571,6 +654,18 @@ namespace DariaTech.Console.Data.Migrations
 
                     b.Property<bool>("RestoreOnly")
                         .HasColumnType("boolean");
+
+                    b.Property<int>("ScheduleDays")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("ScheduleRecorded")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("ScheduleRepeatHours")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("ScheduleStart")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("SourceManagedJobId")
                         .HasColumnType("uuid");
@@ -696,6 +791,13 @@ namespace DariaTech.Console.Data.Migrations
                         .HasColumnType("integer");
 
                     b.Property<string>("ApprovedBy")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset?>("Checked")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CheckedBy")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 

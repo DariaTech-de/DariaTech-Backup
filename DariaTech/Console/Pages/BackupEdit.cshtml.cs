@@ -25,7 +25,10 @@ public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets,Command
  [BindProperty]public int KeepVersions {get;set;}=30;
  [BindProperty]public int RepeatHours {get;set;}=24;
  [BindProperty]public DayOfWeek[] Days {get;set;}=Enum.GetValues<DayOfWeek>();
- [BindProperty]public DateTimeOffset? FirstRun {get;set;}
+ // German local time; converted to UTC with the offset valid on that date.
+ [BindProperty]public DateTime? FirstRun {get;set;}
+ // Allowed age of the last successful backup in hours; empty: derived from the schedule.
+ [BindProperty]public int? MaxBackupAgeHours {get;set;}
  [BindProperty]public string? DirectoryTenant {get;set;}="";
  [BindProperty]public string? ClientId {get;set;}="";
  [BindProperty]public string? ClientSecret {get;set;}
@@ -61,7 +64,8 @@ public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets,Command
   if(await LoadPrevious() is {} previous)
   {
    Name=previous.Name;Sources=string.Join(Environment.NewLine,previous.Sources);TargetUrl=previous.TargetUrl;KeepVersions=previous.KeepVersions;
-   FirstRun=previous.Schedule?.Start;Days=previous.Schedule?.Days??Enum.GetValues<DayOfWeek>();RepeatHours=previous.Schedule?.RepeatHours??24;
+   FirstRun=previous.Schedule?.Start is {} start?Ui.ToLocal(start):null;
+   MaxBackupAgeHours=await db.ManagedJobs.Where(x=>x.Id==ManagedJobId).Select(x=>x.MaxBackupAgeHours).SingleOrDefaultAsync();Days=previous.Schedule?.Days??Enum.GetValues<DayOfWeek>();RepeatHours=previous.Schedule?.RepeatHours??24;
    Provider=previous.Proxmox is not null?"Proxmox":previous.SourceMounts is not null?"NAS":previous.Saas?.Provider.ToString()??"Files";
    ProxmoxGuestIds=previous.Proxmox is {} guests?string.Join(',',guests.GuestIds):null;
    SourceMounts=previous.SourceMounts is {} mounts?string.Join(Environment.NewLine,mounts.Select(m=>m.MountPoint+"|"+m.FileSystemType+"|"+m.RemoteSource)):null;DirectoryTenant=previous.Saas?.DirectoryTenant??"";
@@ -153,7 +157,7 @@ public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets,Command
   }
   var definition=new ManagedBackupDefinition(Name,cloud is null&&proxmox is null?Lines(Sources):[],TargetUrl??"",
    string.IsNullOrEmpty(Passphrase)?previous?.Passphrase??"":Passphrase,storage,KeepVersions,
-   (previous?.Filters.Where(x=>x.Include)??[]).Concat(Lines(Excludes).Select(x=>new BackupFilter(false,x))).ToArray(),FirstRun is {} first?new(first.ToUniversalTime(),RepeatHours,Days):null,cloud,sourceMounts,proxmox);
+   (previous?.Filters.Where(x=>x.Include)??[]).Concat(Lines(Excludes).Select(x=>new BackupFilter(false,x))).ToArray(),FirstRun is {} first?new(Ui.FromLocal(first),RepeatHours,Days):null,cloud,sourceMounts,proxmox);
   // Remove all posted secret values before redisplaying any validation error.
   Passphrase=ClientSecret=RefreshToken=ServiceAccountJson=AuthPassword=AwsSecretKey=null;ModelState.Clear();
   if(!validBinding||!ConfigurationPolicy.Valid(definition))
@@ -165,8 +169,10 @@ public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets,Command
    if(previous is not null)foreach(var key in previous.BackendOptions.Keys)if(DestinationCatalog.Find(DestinationKey)?.Option(key) is {Secret:true} o)StoredSecrets.Add(o.Name);
    return Page();
   }
+  if(MaxBackupAgeHours is <1 or >8760){Error="Das zulässige Backup-Alter muss zwischen 1 und 8760 Stunden liegen (leer = aus dem Zeitplan).";return Page();}
   var result=ManagedJobId is {} id?await ConfigurationApi.Update(id,new(Revision,definition),db,secrets,HttpContext):await ConfigurationApi.Create(DeviceId,new(0,definition),db,secrets,HttpContext);
   if(result is IStatusCodeHttpResult {StatusCode:>=400}){Error="Die Konfiguration wurde abgelehnt. Bei einer geänderten Quelle, einem neuen Ziel oder Passwort bitte einen neuen Backup-Job anlegen.";return Page();}
+  if(result is IValueHttpResult {Value:ManagedJob saved}){var job=await db.ManagedJobs.SingleAsync(x=>x.Id==saved.Id);job.MaxBackupAgeHours=MaxBackupAgeHours;await db.SaveChangesAsync();}
   return RedirectToPage("/Device",new{id=DeviceId});
  }
  // Folder browser: asks the agent for the sub-folders of a path (null = drives / root).
@@ -193,7 +199,10 @@ public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets,Command
   if(previous is null&&DestinationMode=="template")
   {
    var template=await DestinationTemplates.For(db.DestinationTemplates,device.TenantId).SingleOrDefaultAsync(x=>x.Id==TemplateId);if(template is null)return new JsonResult(new{error="Speicherziel nicht gefunden."});
-   url=template.TargetUrl;options=DestinationTemplates.Options(secrets,template);
+   // Test where the job will actually write: the customer/device folder below the template (the job gets its
+   // own sub-folder there). Testing only the template's base folder would not show missing rights below it.
+   var customer=await db.Customers.Where(x=>x.TenantId==device.TenantId).Select(x=>x.Number).SingleOrDefaultAsync()??"kunde";
+   url=DestinationForm.Below(template.TargetUrl,customer,device.Name);options=DestinationTemplates.Options(secrets,template);
   }
   else
   {

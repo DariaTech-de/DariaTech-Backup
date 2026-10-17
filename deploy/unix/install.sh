@@ -80,9 +80,13 @@ if ! "$prefix/DariaTech.Agent" --service-health "$config"; then
   "  Protokoll: $(if [[ "$expected" == osx-* ]]; then printf '%s' "sudo tail -n 50 '/Library/Application Support/DariaTechBackup/state/agent-service.log'"; else printf '%s' "sudo journalctl -u $service.service -n 50"; fi)" >&2
  exit 2
 fi
-printf '\n%s\n%s\n' \
+# A stable removal command outside the program folder (which the removal deletes).
+install -d -m 755 -o 0 -g 0 /usr/local/sbin
+install -m 755 -o 0 -g 0 "$package_dir/uninstall.sh" /usr/local/sbin/dariatech-agent-uninstall
+printf '\n%s\n%s\n%s\n' \
  '✔ Installation erfolgreich: Der DariaTech Backup Agent läuft als Hintergrunddienst und ist mit der Console verbunden.' \
- '  Das Gerät erscheint jetzt in der DariaTech Console beim Kunden. Ein Programmfenster gibt es nicht – alles wird über die Console gesteuert.'
+ '  Das Gerät erscheint jetzt in der DariaTech Console beim Kunden. Ein Programmfenster gibt es nicht – alles wird über die Console gesteuert.' \
+ '  Entfernen: zuerst in der Console „Gerät stilllegen“, dann sudo /usr/local/sbin/dariatech-agent-uninstall (Anleitung auf der Geräteseite).'
 if [[ "$expected" == osx-* ]]; then
  # macOS protects Documents, Desktop, Downloads etc. even from root; only the user can grant Full Disk Access.
  printf '\n%s\n%s\n%s\n%s\n%s\n' \

@@ -16,7 +16,9 @@ public static class ConfigurationApi
   app.MapGet("/api/v1/agent/configurations",async(ManagementDb db,TenantScope scope,ISecretStore secrets,HttpContext ctx)=>
   {
    var agent=await DeviceAuthentication.Authenticate(ctx,db,scope);if(agent is null)return Results.Unauthorized();
-   var jobs=await db.ManagedJobs.Where(x=>x.DeviceId==agent.DeviceId&&x.AppliedRevision<x.LatestRevision).OrderBy(x=>x.Id).Take(20).ToListAsync();
+   // A taken-over job is delivered only once the previous device is known to have stopped backing up.
+   var stopped=db.Devices.Where(x=>x.RetireConfirmed!=null||x.RetireManuallyConfirmed!=null).Select(x=>(Guid?)x.Id);
+   var jobs=await db.ManagedJobs.Where(x=>x.DeviceId==agent.DeviceId&&x.AppliedRevision<x.LatestRevision&&(x.HandoverFromDeviceId==null||stopped.Contains(x.HandoverFromDeviceId))).OrderBy(x=>x.Id).Take(20).ToListAsync();
    var assignments=new List<ConfigurationAssignment>();
    foreach(var j in jobs){var r=await db.ConfigurationRevisions.SingleAsync(x=>x.ManagedJobId==j.Id&&x.Revision==j.LatestRevision);assignments.Add(new(j.Id,j.LatestRevision,Read(secrets,r)));}
    return Results.Ok(assignments);
@@ -112,18 +114,55 @@ public static class ConfigurationApi
    // Cloud and Proxmox jobs depend on the host they were provisioned on; they are set up again on the new device.
    if(definition.Saas is not null||definition.Proxmox is not null)continue;
    var adopted=definition with{Adopted=true};if(!ConfigurationPolicy.Valid(adopted))continue;
-   job.DeviceId=target.Id;job.LatestRevision++;job.AppliedRevision=0;job.LastReportedRevision=0;job.LocalJobId=null;job.Status="Pending";
+   job.DeviceId=target.Id;job.LatestRevision++;job.AppliedRevision=0;job.LastReportedRevision=0;job.LocalJobId=null;job.Status="Pending";job.HandoverFromDeviceId=old.Id;
    AddRevision(db,secrets,job,adopted);ManagementApi.Audit(db,ctx,job.TenantId,"backup.taken-over",job.Id);moved++;
   }
   if(moved==0)return (0,"Auf dem alten Gerät gibt es keine Datei-Backups, die übernommen werden können.");
-  old.Active=false;foreach(var agent in await db.Agents.Where(x=>x.DeviceId==old.Id).ToListAsync())agent.Revoked=true;
+  // The old agent is not revoked here: it must still be able to learn that it was replaced, pause its own
+  // schedules and confirm that. Its credential is revoked when it confirms (AgentApi /retired).
+  old.Active=false;old.ReplacedByDeviceId=target.Id;RequestRetirement(old);
   ManagementApi.Audit(db,ctx,old.TenantId,"device.replaced",old.Id);
   await db.SaveChangesAsync();await tx.CommitAsync();return (moved,null);
  }
+ public static void RequestRetirement(Device device){device.RetireRequested??=DateTimeOffset.UtcNow;}
+ // For a device that will never be online again (wiped, broken, lost): an administrator states that it no
+ // longer backs up. This is recorded as a manual statement, not as a technical confirmation; if the device does
+ // come back online it is still told to stop.
+ // Agents from 0.4 understand the stop (410 Gone) and pause themselves; older agents keep running their local
+ // schedules when they come back, so for them only a confirmed local removal is an acceptable statement.
+ public static readonly Version FirstRetirementCapableAgent=new(0,4,0);
+ public static bool RetirementCapable(string? agentVersion)=>Version.TryParse(agentVersion,out var v)&&v>=FirstRetirementCapableAgent;
+ public static async Task<string?> ConfirmRetirementManually(Guid deviceId,ManagementDb db,HttpContext ctx,bool agentRemoved=false)
+ {
+  if(!ctx.User.IsInRole("SuperAdmin")&&!ctx.User.IsInRole("Administrator"))return "Keine Berechtigung.";
+  var device=await db.Devices.SingleOrDefaultAsync(x=>x.Id==deviceId);
+  if(device is null||device.RetireRequested is null)return "Für dieses Gerät wurde kein Stopp angefordert.";
+  if(device.RetireConfirmed is not null||device.RetireManuallyConfirmed is not null)return null;
+  var version=await db.Agents.Where(x=>x.DeviceId==deviceId).Select(x=>x.Version).FirstOrDefaultAsync();
+  if(!agentRemoved&&!RetirementCapable(version))return $"Der Agent des alten Geräts (Version {(string.IsNullOrEmpty(version)?"unbekannt":version)}) kann sich nicht selbst stoppen und würde nach dem Einschalten weiter sichern. Bitte bestätigen, dass der Agent dort deinstalliert oder das Gerät neu aufgesetzt bzw. entsorgt wurde.";
+  if(agentRemoved)ManagementApi.Audit(db,ctx,device.TenantId,"device.agent-removal-confirmed",device.Id);
+  device.RetireManuallyConfirmed=DateTimeOffset.UtcNow;device.RetireManuallyConfirmedBy=ctx.User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value??"";device.Active=false;
+  ManagementApi.Audit(db,ctx,device.TenantId,"device.retire-manually-confirmed",device.Id);await db.SaveChangesAsync();return null;
+ }
+ // Decommission without replacement: the device keeps its backups at the destination (restorable from another
+ // device), but stops its own schedules on its next contact.
+ public static async Task<string?> Decommission(Guid deviceId,ManagementDb db,HttpContext ctx)
+ {
+  if(!ctx.User.IsInRole("SuperAdmin")&&!ctx.User.IsInRole("Administrator"))return "Keine Berechtigung.";
+  var device=await db.Devices.SingleOrDefaultAsync(x=>x.Id==deviceId);if(device is null)return "Gerät nicht gefunden.";
+  if(device.RetireRequested is not null)return null;
+  RequestRetirement(device);ManagementApi.Audit(db,ctx,device.TenantId,"device.retire-requested",device.Id);await db.SaveChangesAsync();return null;
+ }
  private static void AddRevision(ManagementDb db,ISecretStore secrets,ManagedJob job,ManagedBackupDefinition definition)
  {
+  RecordSchedule(job,definition);
   var r=new ConfigurationRevision{TenantId=job.TenantId,ManagedJobId=job.Id,Revision=job.LatestRevision};
   r.EncryptedConfiguration=secrets.Protect(r.TenantId,$"configuration:{r.ManagedJobId}:{r.Revision}",JsonSerializer.Serialize(definition));db.ConfigurationRevisions.Add(r);
+ }
+ public static void RecordSchedule(ManagedJob job,ManagedBackupDefinition definition)
+ {
+  job.ScheduleRecorded=true;job.ScheduleRepeatHours=definition.Schedule?.RepeatHours;job.KeepVersions=definition.KeepVersions;job.ScheduleStart=definition.Schedule?.Start;
+  job.ScheduleDays=definition.Schedule?.Days.Aggregate(0,(mask,day)=>mask|1<<(int)day)??0;
  }
  public static ManagedBackupDefinition Read(ISecretStore secrets,ConfigurationRevision r)=>JsonSerializer.Deserialize<ManagedBackupDefinition>(secrets.Unprotect(r.TenantId,$"configuration:{r.ManagedJobId}:{r.Revision}",r.EncryptedConfiguration))!;
 }

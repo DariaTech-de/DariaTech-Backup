@@ -21,7 +21,7 @@ public static class AgentApi
    var e=await db.EnrollmentTokens.IgnoreQueryFilters().SingleAsync(x=>x.TokenHash==hash);scope.AgentTenant=e.TenantId;
    if(!await db.Customers.AnyAsync(x=>x.TenantId==scope.AgentTenant&&x.Active))return Results.Unauthorized();
    var d=new Device{TenantId=e.TenantId,SiteId=e.SiteId,Name=r.Hostname,Hostname=r.Hostname,OperatingSystem=r.OperatingSystem};var credential=Tokens.Create();
-   db.Devices.Add(d);db.Agents.Add(new Agent{TenantId=e.TenantId,DeviceId=d.Id,Version=r.AgentVersion,Platform=r.Platform??"",CredentialHash=Tokens.Hash(credential)});
+   e.DeviceId=d.Id;db.Devices.Add(d);db.Agents.Add(new Agent{TenantId=e.TenantId,DeviceId=d.Id,Version=r.AgentVersion,Platform=r.Platform??"",CredentialHash=Tokens.Hash(credential)});
    db.Audit.Add(new AuditEvent{TenantId=e.TenantId,Actor="enrollment",Action="device.registered",Resource=d.Id.ToString()});
    await db.SaveChangesAsync();await tx.CommitAsync();ctx.Response.Headers.CacheControl="no-store";return Results.Ok(new EnrollmentResponse(d.Id,credential));
   }).RequireRateLimiting("Enrollment");
@@ -33,11 +33,13 @@ public static class AgentApi
    // The only cross-scope read: credential and device ID must BOTH match before assigning scope.
    var a=await db.Agents.IgnoreQueryFilters().SingleOrDefaultAsync(x=>x.DeviceId==id&&x.CredentialHash==hash&&!x.Revoked);
    if(a is null)return Results.Unauthorized();scope.AgentTenant=a.TenantId;
+   // A replaced or decommissioned device is told to pause its own schedules (also when the customer is archived).
+   if(await db.Devices.AnyAsync(x=>x.Id==id&&x.RetireRequested!=null))return Results.StatusCode(StatusCodes.Status410Gone);
    if(!await db.Customers.AnyAsync(x=>x.TenantId==scope.AgentTenant&&x.Active))return Results.Unauthorized();
    // A single implausible run or progress value must not keep the whole device offline: only the
    // envelope is fatal, invalid job details are dropped and the heartbeat is still recorded.
    if(Sanitize(r) is not {} clean||r.Platform is not null&&a.Platform!=""&&r.Platform!=a.Platform)return Results.BadRequest();
-   r=clean;
+   var complete=CompleteInventory(r,clean);r=clean;
    await using var tx=await db.Database.BeginTransactionAsync();
    await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({BitConverter.ToInt64(id.ToByteArray())})");
    var d=await db.Devices.SingleOrDefaultAsync(x=>x.Id==id&&x.Active);if(d is null)return Results.Unauthorized();
@@ -46,7 +48,13 @@ public static class AgentApi
    if(r.EngineReachable)
    {
     var jobs=await db.Jobs.Where(x=>x.DeviceId==id).ToListAsync();
-    foreach(var job in jobs)job.Active=false;
+    // Only a complete job list proves that a job no longer exists on the device. When jobs had to be dropped
+    // from the report, known jobs stay monitored and the device is marked as reporting an incomplete inventory.
+    var reportedIds=r.Jobs.Select(x=>x.LocalId).ToHashSet(StringComparer.Ordinal);
+    if(complete)
+     foreach(var job in jobs.Where(x=>x.Active&&!reportedIds.Contains(x.LocalId)))
+     {job.Active=false;db.Audit.Add(new AuditEvent{TenantId=d.TenantId,Actor=id.ToString(),Action="job.removed-from-device",Resource=job.Id.ToString()});}
+    if(complete)d.InventoryIncompleteSince=null;else d.InventoryIncompleteSince??=DateTimeOffset.UtcNow;
     foreach(var report in r.Jobs)
     {
      var job=jobs.SingleOrDefault(x=>x.LocalId==report.LocalId);
@@ -62,6 +70,22 @@ public static class AgentApi
    }
    await db.SaveChangesAsync();await tx.CommitAsync();return Results.NoContent();
   }).RequireRateLimiting("Agent");
+  // The agent confirms that its engine is paused indefinitely and nothing is running. Only then is the
+  // credential revoked and the takeover released to the new device.
+  app.MapPost("/api/v1/agent/retired",async(ManagementDb db,TenantScope scope,HttpContext ctx)=>
+  {
+   var auth=ctx.Request.Headers.Authorization.ToString();
+   if(!auth.StartsWith("Bearer ",StringComparison.Ordinal)||auth.Length!=71||!Guid.TryParse(ctx.Request.Headers["X-Device-Id"].ToString(),out var id))return Results.Unauthorized();
+   var hash=Tokens.Hash(auth[7..]);
+   var a=await db.Agents.IgnoreQueryFilters().SingleOrDefaultAsync(x=>x.DeviceId==id&&x.CredentialHash==hash&&!x.Revoked);
+   if(a is null)return Results.Unauthorized();scope.AgentTenant=a.TenantId;
+   await using var tx=await db.Database.BeginTransactionAsync();
+   await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({BitConverter.ToInt64(id.ToByteArray())})");
+   var d=await db.Devices.SingleOrDefaultAsync(x=>x.Id==id);if(d?.RetireRequested is null)return Results.Conflict();
+   d.RetireConfirmed=DateTimeOffset.UtcNow;d.Active=false;a.Revoked=true;
+   db.Audit.Add(new AuditEvent{TenantId=d.TenantId,Actor=id.ToString(),Action="device.retire-confirmed",Resource=id.ToString()});
+   await db.SaveChangesAsync();await tx.CommitAsync();return Results.NoContent();
+  }).RequireRateLimiting("Agent");
  }
  public static bool Valid(HeartbeatRequest r)
  {
@@ -71,6 +95,8 @@ public static class AgentApi
   if(r.ActiveOperation is {} progress&&!ValidProgress(r,progress))return false;
   return r.EngineReachable||r.Jobs.Length==0;
  }
+ // The sanitized report still lists every job of the original report (only run details may have been dropped).
+ public static bool CompleteInventory(HeartbeatRequest original,HeartbeatRequest clean)=>original.Jobs is not null&&original.Jobs.Length<=500&&clean.Jobs.Length==original.Jobs.Length;
  /// <summary>Returns the heartbeat with invalid job details removed, or null when the envelope itself is invalid.</summary>
  public static HeartbeatRequest? Sanitize(HeartbeatRequest r)
  {

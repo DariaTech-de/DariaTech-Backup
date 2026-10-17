@@ -116,6 +116,9 @@ public sealed class JobActionsModel(ManagementDb db,CommandSigning signer,ISecre
    _=>null,
   };
   if(input is null){Error=step=="restore"?"Bitte mindestens eine Datei oder einen Ordner auswählen.":"Bitte zuerst eine Version wählen.";Point=at;await LoadGuide();return Page();}
+  // A recovery copy restores another device's backup: its original paths belong to that device (possibly another
+  // operating system or user), so it only restores into a new folder on this device.
+  if(input.Restore is {OriginalLocation:true}&&Managed?.RestoreOnly==true){Error="Bei einer Wiederherstellung auf einem anderen Gerät nur in einen neuen Ordner wiederherstellen – die ursprünglichen Pfade gehören zum Quellgerät.";Point=at;await LoadGuide();return Page();}
   if(input.Restore is {OriginalLocation:false} r&&!CommandProtocol.SafeFolder(r.DestinationFolder)){Error="Der Ordnername darf nur Buchstaben, Ziffern, - und _ enthalten.";Point=at;await LoadGuide();return Page();}
   var result=await CommandApi.Request(input,db,signer,secrets,HttpContext);
   if(result is IStatusCodeHttpResult {StatusCode:>=400} rejected)
@@ -151,6 +154,18 @@ public sealed class JobActionsModel(ManagementDb db,CommandSigning signer,ISecre
   if(!await Load()||!await db.Commands.AnyAsync(x=>x.Id==commandId&&x.JobId==JobId))return NotFound();
   var result=await CommandApi.Approve(commandId,db,HttpContext);
   if(result is IStatusCodeHttpResult {StatusCode:>=400}){Error="Freigabe abgelehnt. Ein anderer Administrator muss den noch gültigen Restore bestätigen.";return Page();}
+  return RedirectToPage(new{id=JobId});
+ }
+ // After a completed restore an administrator or technician opens the restored files and confirms they are
+ // usable. This manual statement is what "Restore geprüft" in the setup overview means; the technical result
+ // alone ("Erfolgreich") does not prove that the files can be used.
+ public async Task<IActionResult> OnPostCheckRestoreAsync(Guid commandId,bool confirm)
+ {
+  if(!await Load())return NotFound(); // page policy: operators only
+  var command=await db.Commands.SingleOrDefaultAsync(x=>x.Id==commandId&&x.JobId==JobId&&x.Action==RemoteAction.Restore);if(command is null)return NotFound();
+  if(command.Status!="Completed"){Error="Nur eine technisch abgeschlossene Wiederherstellung kann als geprüft bestätigt werden.";return Page();}
+  if(!confirm){Error="Bitte bestätigen, dass die wiederhergestellten Dateien geöffnet wurden und nutzbar sind.";return Page();}
+  if(command.Checked is null){command.Checked=DateTimeOffset.UtcNow;command.CheckedBy=User.FindFirstValue(ClaimTypes.Name)??"";ManagementApi.Audit(db,HttpContext,command.TenantId,"restore.checked-usable",command.Id);await db.SaveChangesAsync();}
   return RedirectToPage(new{id=JobId});
  }
  private async Task<bool> Load()

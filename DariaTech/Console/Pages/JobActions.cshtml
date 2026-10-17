@@ -68,8 +68,10 @@
     <label class="choice-option"><input type="radio" name="target" value="folder" checked />
      <span><strong>In einen neuen Wiederherstellungsordner (empfohlen)</strong><span class="sub">Nichts Vorhandenes wird verändert. Ort auf dem Gerät: <span class="code">@Model.RestoreRootHint</span></span>
       <input class="folder-input" type="text" name="folder" value="@Model.DefaultFolder" maxlength="100" aria-label="Name des Wiederherstellungsordners" pattern="[A-Za-z0-9_-]+" /></span></label>
+    @if(Model.Managed?.RestoreOnly!=true){
     <label class="choice-option"><input type="radio" name="target" value="original" />
-     <span><strong>An den ursprünglichen Ort</strong><span class="sub">Fehlende Dateien werden zurückgeschrieben. Vorhandene Dateien werden nicht überschrieben – die wiederhergestellte Fassung wird mit Zeitstempel daneben abgelegt.</span></span></label>
+     <span><strong>An den ursprünglichen Ort</strong><span class="sub">Fehlende Dateien werden zurückgeschrieben. Vorhandene Dateien werden nicht überschrieben – die wiederhergestellte Fassung wird mit Zeitstempel daneben abgelegt. Für viele Dateien nach Fehlbedienung oder Schadsoftware zuerst in einen neuen Ordner wiederherstellen und prüfen.</span></span></label>}
+    else{<p class="sub">@Ui.Icon("info")Dieses Backup stammt von einem anderen Gerät. Es wird nur in einen neuen Ordner auf diesem Gerät wiederhergestellt; Pfade und Betriebssystem des Quellgeräts können abweichen. Eine Wiederherstellung des ganzen Systems (Betriebssystem, Programme) ist mit Datei-Backups nicht möglich.</p>}
    </div>
    <div class="form-actions"><button class="button" type="submit">@Ui.Icon("check")Wiederherstellung starten</button></div>
    <p class="sub">@(Model.FourEyes?"Ein zweiter Administrator muss die Wiederherstellung unten unter „Verlauf“ freigeben.":"Es gibt nur einen Administrator; die Wiederherstellung startet ohne zweite Freigabe und wird protokolliert.")</p>
@@ -92,6 +94,11 @@
    <td>@(command.RequestedBy==DariaTech.Console.Api.CommandApi.Scheduler?"Monatliche Prüfung (automatisch)":command.RequestedBy==Model.Actor?"Sie":"Kollege")</td>
    <td class="row-actions">
     @if(command.EncryptedCatalog is not null&&command.Action is not (DariaTech.Contracts.RemoteAction.ListRestorePoints or DariaTech.Contracts.RemoteAction.ListRestoreFiles)){<a class="button secondary" asp-route-id="@Model.JobId" asp-route-catalogId="@command.Id">Katalog</a>}
+    @if(command.Action==DariaTech.Contracts.RemoteAction.Restore&&command.Status=="Completed"){
+     if(command.Checked is {} checkedAt){<span class="sub">Dateien als nutzbar bestätigt @Ui.Ago(checkedAt) (manuell)</span>}
+     else{<form method="post" asp-page-handler="CheckRestore" class="form-grid"><input type="hidden" name="JobId" value="@Model.JobId" /><input type="hidden" name="commandId" value="@command.Id" />
+      <label class="check"><input type="checkbox" name="confirm" value="true" /> Wiederhergestellte Dateien geöffnet – sie sind vollständig und nutzbar.</label><button class="button secondary" type="submit">Restore-Test bestätigen</button></form>}
+    }
     @if(Model.Administrator&&command.Status=="AwaitingApproval"&&command.Expires>DateTimeOffset.UtcNow&&command.RequestedBy!=Model.Actor){
     <form method="post" asp-page-handler="Approve"><input type="hidden" name="JobId" value="@Model.JobId" /><input type="hidden" name="commandId" value="@command.Id" /><button class="button" type="submit">Wiederherstellung freigeben</button></form>}
    </td></tr>}</tbody>

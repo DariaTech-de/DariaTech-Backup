@@ -60,15 +60,18 @@ public static class ManagementApi
   }).RequireAuthorization("Operator");
   g.MapDelete("/devices/{id:guid}",async(Guid id,ManagementDb db,HttpContext ctx)=>
   {
-   var d=await db.Devices.SingleOrDefaultAsync(x=>x.Id==id);if(d is null)return Results.NotFound();d.Active=false;
-   var a=await db.Agents.SingleAsync(x=>x.DeviceId==id);a.Revoked=true;
-   Audit(db,ctx,d.TenantId,"device.revoked",d.Id);await db.SaveChangesAsync();return Results.NoContent();
+   // Decommission: the device leaves monitoring and is told to stop its own schedules on its next contact.
+   // Its agent credential is revoked once it confirms the stop (revoking first would leave it backing up).
+   var d=await db.Devices.SingleOrDefaultAsync(x=>x.Id==id);if(d is null)return Results.NotFound();d.Active=false;ConfigurationApi.RequestRetirement(d);
+   Audit(db,ctx,d.TenantId,"device.retire-requested",d.Id);await db.SaveChangesAsync();return Results.NoContent();
   }).RequireAuthorization("Admin");
   g.MapDelete("/customers/{id:guid}",async(Guid id,ManagementDb db,HttpContext ctx)=>
   {
    var customer=await db.Customers.SingleOrDefaultAsync(x=>x.Id==id);if(customer is null)return Results.NotFound();
+   // Archiving ends management access and monitoring. It does not stop the devices' local schedules and does
+   // not touch storage or archives: those are separate contract-end steps. Agent credentials stay unrevoked so
+   // a later "stop local backups" can still reach the devices (archived customers' agents get no other access).
    customer.Active=false;foreach(var d in await db.Devices.Where(x=>x.TenantId==customer.TenantId).ToListAsync())d.Active=false;
-   foreach(var agent in await db.Agents.Where(x=>x.TenantId==customer.TenantId).ToListAsync())agent.Revoked=true;
    foreach(var u in await db.Users.Where(x=>x.TenantId==customer.TenantId).ToListAsync()){u.Active=false;u.SessionVersion=Guid.NewGuid();}
    Audit(db,ctx,customer.TenantId,"customer.archived",customer.Id);await db.SaveChangesAsync();return Results.NoContent();
   }).RequireAuthorization("Admin");

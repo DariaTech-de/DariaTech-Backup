@@ -1,0 +1,43 @@
+@page
+@model SharedSettingsModel
+@using DariaTech.Console.Services
+@{ ViewData["Title"] = "Gemeinsame Einstellungen"; var c = Model.Customer; }
+<nav class="breadcrumb" aria-label="Brotkrümel"><a href="/Customers">Kunden</a><span aria-hidden="true">/</span><a href="/Customer?id=@c.Id">@c.Name</a><span aria-hidden="true">/</span><span aria-current="page">Gemeinsame Einstellungen</span></nav>
+<div class="page-heading"><div><span class="eyebrow">Backups konfigurieren</span><h1>Gemeinsame Einstellungen</h1>
+ <p class="lead">Zeitplan, Aufbewahrung, zulässiges Backup-Alter oder Speicher-Zugangsdaten für mehrere Backups auf einmal setzen. Nur die angehakten Einstellungen ändern sich; Quellen, Ausschlüsse, Speicherziel und Passphrase jedes Backups bleiben unverändert.</p></div></div>
+@if(Model.Error is not null){<p class="form-error" role="alert">@Model.Error</p>}
+@if(Model.Results.Count>0){<section class="card"><h2>Ergebnis</h2><ul class="steps-list">@foreach(var r in Model.Results){<li>@r</li>}</ul><p class="sub">Gespeichert heißt noch nicht angewendet: den Stand pro Gerät zeigt die Geräteseite („Auf dem Gerät angewendet“).</p></section>}
+<form method="post">
+ <input type="hidden" name="id" value="@c.Id" />
+ <section class="card card-flush"><div class="card-head padded"><h2>1. Backups auswählen</h2></div>
+  @if(Model.Rows.Count==0){<p class="card-empty padded">@Ui.Icon("info")Keine zentral verwalteten Datei-Backups.</p>}
+  else{<div class="table-wrap"><table class="table"><thead><tr><th scope="col"><span class="sr-only">Auswahl</span></th><th scope="col">Gerät</th><th scope="col">Backup</th><th scope="col">Aktuell</th></tr></thead><tbody>
+  @foreach(var r in Model.Rows){<tr><td><input type="checkbox" name="JobIds" value="@r.Job.Id" checked="@(Model.JobIds.Contains(r.Job.Id)?"checked":null)" aria-label="@r.Device – @r.Job.Name" /></td><td>@r.Device</td><td>@r.Job.Name</td><td class="sub">@(r.Definition.Schedule is null?"Manuell":BackupAge.Describe(r.Job)) · @Ui.Retention(r.Definition.KeepVersions,r.Definition.Schedule?.RepeatHours,r.Job.ScheduleDays)</td></tr>}
+  </tbody></table></div>}
+ </section>
+ <section class="card"><h2>2. Was soll sich ändern?</h2>
+  <label class="check"><input type="checkbox" asp-for="ChangeSchedule" /> Zeitplan</label>
+  <div class="form-grid">
+   <div class="field"><label asp-for="FirstRun"><span>Erster Lauf (deutsche Zeit)</span><span class="label-hint">leer = kein Zeitplan, nur manuell</span></label><input asp-for="FirstRun" type="datetime-local" asp-format="{0:yyyy-MM-ddTHH:mm}" /></div>
+   <div class="field"><label asp-for="RepeatHours">Wiederholung (Stunden)</label><input asp-for="RepeatHours" type="number" min="1" max="8760" /></div>
+   <div class="field"><label asp-for="Days">Wochentage</label><select asp-for="Days" multiple size="7">@foreach(var day in Enum.GetValues<DayOfWeek>()){<option value="@day">@System.Globalization.CultureInfo.GetCultureInfo("de-DE").DateTimeFormat.GetDayName(day)</option>}</select></div>
+   <div class="field"><label asp-for="StaggerMinutes"><span>Startzeiten staffeln (Minuten je Backup)</span><span class="label-hint">verteilt große Erstsicherungen und Netzlast</span></label><input asp-for="StaggerMinutes" type="number" min="0" max="720" /></div>
+  </div>
+  <label class="check"><input type="checkbox" asp-for="ChangeRetention" /> Aufbewahrung</label>
+  <div class="form-grid"><div class="field"><label asp-for="KeepVersions">Aufzubewahrende Versionen (nicht Tage)</label><input asp-for="KeepVersions" type="number" min="1" max="10000" /></div></div>
+  <label class="check"><input type="checkbox" asp-for="ChangeMaxAge" /> Zulässiges Backup-Alter</label>
+  <div class="form-grid"><div class="field"><label asp-for="MaxBackupAgeHours"><span>Stunden</span><span class="label-hint">leer = aus dem Zeitplan</span></label><input asp-for="MaxBackupAgeHours" type="number" min="1" max="8760" /></div></div>
+  <label class="check"><input type="checkbox" asp-for="ChangeCredentials" /> Speicher-Zugangsdaten aus Vorlage übernehmen</label>
+  <div class="form-grid"><div class="field"><label asp-for="TemplateId">Vorlage</label><select asp-for="TemplateId"><option value="">–</option>@foreach(var t in Model.Templates){<option value="@t.Id">@t.Name · @DestinationForm.Describe(t.TargetUrl)</option>}</select></div></div>
+  <p class="hint">@Ui.Icon("info")Für rotierte Zugangsdaten: Änderungen an einer Vorlage gelten sonst nur für neue Jobs. Übernommen wird nur in ausgewählte Backups dieses Kunden, die unterhalb der Vorlage speichern; Zielordner und Passphrase bleiben gleich. Erst ändern, wenn die neuen Zugangsdaten am Speicher gültig sind, und danach den Verbindungstest auf einem Gerät ausführen. Ein Wechsel des Speicheranbieters ist kein Zugangsdatenwechsel, sondern ein neuer Backup-Job (siehe Dokumentation „Speicher wechseln“).</p>
+  <div class="form-actions"><button type="submit" asp-page-handler="Preview" class="button secondary">Vorschau</button></div>
+ </section>
+ @if(Model.Preview.Count>0){
+ <section class="card card-flush highlight"><div class="card-head padded"><div><h2>3. Vorschau – diese Backups ändern sich</h2><span class="sub">@Model.Preview.Count Backup@(Model.Preview.Count==1?"":"s") auf @Model.Preview.Select(x=>x.Row.Device).Distinct().Count() Gerät(en).</span></div></div>
+  <div class="table-wrap"><table class="table"><thead><tr><th scope="col">Gerät · Backup</th><th scope="col">Vorher</th><th scope="col">Nachher</th></tr></thead><tbody>
+  @foreach(var p in Model.Preview){<tr><td>@p.Row.Device · @p.Row.Job.Name</td><td class="sub">@p.Before</td><td><strong>@p.After</strong></td></tr>}
+  </tbody></table></div>
+  <div class="padded"><label class="check"><input type="checkbox" asp-for="Confirm" /> Für genau diese Backups übernehmen. Quellen, Ausschlüsse, Ziel und Passphrase bleiben unverändert.</label>
+  <div class="form-actions"><button type="submit" asp-page-handler="Apply" class="button">Speichern</button></div></div>
+ </section>}
+</form>
