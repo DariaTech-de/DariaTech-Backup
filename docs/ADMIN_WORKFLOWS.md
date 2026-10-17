@@ -167,6 +167,16 @@ Guided restore (job → "Aktionen / Restore"): load versions → choose version 
   credentials where that matters. Before the new device resumes, check its sources and schedule on its device page.
   (impl., auto; open: real old device coming back online, agents ≤ 0.3.1 do not understand the stop.)
 - **Decommission** ("Gerät stilllegen"): the same stop without a replacement; backups stay restorable.
+- **Removing the agent from a device** (device page "Agent vom Gerät entfernen", overview `/AgentRemoval` for
+  Windows, Linux and macOS): first decommission or replace in the Console, then remove locally with the commands
+  shown for the device's platform — they use fixed paths and work for every agent version. Removal keeps the local
+  identity and job databases for a reinstallation of the same PC; the second command deletes them (clean removal),
+  the third one also the restored files. Agents from 0.4 install `/usr/local/sbin/dariatech-agent-uninstall`
+  (`--purge`, `--purge-restores`) on Linux and macOS; on Windows the uninstaller in "Apps" is used. A device that
+  could not confirm its stop (offline, agent ≤ 0.3.1) is confirmed manually after removal; if it does come back
+  with an agent, it is still stopped. Backups at the storage are never touched
+  (impl., auto for the Console; the scripts are covered by the native Linux/macOS smoke test in CI; open: Windows
+  data deletion on a real PC).
 - Changing sources, schedule or retention: new revision of the same chain. Changing destination or passphrase
   of a job is refused: that is a new chain (new job).
 - **Rotate storage credentials**: per job in the job form, or for several jobs of a customer from a template in

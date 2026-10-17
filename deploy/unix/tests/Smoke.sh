@@ -83,4 +83,18 @@ bash "$repo/artifacts/unix/$rid/payload/uninstall.sh"
 test -s "$state/identity.bin"
 test -s "$state/agent.key"
 test -s "$config"
-printf '%s\n' 'PASS: native service, HTTPS enrollment, heartbeat, restart, identity-preserving upgrade and retained uninstall state'
+test ! -e "$prefix"
+test ! -e /usr/local/sbin/dariatech-agent-uninstall
+# Reinstalling after a plain removal reuses the retained identity; the installed removal command then purges.
+printf '%s\n' 'CI: reinstalling after removal and purging with the installed removal command'
+bash "$repo/artifacts/unix/$rid/payload/install.sh"
+test "$(openssl dgst -sha256 "$state/identity.bin")" = "$identity_hash"
+test -x /usr/local/sbin/dariatech-agent-uninstall
+if [ "$(uname -s)" = Linux ]; then restores=/var/lib/dariatech-backup-restores; else restores='/Library/Application Support/DariaTechBackup/Restores'; fi
+mkdir -p "$restores";printf '%s' restored > "$restores/ci-restored-file.txt"
+/usr/local/sbin/dariatech-agent-uninstall --purge
+test ! -e "$prefix";test ! -e "$state";test ! -e "$(dirname "$config")";test ! -e /usr/local/sbin/dariatech-agent-uninstall
+test -s "$restores/ci-restored-file.txt"
+if [ "$(uname -s)" = Linux ]; then if systemctl is-active --quiet DariaTechBackupAgent.service; then echo "service still active" >&2; exit 1; fi;test ! -e /etc/systemd/system/DariaTechBackupAgent.service;else test ! -e /Library/LaunchDaemons/de.dariatech.dariatechbackupagent.plist;fi
+rm -rf "$restores"
+printf '%s\n' 'PASS: native service, HTTPS enrollment, heartbeat, restart, identity-preserving upgrade, retained uninstall state and purging removal'

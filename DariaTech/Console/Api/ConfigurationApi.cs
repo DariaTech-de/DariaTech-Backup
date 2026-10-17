@@ -134,7 +134,7 @@ public static class ConfigurationApi
   var device=await db.Devices.SingleOrDefaultAsync(x=>x.Id==deviceId);
   if(device is null||device.RetireRequested is null)return "Für dieses Gerät wurde kein Stopp angefordert.";
   if(device.RetireConfirmed is not null||device.RetireManuallyConfirmed is not null)return null;
-  device.RetireManuallyConfirmed=DateTimeOffset.UtcNow;device.RetireManuallyConfirmedBy=ctx.User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value??"";
+  device.RetireManuallyConfirmed=DateTimeOffset.UtcNow;device.RetireManuallyConfirmedBy=ctx.User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value??"";device.Active=false;
   ManagementApi.Audit(db,ctx,device.TenantId,"device.retire-manually-confirmed",device.Id);await db.SaveChangesAsync();return null;
  }
  // Decommission without replacement: the device keeps its backups at the destination (restorable from another

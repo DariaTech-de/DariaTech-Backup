@@ -219,6 +219,37 @@ public sealed class PostgresTests
   Assert.That(Latest(ids[1]).BackendOptions["auth-password"],Is.EqualTo("old-password-1"),"a job outside the template is not touched");
   db.DestinationTemplates.Remove(await db.DestinationTemplates.SingleAsync(x=>x.Id==template.Id));await db.SaveChangesAsync();
  }
+ [Test]public async Task AgentRemovalIsGuidedPerPlatformAndAnUnconfirmedStopCanBeConfirmedManually()
+ {
+  var(t,site)=await Customer();await using var db=Db();var customer=await db.Customers.IgnoreQueryFilters().SingleAsync(x=>x.TenantId==t.Id);
+  var mac=factory.CreateClient(new(){BaseAddress=new Uri("https://localhost")});
+  using(var e=await mac.PostAsJsonAsync("/api/v1/agent/enroll",new EnrollmentRequest(await Token(t,site),"Mac-Empfang","Darwin 25.0.0","0.3.1","osx-arm64")))
+  {var identity=(await e.Content.ReadFromJsonAsync<EnrollmentResponse>())!;mac.DefaultRequestHeaders.Authorization=new("Bearer",identity.Credential);mac.DefaultRequestHeaders.Add("X-Device-Id",identity.DeviceId.ToString());}
+  var id=Guid.Parse(mac.DefaultRequestHeaders.GetValues("X-Device-Id").Single());
+  using var admin=await Login(UserRole.Administrator);using var technician=await Login(UserRole.Technician);using var portal=await Login(UserRole.CustomerAdmin,t.Id);
+  string Form(string html){var m=Regex.Match(html,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");Assert.That(m.Success,Is.True);return WebUtility.HtmlDecode(m.Groups[1].Value);}
+  var page=WebUtility.HtmlDecode(await admin.GetStringAsync($"/Device?id={id}"));
+  Assert.That(page,Does.Contain("Agent vom Gerät entfernen").And.Contain("launchctl bootout system/de.dariatech.dariatechbackupagent").And.Contain("Festplattenvollzugriff").And.Not.Contain("unins000.exe"));
+  var all=WebUtility.HtmlDecode(await technician.GetStringAsync("/AgentRemoval"));
+  Assert.That(all,Does.Contain("unins000.exe").And.Contain("systemctl disable --now DariaTechBackupAgent.service").And.Contain("launchctl bootout").And.Contain("zuerst in der Console stilllegen"));
+  using(var denied=await portal.GetAsync("/AgentRemoval"))Assert.That(denied.StatusCode,Is.EqualTo(HttpStatusCode.Forbidden));
+  async Task<HttpResponseMessage> Post(string handler,bool confirm)
+  {
+   var fields=new Dictionary<string,string>{{"__RequestVerificationToken",Form(await admin.GetStringAsync($"/Device?id={id}"))}};if(confirm)fields["confirm"]="true";
+   return await admin.PostAsync($"/Device?id={id}&handler={handler}",new FormUrlEncodedContent(fields));
+  }
+  using(await Post("Decommission",true)){}
+  // The Mac is already switched off, so it cannot confirm its stop; the administrator confirms the removal.
+  page=WebUtility.HtmlDecode(await admin.GetStringAsync($"/Device?id={id}"));Assert.That(page,Does.Contain("angefordert, vom Gerät noch nicht bestätigt").And.Contain("Entfernung bestätigen"));
+  using(var confirmed=await Post("ConfirmRemoved",true))
+  {
+   Assert.That(confirmed.StatusCode,Is.EqualTo(HttpStatusCode.Redirect));Assert.That(confirmed.Headers.Location!.ToString(),Does.Contain($"/Customer?id={customer.Id}"));
+  }
+  var device=await db.Devices.AsNoTracking().SingleAsync(x=>x.Id==id);Assert.That(device.Active,Is.False);Assert.That(device.RetireManuallyConfirmed,Is.Not.Null);Assert.That(device.RetireConfirmed,Is.Null,"manual, not technical");
+  Assert.That(await db.Audit.AnyAsync(x=>x.Action=="device.retire-manually-confirmed"&&x.Resource==id.ToString()),Is.True);
+  using(var back=await mac.PostAsJsonAsync("/api/v1/agent/heartbeat",new HeartbeatRequest("0.3.1","Darwin 25.0.0",true,[])))Assert.That(back.StatusCode,Is.EqualTo(HttpStatusCode.Gone),"if the agent was not really removed it is still stopped");
+  mac.Dispose();
+ }
  private async Task<HttpClient> Login(UserRole role,Guid? tenant=null,bool includeMfa=true,TestFactory? isolatedFactory=null)
  {
   var host=isolatedFactory??factory;using var scope=host.Services.CreateScope();var secrets=scope.ServiceProvider.GetRequiredService<ISecretStore>();await using var db=Db();

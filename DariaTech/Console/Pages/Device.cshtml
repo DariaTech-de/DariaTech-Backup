@@ -170,6 +170,22 @@
  </form>}
 </section>
 }
+@if(User.IsInRole("SuperAdmin")||User.IsInRole("Administrator")||User.IsInRole("Technician")){var family=AgentRemoval.Family(Model.Platform);
+<section class="card" id="remove-agent">
+ <div class="card-head"><div><h2>Agent vom Gerät entfernen</h2><span class="sub">Reihenfolge: zuerst stilllegen, dann lokal entfernen. Backups im Speicherziel bleiben erhalten.</span></div><a class="button secondary small" href="/AgentRemoval">Anleitung für alle Systeme</a></div>
+ <ol class="steps-list">
+  <li><strong>Stilllegen:</strong> @(d.RetireConfirmed is not null?"Stopp vom Gerät bestätigt – das Gerät sichert nicht mehr.":d.RetireManuallyConfirmed is not null?"Stopp manuell bestätigt (nicht technisch).":d.RetireRequested is not null?"angefordert, vom Gerät noch nicht bestätigt – das Gerät muss dazu einmal online sein.":"noch nicht – unten „Gerät stilllegen“ verwenden (oder am Nachfolger „Gerät ersetzen“).")</li>
+  <li><strong>Lokal entfernen</strong> mit den Befehlen unten@(family==""?" (Betriebssystem unbekannt – siehe Anleitung für alle Systeme)":"").</li>
+  <li><strong>Bestätigen</strong>, falls das Gerät den Stopp nicht selbst bestätigen konnte (offline, Agent bis 0.3.1).</li>
+ </ol>
+ @if(family!=""){<partial name="_AgentRemoval" model="AgentRemoval.For(family)" />}
+ @if(d.RetirementPending&&(User.IsInRole("SuperAdmin")||User.IsInRole("Administrator"))){
+ <form method="post" asp-page-handler="ConfirmRemoved" asp-route-id="@d.Id" class="form-grid">
+  <label class="check"><input type="checkbox" name="confirm" value="true" /> Der Agent wurde auf „@d.Name“ entfernt bzw. das Gerät ist gelöscht. (Manuelle Bestätigung; kommt das Gerät mit Agent doch wieder online, wird es trotzdem gestoppt.)</label>
+  <div><button type="submit" class="button secondary">Entfernung bestätigen</button></div>
+ </form>}
+</section>
+}
 @if((User.IsInRole("SuperAdmin")||User.IsInRole("Administrator"))&&d.RetireRequested is null){
 <section class="card" id="decommission">
  <div class="card-head"><div><h2>Gerät stilllegen</h2><span class="sub">Für ein Gerät, das nicht mehr gesichert werden soll und nicht ersetzt wird. Ersetzt ein neues Gerät dieses, stattdessen am neuen Gerät „Gerät ersetzen“ verwenden.</span></div></div>

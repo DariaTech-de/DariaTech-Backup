@@ -1,0 +1,13 @@
+@model DariaTech.Console.Services.AgentRemoval.Guide
+@using DariaTech.Console.Services
+<div class="removal">
+ <h3>@Model.Title <span class="sub">· @Model.Shell</span></h3>
+ @if(!string.IsNullOrEmpty(Model.Gui)){<p class="sub">Per Maus: @Model.Gui Oder per Befehl:</p>}
+ <p><strong>1. Agent entfernen</strong> – Dienst, Programm und Backup-Engine.</p>
+ <div class="command"><pre><code data-copy-source>@Model.Remove</code></pre><button type="button" class="button secondary small" data-copy>Befehl kopieren</button></div>
+ <p><strong>2. Lokale Daten löschen</strong> (optional, für eine saubere Entfernung) – danach kann dieser PC nicht mehr als dasselbe Gerät neu installiert werden; eine Neuinstallation erscheint als neues Gerät.</p>
+ <div class="command"><pre><code data-copy-source>@Model.Purge</code></pre><button type="button" class="button secondary small" data-copy>Befehl kopieren</button></div>
+ <p><strong>3. Wiederhergestellte Dateien löschen</strong> (nur wenn sie nicht mehr gebraucht werden).</p>
+ <div class="command"><pre><code data-copy-source>@Model.PurgeRestores</code></pre><button type="button" class="button secondary small" data-copy>Befehl kopieren</button></div>
+ <ul class="steps-list">@foreach(var note in Model.Notes){<li>@note</li>}</ul>
+</div>

@@ -10,5 +10,6 @@
   <span class="status offline">@Model.Rows.Count(x=>x.Status=="Offline") Offline</span>
   <span class="status healthy">@Model.Rows.Count(x=>x.Status=="Healthy") Gesund</span>
  </div>
+ @if(User.IsInRole("SuperAdmin")||User.IsInRole("Administrator")||User.IsInRole("Technician")){<div class="actions"><a class="button secondary" href="/AgentRemoval">Agent entfernen – Anleitung</a></div>}
 </div>
 <section class="card card-flush"><partial name="_Devices" model="Model.Rows" /></section>

@@ -54,6 +54,17 @@ public sealed class DeviceModel(ManagementDb db,IOptions<MonitoringOptions> o,Da
   Message=$"Abwesend bis {Ui.Date(end)}: „Offline“ und „Backup überfällig“ werden bis dahin nicht gemeldet, Fehler weiterhin. Danach gilt automatisch wieder die normale Überwachung.";
   return RedirectToPage(new{id});
  }
+ // The agent was removed from a device that could not confirm its own stop (offline, old agent).
+ public async Task<IActionResult> OnPostConfirmRemovedAsync(Guid id,bool confirm)
+ {
+  if(!User.IsInRole("SuperAdmin")&&!User.IsInRole("Administrator"))return Forbid();
+  if(!confirm){Failure="Bitte bestätigen, dass der Agent entfernt wurde.";return RedirectToPage(new{id});}
+  var tenant=await db.Devices.Where(x=>x.Id==id).Select(x=>(Guid?)x.TenantId).SingleOrDefaultAsync();if(tenant is null)return NotFound();
+  var error=await DariaTech.Console.Api.ConfigurationApi.ConfirmRetirementManually(id,db,HttpContext);
+  if(error is not null){Failure=error;return RedirectToPage(new{id});}
+  // The device leaves monitoring; its backups stay listed and restorable on the customer page.
+  return RedirectToPage("/Customer",null,new{id=await db.Customers.Where(x=>x.TenantId==tenant).Select(x=>x.Id).SingleAsync()},"backups");
+ }
  public async Task<IActionResult> OnPostDecommissionAsync(Guid id,bool confirm)
  {
   if(!User.IsInRole("SuperAdmin")&&!User.IsInRole("Administrator"))return Forbid();
