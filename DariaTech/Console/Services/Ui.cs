@@ -23,7 +23,7 @@ public static class Ui
   "StorageCapacityWarning"=>"Speicher fast voll","StorageCapacityCritical"=>"Speicher kritisch voll",
   "BackupManualOnly"=>"Kein Zeitplan – noch nie gesichert","ConfigurationFailed"=>"Konfiguration auf dem Gerät fehlgeschlagen",
   "ManagedJobMissing"=>"Verwalteter Backup-Job fehlt auf dem Gerät","InventoryIncomplete"=>"Gerät meldet eine unvollständige Job-Liste",
-  "HandoverPending"=>"Geräteübernahme wartet auf Stopp des Altgeräts",_=>code
+  "HandoverPending"=>"Geräteübernahme wartet auf Stopp des Altgeräts","AgentUpdateFailed"=>"Agent-Update fehlgeschlagen",_=>code
  };
  // The next step for an alert, phrased for the administrator who has to act.
  public static string AlertAction(string code)=>code switch
@@ -40,6 +40,7 @@ public static class Ui
   "RetentionFailed"=>"Alte Versionen konnten nicht gelöscht werden – Rechte am Speicher prüfen.",
   "BackupVerificationFailed"=>"Backup-Prüfung fehlgeschlagen: Reparatur prüfen und einen Restore-Test durchführen.",
   "AgentOutdated"=>"Agent-Update freigeben.",
+  "AgentUpdateFailed"=>"Fehlercode auf der Geräteseite prüfen. Der bisherige Agent läuft weiter und sichert. Danach ein neueres Release freigeben oder den Agenten mit dem aktuellen Befehl aus „Gerät hinzufügen“ neu installieren.",
   "BackupManualOnly"=>"Zeitplan eintragen oder Backup manuell starten.",
   "ConfigurationFailed"=>"Konfiguration öffnen und Fehler beheben; das Gerät hat sie nicht übernommen.",
   "ManagedJobMissing"=>"Der Job wurde auf dem Gerät entfernt. Konfiguration erneut speichern, damit das Gerät ihn wieder anlegt.",

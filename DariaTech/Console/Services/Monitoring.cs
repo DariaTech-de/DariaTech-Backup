@@ -37,6 +37,8 @@ public sealed class Monitoring(IServiceScopeFactory scopes,Microsoft.Extensions.
   var managedByJob=managed.Where(x=>!x.RestoreOnly&&x.LocalJobId!=null).GroupBy(x=>(x.DeviceId,x.LocalJobId!)).ToDictionary(x=>x.Key,x=>x.First());
   var facts=await JobFacts.Load(db,jobs.Select(x=>x.Id).ToList(),ct);
   var agents=await db.Agents.ToListAsync(ct);var alerts=await db.Alerts.ToListAsync(ct);
+  // Latest update attempt per device: a failed or rejected one stays visible until a newer attempt replaces it.
+  var deployments=(await db.UpdateDeployments.ToListAsync(ct)).GroupBy(x=>x.DeviceId).ToDictionary(g=>g.Key,g=>g.OrderByDescending(x=>x.Approved).First());
   var retiring=await db.Devices.Where(x=>x.RetireRequested!=null&&x.RetireConfirmed==null&&x.RetireManuallyConfirmed==null).Select(x=>x.Id).ToListAsync(ct);
   var repeated=Math.Clamp(o.RepeatedFailureCount,2,20);var offlineAfter=now.AddMinutes(-Math.Clamp(o.OfflineMinutes,1,1440));
   foreach(var d in devices)
@@ -77,6 +79,7 @@ public sealed class Monitoring(IServiceScopeFactory scopes,Microsoft.Extensions.
    var a=agents.FirstOrDefault(x=>x.DeviceId==d.Id);
    var platform=a?.Platform is {Length:>0} actual?actual:"win-x64";var approvedVersion=releases.FirstOrDefault(x=>x.Platform==platform)?.Version??(platform=="win-x64"?o.LatestApprovedVersion:"");
    if(Version.TryParse(approvedVersion,out var approved)&&Version.TryParse(a?.Version,out var installed)&&installed<approved)problems["outdated"]=("Warning","AgentOutdated");
+   if(deployments.GetValueOrDefault(d.Id) is {Status:"Failed" or "Rejected"} failedUpdate&&releases.FirstOrDefault(x=>x.Id==failedUpdate.ReleaseId) is {} target&&Version.TryParse(target.Version,out var wanted)&&(!Version.TryParse(a?.Version,out var now2)||now2<wanted))problems["update"]=("Warning","AgentUpdateFailed");
    foreach(var (key,value) in problems)
    {
     var alert=alerts.SingleOrDefault(x=>x.DeviceId==d.Id&&x.Key==key);

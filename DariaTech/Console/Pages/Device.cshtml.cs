@@ -67,7 +67,9 @@ public sealed class DeviceModel(ManagementDb db,IOptions<MonitoringOptions> o,Da
   var from=Managed.Where(x=>x.HandoverFromDeviceId is not null).GroupBy(x=>x.HandoverFromDeviceId!.Value).ToDictionary(x=>x.Key,x=>x.Count());
   var olds=await db.Devices.Where(x=>from.Keys.Contains(x.Id)).ToListAsync();
   PendingHandovers=olds.Where(x=>x.RetirementPending).Select(x=>new Handover(x,from[x.Id])).ToList();
+  Updates=(await (from u in db.UpdateDeployments join r in db.AgentReleases on u.ReleaseId equals r.Id where u.DeviceId==id orderby u.Approved descending select new{u,r.Version}).Take(5).ToListAsync()).Select(x=>(x.u,x.Version)).ToList();
   if(await db.Customers.SingleOrDefaultAsync(x=>x.TenantId==row.Device.TenantId) is {} customer)Protection=(await Onboarding.Load(db,customer,o.Value)).Devices.FirstOrDefault(x=>x.Device.Id==id);
   return Page();}
  public DeviceProtection? Protection{get;private set;}
+ public List<(UpdateDeployment Deployment,string Version)> Updates{get;private set;}=[];
 }

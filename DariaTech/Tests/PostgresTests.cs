@@ -661,6 +661,11 @@ public sealed class PostgresTests
   Assert.That(await Codes(manual),Is.EqualTo(new[]{"BackupManualOnly"}));
   Assert.That(await Codes(away),Is.Empty,"a planned absence suppresses offline and overdue");
   Assert.That(await Codes(broken),Is.EqualTo(new[]{"ConfigurationFailed","ManagedJobMissing"}));
+  // A failed agent update stays visible until a newer agent is installed.
+  var release=new ApprovedAgentRelease{Id=Guid.NewGuid(),Sequence=9_000_000+Random.Shared.Next(1_000_000),Version="9.9.9",Platform="osx-x64",Payload="test",Signature="test",Expires=monday.AddDays(400)};db.AgentReleases.Add(release);
+  db.UpdateDeployments.Add(new UpdateDeployment{TenantId=t.Id,DeviceId=office.Id,ReleaseId=release.Id,Status="Failed",ErrorCode="InstallationIndeterminate",Approved=monday});await db.SaveChangesAsync();
+  await Monitoring.Evaluate(db,new(),monday);Assert.That(await Codes(office),Is.EqualTo(new[]{"AgentUpdateFailed"}));
+  db.UpdateDeployments.Remove(db.UpdateDeployments.Local.Single(x=>x.DeviceId==office.Id));db.AgentReleases.Remove(release);await db.SaveChangesAsync();
   // After the absence ends, normal monitoring applies again by itself.
   await Monitoring.Evaluate(db,new(),monday.AddDays(3).AddMinutes(1));
   Assert.That(await Codes(away),Is.EqualTo(new[]{"BackupOverdue","DeviceOffline"}));

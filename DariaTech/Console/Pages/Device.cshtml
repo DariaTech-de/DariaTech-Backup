@@ -148,6 +148,7 @@
     <dt>Letzter Heartbeat</dt><dd>@Ui.Date(d.LastHeartbeat)</dd>
     <dt>Agent</dt><dd class="mono">@row.Version</dd>
    </dl>
+   @if(Model.Updates.Count>0){<h3>Agent-Updates</h3><ul class="site-list">@foreach(var (u,version) in Model.Updates){<li><span><strong>@version</strong><span class="sub">@(u.Status switch{"Approved"=>"freigegeben – wartet, bis keine Sicherung läuft","Downloaded"=>"heruntergeladen","Applying"=>"wird installiert","Installed"=>"installiert","Failed"=>"fehlgeschlagen – bisheriger Agent läuft weiter","Rejected"=>"vom Gerät abgelehnt (Signatur/Plattform)",var other=>other})@(u.ErrorCode is null?"":" · "+u.ErrorCode) · @Ui.Ago(u.Approved)</span></span></li>}</ul>}
   </article>
   <article class="card">
    <h2>Logs und Datenschutz</h2>
