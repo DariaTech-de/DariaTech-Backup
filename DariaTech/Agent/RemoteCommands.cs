@@ -91,10 +91,35 @@ public sealed partial class DuplicatiAdapter
 }
 
 public sealed record CloudTaskBinding(string LocalJobId,DateTimeOffset Dispatched);
-public sealed record CommandJournalEntry(DeviceCommand Command,string Digest,Guid EngineInstance,CommandReceipt? Receipt,bool Reported);
+// Refused: HTTP status with which the Console permanently refused this receipt (unknown, conflicting or deleted
+// command). The entry stays in the journal for replay protection but no longer blocks other commands.
+public sealed record CommandJournalEntry(DeviceCommand Command,string Digest,Guid EngineInstance,CommandReceipt? Receipt,bool Reported,int? Refused=null);
+public enum ReceiptDelivery { Delivered, Transient, Refused }
 public static class RemoteCommands
 {
- public static async Task Synchronize(HttpClient console,DuplicatiAdapter adapter,AgentOptions options,ProtectedState state,Guid device,CancellationToken ct)
+ // 400/404/409/410/422 will never be accepted on retry; 401/403 mean this agent may not talk to the Console at all.
+ public static bool PermanentlyRefused(System.Net.HttpStatusCode code)=>(int)code is 400 or 404 or 409 or 410 or 422;
+ static async Task<(ReceiptDelivery Delivery,int Code)> Deliver(HttpClient console,Guid id,CommandReceipt receipt,CancellationToken ct)
+ {
+  try
+  {
+   using var response=await console.PostAsJsonAsync($"/api/v1/agent/commands/{id}/receipt",receipt,ct);
+   if(response.IsSuccessStatusCode)return (ReceiptDelivery.Delivered,(int)response.StatusCode);
+   if(response.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)throw new HttpRequestException("Console refused the agent credential",null,response.StatusCode);
+   return (PermanentlyRefused(response.StatusCode)?ReceiptDelivery.Refused:ReceiptDelivery.Transient,(int)response.StatusCode);
+  }
+  catch(HttpRequestException ex)when(ex.StatusCode is not (System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)){return (ReceiptDelivery.Transient,0);}
+  catch(TaskCanceledException)when(!ct.IsCancellationRequested){return (ReceiptDelivery.Transient,0);}
+ }
+ // Records the delivery outcome. A transient failure keeps the entry unreported so it is retried next cycle,
+ // while the remaining entries and new commands are still processed.
+ static void Record(Dictionary<Guid,CommandJournalEntry> journal,ProtectedState state,Guid id,(ReceiptDelivery Delivery,int Code) outcome,Action<string>? log)
+ {
+  if(outcome.Delivery==ReceiptDelivery.Delivered)journal[id]=journal[id] with{Reported=true};
+  else if(outcome.Delivery==ReceiptDelivery.Refused){journal[id]=journal[id] with{Reported=true,Refused=outcome.Code};log?.Invoke($"Console refused the receipt of a {journal[id].Command.Action} command with HTTP {outcome.Code}; the command is not executed again");}
+  state.Write("commands.bin",journal);
+ }
+ public static async Task Synchronize(HttpClient console,DuplicatiAdapter adapter,AgentOptions options,ProtectedState state,Guid device,CancellationToken ct,Action<string>? log=null)
  {
   if(!options.AllowRemoteCommands)return;
   using var key=ECDsa.Create();key.ImportFromPem(File.ReadAllText(options.CommandPublicKeyFile!));if(key.KeySize!=256)throw new CryptographicException("Pinned key must be ECDSA P-256");
@@ -102,7 +127,7 @@ public static class RemoteCommands
   // Complete the write-ahead journal before requesting more work. A crash during dispatch is never retried blindly.
   foreach(var (id,entry) in journal.ToArray())
   {
-   if(entry.Reported&&entry.Receipt?.Status!="Accepted")continue;
+   if(entry.Refused is not null||entry.Reported&&entry.Receipt?.Status!="Accepted")continue;
    var receipt=entry.Receipt??new CommandReceipt("Indeterminate",null,"DispatchIndeterminate");
    if(receipt.Status=="Accepted"&&receipt.TaskId is {} task)
    {
@@ -113,7 +138,7 @@ public static class RemoteCommands
     catch(HttpRequestException){continue;} // Preserve accepted task; do not mistake missing history for success.
    }
    journal[id]=entry with{Receipt=receipt};state.Write("commands.bin",journal);
-   using var response=await console.PostAsJsonAsync($"/api/v1/agent/commands/{id}/receipt",receipt,ct);response.EnsureSuccessStatusCode();journal[id]=journal[id] with{Reported=true};state.Write("commands.bin",journal);
+   Record(journal,state,id,await Deliver(console,id,receipt,ct),log);
   }
   var envelopes=await console.GetFromJsonAsync<SignedCommand[]>("/api/v1/agent/commands",ct)??[];
   foreach(var envelope in envelopes)
@@ -122,7 +147,9 @@ public static class RemoteCommands
    if(journal.TryGetValue(command.Id,out var old))
    {
     if(old.Digest!=digest)throw new CryptographicException("Command mutation rejected");
-    using var replay=await console.PostAsJsonAsync($"/api/v1/agent/commands/{command.Id}/receipt",old.Receipt??new("Indeterminate",null,"DispatchIndeterminate"),ct);replay.EnsureSuccessStatusCode();continue;
+    // Replay protection: a known command is never executed twice, only its recorded outcome is reported again.
+    if(old.Refused is null)Record(journal,state,command.Id,await Deliver(console,command.Id,old.Receipt??new("Indeterminate",null,"DispatchIndeterminate"),ct),log);
+    continue;
    }
    var instance=state.Read<Guid>("engine-instance.bin");if(instance==Guid.Empty)throw new InvalidOperationException("Engine instance identity is required");
    journal[command.Id]=new(command,digest,instance,null,false);state.Write("commands.bin",journal);
@@ -141,9 +168,9 @@ public static class RemoteCommands
    catch(HttpRequestException){receipt=new("Indeterminate",null,"DispatchIndeterminate");}
    if(state.Read<Guid>("engine-instance.bin")!=instance)receipt=new("Indeterminate",receipt.TaskId,"DispatchIndeterminate");
    journal[command.Id]=new(command,digest,instance,receipt,false);state.Write("commands.bin",journal);
-   using var response=await console.PostAsJsonAsync($"/api/v1/agent/commands/{command.Id}/receipt",receipt,ct);response.EnsureSuccessStatusCode();journal[command.Id]=journal[command.Id] with{Reported=true};state.Write("commands.bin",journal);
+   Record(journal,state,command.Id,await Deliver(console,command.Id,receipt,ct),log);
   }
-  foreach(var id in journal.Where(x=>x.Value.Reported&&x.Value.Receipt?.Status!="Accepted"&&x.Value.Command.Expires<DateTimeOffset.UtcNow.AddDays(-1)).Select(x=>x.Key).ToArray())journal.Remove(id);
+  foreach(var id in journal.Where(x=>x.Value.Reported&&(x.Value.Refused is not null||x.Value.Receipt?.Status!="Accepted")&&x.Value.Command.Expires<DateTimeOffset.UtcNow.AddDays(-1)).Select(x=>x.Key).ToArray())journal.Remove(id);
   state.Write("commands.bin",journal);
  }
 }

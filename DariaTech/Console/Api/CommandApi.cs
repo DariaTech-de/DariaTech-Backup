@@ -40,8 +40,13 @@ public static class CommandApi
    }
    if(receipt.Catalog is {} typed&&(c.Action==RemoteAction.ListRestorePoints&&typed.Files.Length!=0||c.Action is RemoteAction.ListRestoreFiles or RemoteAction.BrowseFolders&&typed.Points.Length!=0||c.Action==RemoteAction.BrowseFolders&&typed.Files.Any(x=>!x.Directory||x.Bytes is not null)))return Results.BadRequest();
    if(c.Status==receipt.Status&&c.TaskId==receipt.TaskId&&c.ErrorCode==receipt.ErrorCode)return Results.NoContent();
-   if(c.Status is not ("Pending" or "Accepted"))return Results.Conflict();
-   if(c.TaskId is not null&&c.TaskId!=receipt.TaskId)return Results.Conflict();
+   // A contradicting receipt is refused but recorded, so the command's history shows it; the agent stops
+   // resending it and never executes the command again.
+   if(c.Status is not ("Pending" or "Accepted")||c.TaskId is not null&&c.TaskId!=receipt.TaskId)
+   {
+    db.Audit.Add(new AuditEvent{TenantId=c.TenantId,Actor=agent.DeviceId.ToString(),Action="command.receipt-conflict-"+receipt.Status.ToLowerInvariant(),Resource=id.ToString()});
+    await db.SaveChangesAsync();await tx.CommitAsync();return Results.Conflict();
+   }
    if(receipt.Catalog is {} result)c.EncryptedCatalog=secrets.Protect(c.TenantId,$"catalog:{id}",System.Text.Json.JsonSerializer.Serialize(result));
    c.Status=receipt.Status;c.TaskId=receipt.TaskId;c.ErrorCode=receipt.ErrorCode;c.Detail=receipt.Detail;
    db.Audit.Add(new AuditEvent{TenantId=c.TenantId,Actor=agent.DeviceId.ToString(),Action="command."+receipt.Status.ToLowerInvariant(),Resource=id.ToString()});await db.SaveChangesAsync();await tx.CommitAsync();return Results.NoContent();

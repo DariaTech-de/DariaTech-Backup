@@ -25,7 +25,7 @@ public sealed class Worker(AgentOptions options,ProtectedState state,ILogger<Wor
    if(DateTimeOffset.UtcNow-lastCycle<TimeSpan.FromSeconds(options.HeartbeatSeconds))
    {
     var update=state.Read<UpdateJournal>("update.bin");if(update is {Status:"Applying"}&&update.Manifest.Version!=options.Version)continue;
-    try{await RemoteCommands.Synchronize(client,adapter,options,state,identity.DeviceId,ct);}
+    try{await RemoteCommands.Synchronize(client,adapter,options,state,identity.DeviceId,ct,m=>log.LogWarning("{Message}",m));}
     catch(OperationCanceledException)when(ct.IsCancellationRequested){break;}
     catch(Exception ex){log.LogDebug("Remote command poll failed ({Type})",ex.GetType().Name);}
     continue;
@@ -49,7 +49,7 @@ public sealed class Worker(AgentOptions options,ProtectedState state,ILogger<Wor
     }
     if(reachable&&!updating)
     {
-     try{await RemoteCommands.Synchronize(client,adapter,options,state,identity.DeviceId,ct);}
+     try{await RemoteCommands.Synchronize(client,adapter,options,state,identity.DeviceId,ct,m=>log.LogWarning("{Message}",m));}
      catch(OperationCanceledException)when(ct.IsCancellationRequested){throw;}
      catch(Exception ex){log.LogWarning("Remote command synchronization failed ({Type})",ex.GetType().Name);}
     }
