@@ -120,7 +120,7 @@
    <h2 id="backup-jobs">Backup-Jobs</h2>
    @if(Model.Jobs.Count==0){<p class="card-empty">@Ui.Icon("info")Noch keine Jobs eingerichtet.</p>}
    <ul class="job-list">@foreach(var j in Model.Jobs){<li><span class="dot @(j.Active?"healthy":"offline")"></span><span><strong>@j.Name</strong><span class="sub">@Ui.Ownership(j.Ownership) · Nächster Lauf @Ui.In(j.NextRun)</span></span>@if(User.IsInRole("SuperAdmin")||User.IsInRole("Administrator")||User.IsInRole("Technician")){<a asp-page="/JobActions" asp-route-id="@j.Id">Aktionen / Restore</a>}</li>}</ul>
-   @if(User.IsInRole("SuperAdmin")||User.IsInRole("Administrator")){@foreach(var managed in Model.Managed){<div class="managed-job"><strong>@managed.Name</strong><span class="dest-line">@Ui.Icon("cloud")Ziel: @(Model.Destinations.GetValueOrDefault(managed.Id)??"unbekannt")</span><span class="sub">@(managed.Status=="Pending"&&managed.AppliedRevision==0?"Wird eingerichtet":managed.Status) · Revision @managed.AppliedRevision / @managed.LatestRevision · <a asp-page="/BackupEdit" asp-route-deviceId="@d.Id" asp-route-id="@managed.Id">Konfiguration ändern</a></span></div>}}
+   @if(User.IsInRole("SuperAdmin")||User.IsInRole("Administrator")){@foreach(var managed in Model.Managed){<div class="managed-job"><strong>@managed.Name</strong><span class="dest-line">@Ui.Icon("cloud")Ziel: @(Model.Destinations.GetValueOrDefault(managed.Id)??"unbekannt")</span>@{var state=Ui.ConfigState(managed,Model.PendingHandovers.Any(h=>h.Old.Id==managed.HandoverFromDeviceId));}<span class="sub"><span class="status @state.Class">@state.Label</span> · @(managed.RestoreOnly?"Nur Wiederherstellung (sichert nie)":BackupAge.Describe(managed)) @if(!managed.RestoreOnly&&managed.ScheduleRecorded){<text> · @Ui.Retention(managed.KeepVersions,managed.ScheduleRepeatHours,managed.ScheduleDays)</text>} · <a asp-page="/BackupEdit" asp-route-deviceId="@d.Id" asp-route-id="@managed.Id">Konfiguration ändern</a></span></div>}}
    <p class="sub">Lokal verwaltete Jobs werden in der Backup-Engine gepflegt. Zentrale Jobs verwenden versionierte, verschlüsselte Konfigurationen.</p>
   </article>
   <article class="card">
@@ -139,6 +139,20 @@
   </article>
  </div>
 </section>
+@if(User.IsInRole("SuperAdmin")||User.IsInRole("Administrator")||User.IsInRole("Technician")){
+<section class="card" id="absence">
+ <div class="card-head"><div><h2>Geplante Abwesenheit</h2><span class="sub">Für Urlaub, Lager oder Reparatur: bis zum Enddatum werden „Gerät offline“ und „Backup überfällig“ nicht gemeldet. Fehlgeschlagene Sicherungen und volle Speicher weiterhin. Nach dem Enddatum gilt automatisch wieder die normale Überwachung.</span></div></div>
+ @if(d.AbsentUntil is {} absent&&absent>DateTimeOffset.UtcNow){
+ <p class="notice-inline" role="status">@Ui.Icon("info")Abwesend bis @Ui.Date(absent)@(string.IsNullOrEmpty(d.AbsenceNote)?"":" · "+d.AbsenceNote)</p>
+ <form method="post" asp-page-handler="Absence" asp-route-id="@d.Id"><input type="hidden" name="clear" value="true" /><button type="submit" class="button secondary">Abwesenheit beenden</button></form>
+ }else{
+ <form method="post" asp-page-handler="Absence" asp-route-id="@d.Id" class="form-grid">
+  <div class="field"><label for="absence-until">Abwesend bis einschließlich</label><input id="absence-until" type="date" name="until" /></div>
+  <div class="field"><label for="absence-note">Grund (optional)</label><input id="absence-note" name="note" maxlength="200" /></div>
+  <div><button type="submit" class="button secondary">Abwesenheit eintragen</button></div>
+ </form>}
+</section>
+}
 @if((User.IsInRole("SuperAdmin")||User.IsInRole("Administrator"))&&d.RetireRequested is null){
 <section class="card" id="decommission">
  <div class="card-head"><div><h2>Gerät stilllegen</h2><span class="sub">Für ein Gerät, das nicht mehr gesichert werden soll und nicht ersetzt wird. Ersetzt ein neues Gerät dieses, stattdessen am neuen Gerät „Gerät ersetzen“ verwenden.</span></div></div>

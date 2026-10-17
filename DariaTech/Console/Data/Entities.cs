@@ -33,6 +33,9 @@ public sealed class Device : TenantEntity
  public DateTimeOffset? RetireRequested { get; set; } public DateTimeOffset? RetireConfirmed { get; set; }
  public DateTimeOffset? RetireManuallyConfirmed { get; set; } public string? RetireManuallyConfirmedBy { get; set; }
  public Guid? ReplacedByDeviceId { get; set; }
+ // Planned absence (holiday, device in storage): offline and overdue are not alerted until this time; failures
+ // still are. After it ends normal monitoring applies again without any further action.
+ public DateTimeOffset? AbsentUntil { get; set; } public string AbsenceNote { get; set; } = "";
  public bool RetirementPending=>RetireRequested is not null&&RetireConfirmed is null&&RetireManuallyConfirmed is null;
 }
 public sealed class Agent : TenantEntity
@@ -108,6 +111,11 @@ public sealed class ManagedJob : TenantEntity
  // Taken over from this device: the configuration is held back until that device's stop is confirmed, so the
  // old and the new device never write into the same backup chain at the same time.
  public Guid? HandoverFromDeviceId { get; set; }
+ // Plain copy of the latest revision's schedule for monitoring (the revision itself is encrypted).
+ // ScheduleRecorded=false: not yet copied (job created before this column existed). Days: bit per DayOfWeek.
+ public bool ScheduleRecorded { get; set; } public int? ScheduleRepeatHours { get; set; } public int ScheduleDays { get; set; } public int KeepVersions { get; set; }
+ // Allowed age of the last successful backup in hours. null: derived from the schedule.
+ public int? MaxBackupAgeHours { get; set; }
 }
 public sealed class ConfigurationRevision : TenantEntity
 {

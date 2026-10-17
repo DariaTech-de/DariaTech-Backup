@@ -509,6 +509,38 @@ public sealed class PostgresTests
   db.Runs.Add(new BackupRun{TenantId=t.Id,JobId=job.Id,LocalRunId="recovered",Started=now,Completed=now.AddMinutes(1),Status=RunStatus.Success,QuotaTotalBytes=100,QuotaFreeBytes=90,QuotaError=false,RetentionError=false});db.Commands.Add(new RemoteCommand{TenantId=t.Id,DeviceId=d.Id,JobId=job.Id,Action=RemoteAction.VerifyBackup,Expires=now.AddMinutes(1),Status="Completed"});await db.SaveChangesAsync();await Monitoring.Evaluate(db,new(),now.AddMinutes(2));
   Assert.That(await db.Alerts.CountAsync(x=>x.DeviceId==d.Id&&x.Resolved==null),Is.EqualTo(0));
  }
+ [Test]public async Task OverdueFollowsTheScheduleAbsenceAndManagedJobState()
+ {
+  var(t,site)=await Customer();await using var db=Db();
+  // Monday 08:00 UTC; the last successful run was Friday 22:05.
+  var monday=new DateTimeOffset(2026,10,19,8,0,0,TimeSpan.Zero);var friday=monday.AddDays(-3).AddHours(14).AddMinutes(5);
+  Device Pc(string name){var d=new Device{TenantId=t.Id,SiteId=site.Id,Name=name,EngineReachable=true,LastHeartbeat=monday};db.Devices.Add(d);db.Agents.Add(new DariaTech.Console.Data.Agent{TenantId=t.Id,DeviceId=d.Id,CredentialHash=Tokens.Hash(Tokens.Create())});return d;}
+  (BackupJob Job,ManagedJob Managed) Job(Device d,string local,int? repeat,int days,DateTimeOffset? success)
+  {
+   var job=new BackupJob{TenantId=t.Id,DeviceId=d.Id,LocalId=local,Name="Dokumente",Ownership="Managed"};db.Jobs.Add(job);
+   var managed=new ManagedJob{TenantId=t.Id,DeviceId=d.Id,Name="Dokumente",LatestRevision=1,AppliedRevision=1,LastReportedRevision=1,LocalJobId=local,Status="Applied",ScheduleRecorded=true,ScheduleRepeatHours=repeat,ScheduleDays=days};db.ManagedJobs.Add(managed);
+   if(success is {} at)db.Runs.Add(new BackupRun{TenantId=t.Id,JobId=job.Id,LocalRunId="ok-"+local,Started=at.AddMinutes(-5),Completed=at,Status=RunStatus.Success});
+   return (job,managed);
+  }
+  const int weekdays=0b0111110;
+  var office=Pc("Büro-1");Job(office,"1",24,weekdays,friday);                 // Mon-Fri daily: not overdue on Monday morning
+  var daily=Pc("Büro-2");Job(daily,"1",24,127,friday);                       // every day: overdue on Monday
+  var manual=Pc("Büro-3");Job(manual,"1",null,0,null);                       // no schedule, never backed up
+  var away=Pc("Laptop");away.LastHeartbeat=monday.AddDays(-5);away.AbsentUntil=monday.AddDays(3);Job(away,"1",24,127,monday.AddDays(-5));
+  var broken=Pc("Büro-4");var (_,failed)=Job(broken,"1",24,127,monday.AddHours(-2));failed.Status="Failed";
+  var (_,gone)=Job(broken,"2",24,127,null);db.Jobs.Remove(db.Jobs.Local.Single(x=>x.DeviceId==broken.Id&&x.LocalId=="2"));
+  await db.SaveChangesAsync();await Monitoring.Evaluate(db,new(),monday);
+  async Task<string[]> Codes(Device d)=>await db.Alerts.Where(x=>x.DeviceId==d.Id&&x.Resolved==null).Select(x=>x.Code).OrderBy(x=>x).ToArrayAsync();
+  Assert.That(await Codes(office),Is.Empty,"a weekend without scheduled runs is not overdue");
+  Assert.That(await Codes(daily),Is.EqualTo(new[]{"BackupOverdue"}));
+  Assert.That(await Codes(manual),Is.EqualTo(new[]{"BackupManualOnly"}));
+  Assert.That(await Codes(away),Is.Empty,"a planned absence suppresses offline and overdue");
+  Assert.That(await Codes(broken),Is.EqualTo(new[]{"ConfigurationFailed","ManagedJobMissing"}));
+  // After the absence ends, normal monitoring applies again by itself.
+  await Monitoring.Evaluate(db,new(),monday.AddDays(3).AddMinutes(1));
+  Assert.That(await Codes(away),Is.EqualTo(new[]{"BackupOverdue","DeviceOffline"}));
+  Assert.That(await Codes(office),Is.EqualTo(new[]{"BackupOverdue","DeviceOffline"}),"Thursday without a run since Friday is overdue");
+ }
  [Test]public async Task AddDeviceWizardShowsPlatformPackageAndInstallCommandWithOneTimeToken()
  {
   var(t,site)=await Customer();await using var db=Db();var customer=await db.Customers.IgnoreQueryFilters().SingleAsync(x=>x.TenantId==t.Id);

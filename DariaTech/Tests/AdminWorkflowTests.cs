@@ -136,3 +136,37 @@ public sealed class RetirementTests
   finally{Directory.Delete(directory,true);}
  }
 }
+
+public sealed class BackupAgeTests
+{
+ [TestCase(24,127,24)][TestCase(24,0b0111110,72)][TestCase(168,127,168)][TestCase(6,0b0111110,72)][TestCase(48,0b0111110,96)][TestCase(24,0b0000010,168)]
+ public void TheLongestScheduledGapCoversDaysWithoutRuns(int repeat,int days,double hours)=>Assert.That(DariaTech.Console.Services.BackupAge.LongestGapHours(repeat,days),Is.EqualTo(hours));
+ [Test]public void ManualJobsAndExplicitLimitsAreDistinguished()
+ {
+  var o=new DariaTech.Console.Services.MonitoringOptions();
+  Assert.That(DariaTech.Console.Services.BackupAge.Allowed(null,o),Is.EqualTo(24),"locally managed jobs keep the configured default");
+  Assert.That(DariaTech.Console.Services.BackupAge.Allowed(new DariaTech.Console.Data.ManagedJob{ScheduleRecorded=true},o),Is.Null);
+  Assert.That(DariaTech.Console.Services.BackupAge.Allowed(new DariaTech.Console.Data.ManagedJob{ScheduleRecorded=true,MaxBackupAgeHours=200},o),Is.EqualTo(200));
+  Assert.That(DariaTech.Console.Services.BackupAge.Describe(new DariaTech.Console.Data.ManagedJob{ScheduleRecorded=true,ScheduleRepeatHours=24,ScheduleDays=0b0111110}),Is.EqualTo("täglich · Mo, Di, Mi, Do, Fr"));
+  Assert.That(DariaTech.Console.Services.BackupAge.Describe(new DariaTech.Console.Data.ManagedJob{ScheduleRecorded=true}),Does.StartWith("Manuell"));
+ }
+}
+
+public sealed class ScheduleTextTests
+{
+ [Test]public void LocalScheduleTimesAreConvertedWithTheOffsetOfTheirDate()
+ {
+  if(DariaTech.Console.Services.Ui.Zone==TimeZoneInfo.Utc)Assert.Ignore("No time zone database on this machine");
+  Assert.That(DariaTech.Console.Services.Ui.FromLocal(new DateTime(2026,7,1,22,0,0)),Is.EqualTo(new DateTimeOffset(2026,7,1,20,0,0,TimeSpan.Zero)),"summer time: UTC+2");
+  Assert.That(DariaTech.Console.Services.Ui.FromLocal(new DateTime(2026,12,1,22,0,0)),Is.EqualTo(new DateTimeOffset(2026,12,1,21,0,0,TimeSpan.Zero)),"winter time: UTC+1");
+  Assert.That(DariaTech.Console.Services.Ui.FromLocal(new DateTime(2026,3,29,2,30,0)),Is.EqualTo(new DateTimeOffset(2026,3,29,1,30,0,TimeSpan.Zero)),"a time skipped by the clock change moves one hour later");
+  Assert.That(DariaTech.Console.Services.Ui.ToLocal(new DateTimeOffset(2026,7,1,20,0,0,TimeSpan.Zero)),Is.EqualTo(new DateTime(2026,7,1,22,0,0)));
+ }
+ [Test]public void RetentionIsExplainedAsVersionsNotDays()
+ {
+  Assert.That(DariaTech.Console.Services.Ui.Retention(30,24,127),Is.EqualTo("30 Versionen ≈ 30 Tage bei diesem Zeitplan"));
+  Assert.That(DariaTech.Console.Services.Ui.Retention(30,6,127),Is.EqualTo("30 Versionen ≈ 8 Tage bei diesem Zeitplan"));
+  Assert.That(DariaTech.Console.Services.Ui.Retention(30,24,0b0111110),Is.EqualTo("30 Versionen ≈ 42 Tage bei diesem Zeitplan"));
+  Assert.That(DariaTech.Console.Services.Ui.Retention(30,null,0),Does.Contain("manuell"));
+ }
+}

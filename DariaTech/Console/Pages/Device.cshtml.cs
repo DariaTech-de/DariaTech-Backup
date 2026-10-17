@@ -41,6 +41,19 @@ public sealed class DeviceModel(ManagementDb db,IOptions<MonitoringOptions> o,Da
   if(error is not null)Failure=error;else Message="Bestätigt. Dieses Gerät übernimmt die Backups jetzt. Hinweis: Der Stopp des alten Geräts ist nicht technisch bestätigt – wird es doch wieder eingeschaltet und erreicht die Console, hält es seine Zeitpläne beim ersten Kontakt an.";
   return RedirectToPage(new{id});
  }
+ // Planned absence: offline and overdue are not alerted until the end date; afterwards normal monitoring resumes.
+ public async Task<IActionResult> OnPostAbsenceAsync(Guid id,DateTime? until,string? note,bool clear)
+ {
+  if(!User.IsInRole("SuperAdmin")&&!User.IsInRole("Administrator")&&!User.IsInRole("Technician"))return Forbid();
+  var device=await db.Devices.SingleOrDefaultAsync(x=>x.Id==id&&x.Active);if(device is null)return NotFound();
+  if(clear){device.AbsentUntil=null;device.AbsenceNote="";DariaTech.Console.Api.ManagementApi.Audit(db,HttpContext,device.TenantId,"device.absence-cleared",device.Id);await db.SaveChangesAsync();Message="Abwesenheit beendet. Es gilt wieder die normale Überwachung.";return RedirectToPage(new{id});}
+  var end=until is {} u?new DateTimeOffset(DateTime.SpecifyKind(u.Date.AddDays(1),DateTimeKind.Utc)):(DateTimeOffset?)null;
+  if(end is null||end<=DateTimeOffset.UtcNow||end>DateTimeOffset.UtcNow.AddDays(180)||(note?.Length??0)>200){Failure="Bitte ein Enddatum innerhalb der nächsten 180 Tage angeben.";return RedirectToPage(new{id});}
+  device.AbsentUntil=end;device.AbsenceNote=note?.Trim()??"";
+  DariaTech.Console.Api.ManagementApi.Audit(db,HttpContext,device.TenantId,"device.absence-set",device.Id);await db.SaveChangesAsync();
+  Message=$"Abwesend bis {Ui.Date(end)}: „Offline“ und „Backup überfällig“ werden bis dahin nicht gemeldet, Fehler weiterhin. Danach gilt automatisch wieder die normale Überwachung.";
+  return RedirectToPage(new{id});
+ }
  public async Task<IActionResult> OnPostDecommissionAsync(Guid id,bool confirm)
  {
   if(!User.IsInRole("SuperAdmin")&&!User.IsInRole("Administrator"))return Forbid();

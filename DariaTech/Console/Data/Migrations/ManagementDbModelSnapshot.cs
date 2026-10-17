@@ -454,6 +454,14 @@ namespace DariaTech.Console.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("AbsenceNote")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset?>("AbsentUntil")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("Active")
                         .HasColumnType("boolean");
 
@@ -576,6 +584,9 @@ namespace DariaTech.Console.Data.Migrations
                     b.Property<Guid?>("HandoverFromDeviceId")
                         .HasColumnType("uuid");
 
+                    b.Property<int>("KeepVersions")
+                        .HasColumnType("integer");
+
                     b.Property<long>("LastReportedRevision")
                         .HasColumnType("bigint");
 
@@ -586,6 +597,9 @@ namespace DariaTech.Console.Data.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
+                    b.Property<int?>("MaxBackupAgeHours")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(1000)
@@ -593,6 +607,15 @@ namespace DariaTech.Console.Data.Migrations
 
                     b.Property<bool>("RestoreOnly")
                         .HasColumnType("boolean");
+
+                    b.Property<int>("ScheduleDays")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("ScheduleRecorded")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("ScheduleRepeatHours")
+                        .HasColumnType("integer");
 
                     b.Property<Guid?>("SourceManagedJobId")
                         .HasColumnType("uuid");

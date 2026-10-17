@@ -8,8 +8,8 @@ public static class Ui
 {
  static readonly CultureInfo De=CultureInfo.GetCultureInfo("de-DE");
 
- public static string StatusLabel(string status)=>status switch{"Healthy"=>"Gesund","Warning"=>"Warnung","Critical"=>"Kritisch","Offline"=>"Offline",_=>"Unbekannt"};
- public static string StatusClass(string status)=>status switch{"Healthy"=>"healthy","Warning"=>"warning","Critical"=>"critical","Offline"=>"offline",_=>"unknown"};
+ public static string StatusLabel(string status)=>status switch{"Healthy"=>"Gesund","Warning"=>"Warnung","Critical"=>"Kritisch","Offline"=>"Offline","Absent"=>"Abwesend",_=>"Unbekannt"};
+ public static string StatusClass(string status)=>status switch{"Healthy"=>"healthy","Warning"=>"warning","Critical"=>"critical","Offline"=>"offline","Absent"=>"offline",_=>"unknown"};
  public static string RunLabel(RunStatus s)=>s switch{RunStatus.Success=>"Erfolgreich",RunStatus.Warning=>"Warnung",RunStatus.Failed=>"Fehlgeschlagen",RunStatus.Running=>"Läuft",RunStatus.Cancelled=>"Abgebrochen",_=>"Unbekannt"};
  public static string RunClass(RunStatus s)=>s switch{RunStatus.Success=>"healthy",RunStatus.Warning or RunStatus.Cancelled=>"warning",RunStatus.Failed=>"critical",RunStatus.Running=>"running",_=>"unknown"};
  public static string SeverityClass(string severity)=>severity=="Critical"?"critical":"warning";
@@ -20,7 +20,10 @@ public static class Ui
   "BackupOverdue"=>"Backup überfällig","BackupFailed"=>"Backup fehlgeschlagen","EngineOperationFailed"=>"Engine-Vorgang fehlgeschlagen",
   "BackupWarning"=>"Backup mit Warnungen beendet","BackupNotSuccessful"=>"Backup nicht vollständig","AgentOutdated"=>"Agent-Version veraltet",
   "RepeatedBackupFailures"=>"Wiederholt fehlgeschlagene Backups","BackupVerificationFailed"=>"Backup-Prüfung fehlgeschlagen","RetentionFailed"=>"Aufbewahrung fehlgeschlagen",
-  "StorageCapacityWarning"=>"Speicher fast voll","StorageCapacityCritical"=>"Speicher kritisch voll",_=>code
+  "StorageCapacityWarning"=>"Speicher fast voll","StorageCapacityCritical"=>"Speicher kritisch voll",
+  "BackupManualOnly"=>"Kein Zeitplan – noch nie gesichert","ConfigurationFailed"=>"Konfiguration auf dem Gerät fehlgeschlagen",
+  "ManagedJobMissing"=>"Verwalteter Backup-Job fehlt auf dem Gerät","InventoryIncomplete"=>"Gerät meldet eine unvollständige Job-Liste",
+  "HandoverPending"=>"Geräteübernahme wartet auf Stopp des Altgeräts",_=>code
  };
  public static string Ownership(string o)=>o=="Local"?"Lokal verwaltet":o=="Managed"?"Zentral verwaltet":o;
 
@@ -52,6 +55,34 @@ public static class Ui
   while(x>=1024&&i<units.Length-1){x/=1024;i++;}
   return x.ToString(i==0?"0":x<10?"0.0#":"0.#",De)+" "+units[i];
  }
+ // Schedules are entered and shown in German local time; the engine keeps the wall-clock time across daylight
+ // saving changes in the device's own time zone.
+ public static readonly TimeZoneInfo Zone=FindZone();
+ static TimeZoneInfo FindZone(){try{return TimeZoneInfo.FindSystemTimeZoneById("Europe/Berlin");}catch(Exception ex)when(ex is TimeZoneNotFoundException or InvalidTimeZoneException){return TimeZoneInfo.Utc;}}
+ public static DateTime ToLocal(DateTimeOffset t)=>TimeZoneInfo.ConvertTime(t,Zone).DateTime;
+ public static DateTimeOffset FromLocal(DateTime local)
+ {
+  var t=DateTime.SpecifyKind(local,DateTimeKind.Unspecified);
+  if(Zone.IsInvalidTime(t))t=t.AddHours(1); // 02:30 on the spring-forward day does not exist; use 03:30
+  return new DateTimeOffset(t,Zone.GetUtcOffset(t)).ToUniversalTime();
+ }
+ public static string LocalDate(DateTimeOffset? t)=>t is {} x?TimeZoneInfo.ConvertTime(x,Zone).ToString("dd.MM.yyyy · HH:mm 'Uhr'",De):"Unbekannt";
+ // Retention keeps a number of versions, not days: how many days that covers depends on the schedule.
+ public static string Retention(int versions,int? repeatHours,int days)
+ {
+  if(versions<1)return "—";
+  if(repeatHours is not int repeat)return $"{versions} Versionen (manuell – entspricht keiner festen Zeitspanne)";
+  var runsPerWeek=(days is 0 or 127?7:System.Numerics.BitOperations.PopCount((uint)days))*Math.Max(1d,24d/repeat)*(repeat>24?24d/repeat:1);
+  var covered=versions/runsPerWeek*7;
+  return $"{versions} Versionen ≈ {(covered>=60?Math.Round(covered/30.4).ToString(De)+" Monate":Math.Round(covered).ToString(De)+" Tage")} bei diesem Zeitplan";
+ }
+ // "Saved" is not "applied": the distribution state of a centrally managed job on its device.
+ public static (string Label,string Class) ConfigState(DariaTech.Console.Data.ManagedJob m,bool handoverPending)=>
+  handoverPending?("Wartet auf Stopp des Altgeräts","warning")
+  :m.Status is "Failed" or "Rejected"?($"Auf dem Gerät fehlgeschlagen (Revision {m.LatestRevision})","critical")
+  :m.AppliedRevision==0?("Gespeichert – noch nicht auf dem Gerät eingerichtet","warning")
+  :m.AppliedRevision<m.LatestRevision?($"Änderung gespeichert – Gerät nutzt noch Revision {m.AppliedRevision} von {m.LatestRevision}","warning")
+  :($"Auf dem Gerät angewendet (Revision {m.AppliedRevision})","healthy");
  public static string Number(long v)=>v.ToString("N0",De);
  public static string Percent(double v)=>v.ToString("0.0",De);
  public static string Duration(TimeSpan? d)=>d is not {} x?"—":x.TotalHours>=1?$"{(int)x.TotalHours} Std. {x.Minutes} Min.":x.TotalMinutes>=1?$"{x.Minutes} Min. {x.Seconds} Sek.":$"{Math.Max(0,x.Seconds)} Sek.";

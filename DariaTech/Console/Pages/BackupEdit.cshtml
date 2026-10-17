@@ -106,11 +106,18 @@
  <section class="card">
   <div class="card-head"><div><h2><span class="step">4</span>Zeitplan und Aufbewahrung</h2></div></div>
   <div class="form-grid">
-   <div class="field"><label asp-for="FirstRun"><span>Erster Lauf (UTC)</span><span class="label-hint">leer = nur manuell</span></label><input asp-for="FirstRun" type="datetime-local" asp-format="{0:yyyy-MM-ddTHH:mm}" /></div>
+   <div class="field"><label asp-for="FirstRun"><span>Erster Lauf (deutsche Zeit)</span><span class="label-hint">leer = kein Zeitplan, nur manuell</span></label><input asp-for="FirstRun" type="datetime-local" asp-format="{0:yyyy-MM-ddTHH:mm}" /></div>
    <div class="field"><label asp-for="RepeatHours">Wiederholung (Stunden)</label><input asp-for="RepeatHours" type="number" min="1" max="8760" /></div>
    <div class="field"><label asp-for="Days">Wochentage</label><select asp-for="Days" multiple size="7">@foreach(var day in Enum.GetValues<DayOfWeek>()){<option value="@day">@System.Globalization.CultureInfo.GetCultureInfo("de-DE").DateTimeFormat.GetDayName(day)</option>}</select></div>
    <div class="field"><label asp-for="KeepVersions">Aufzubewahrende Versionen</label><input asp-for="KeepVersions" type="number" min="1" max="10000" /></div>
+   <div class="field"><label asp-for="MaxBackupAgeHours"><span>Zulässiges Backup-Alter (Stunden)</span><span class="label-hint">leer = aus dem Zeitplan</span></label><input asp-for="MaxBackupAgeHours" type="number" min="1" max="8760" /></div>
   </div>
+  <ul class="steps-list">
+   <li>Die Uhrzeit bleibt bei Sommer- und Winterzeit gleich (in der Zeitzone des Geräts). Die Console zeigt Zeitpunkte sonst in UTC.</li>
+   <li>Aufbewahrung zählt <strong>Versionen, nicht Tage</strong>: 30 Versionen sind bei einem Lauf pro Tag etwa 30 Tage, bei vier Läufen pro Tag nur etwa eine Woche.</li>
+   <li>Ohne Zeitplan sichert der Job nur auf Anforderung; er ist dann als „Manuell“ gekennzeichnet und sein Alter wird nur mit einem zulässigen Backup-Alter überwacht.</li>
+   <li>Überfällig ist ein Backup erst, wenn der längste reguläre Abstand des Zeitplans (z. B. Freitag bis Montag bei Mo–Fr) plus 6 Stunden überschritten ist. Verpasst das Gerät einen Lauf (ausgeschaltet), holt die Engine ihn beim nächsten Start einmal nach.</li>
+  </ul>
  </section>
 
  <div class="form-actions">

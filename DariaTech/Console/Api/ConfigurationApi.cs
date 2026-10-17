@@ -148,8 +148,14 @@ public static class ConfigurationApi
  }
  private static void AddRevision(ManagementDb db,ISecretStore secrets,ManagedJob job,ManagedBackupDefinition definition)
  {
+  RecordSchedule(job,definition);
   var r=new ConfigurationRevision{TenantId=job.TenantId,ManagedJobId=job.Id,Revision=job.LatestRevision};
   r.EncryptedConfiguration=secrets.Protect(r.TenantId,$"configuration:{r.ManagedJobId}:{r.Revision}",JsonSerializer.Serialize(definition));db.ConfigurationRevisions.Add(r);
+ }
+ public static void RecordSchedule(ManagedJob job,ManagedBackupDefinition definition)
+ {
+  job.ScheduleRecorded=true;job.ScheduleRepeatHours=definition.Schedule?.RepeatHours;job.KeepVersions=definition.KeepVersions;
+  job.ScheduleDays=definition.Schedule?.Days.Aggregate(0,(mask,day)=>mask|1<<(int)day)??0;
  }
  public static ManagedBackupDefinition Read(ISecretStore secrets,ConfigurationRevision r)=>JsonSerializer.Deserialize<ManagedBackupDefinition>(secrets.Unprotect(r.TenantId,$"configuration:{r.ManagedJobId}:{r.Revision}",r.EncryptedConfiguration))!;
 }
