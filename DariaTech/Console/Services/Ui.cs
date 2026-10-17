@@ -25,6 +25,28 @@ public static class Ui
   "ManagedJobMissing"=>"Verwalteter Backup-Job fehlt auf dem Gerät","InventoryIncomplete"=>"Gerät meldet eine unvollständige Job-Liste",
   "HandoverPending"=>"Geräteübernahme wartet auf Stopp des Altgeräts",_=>code
  };
+ // The next step for an alert, phrased for the administrator who has to act.
+ public static string AlertAction(string code)=>code switch
+ {
+  "DeviceOffline"=>"Prüfen, ob das Gerät eingeschaltet und im Internet ist. Bei Urlaub/Lager eine Abwesenheit eintragen. Eine aktuelle Sicherung kann trotzdem vorhanden sein.",
+  "EngineUnavailable"=>"Agent-Dienst auf dem Gerät neu starten; Protokoll des Agenten prüfen.",
+  "NoBackupJobs"=>"Backup-Job für das Gerät anlegen.",
+  "BackupOverdue"=>"Letzte Läufe prüfen; ist das Gerät zu den Zeiten aus, Zeitplan anpassen oder Backup manuell starten.",
+  "BackupFailed" or "EngineOperationFailed"=>"Fehler im Job-Verlauf öffnen; Speicher-Verbindung vom Gerät testen; danach Backup erneut starten.",
+  "RepeatedBackupFailures"=>"Dauerhafter Fehler: Zugangsdaten, Speicherplatz und Quellordner prüfen, Verbindung testen.",
+  "BackupWarning"=>"Einzelne Dateien wurden nicht gesichert (z. B. gesperrt oder ohne Leserecht). Quellen und Rechte prüfen.",
+  "BackupNotSuccessful"=>"Lauf wurde abgebrochen oder Ergebnis ist unbekannt – Backup erneut starten und Ergebnis prüfen.",
+  "StorageCapacityWarning" or "StorageCapacityCritical"=>"Speicher erweitern oder Aufbewahrung verringern; bei vollem Speicher schlagen Sicherungen fehl.",
+  "RetentionFailed"=>"Alte Versionen konnten nicht gelöscht werden – Rechte am Speicher prüfen.",
+  "BackupVerificationFailed"=>"Backup-Prüfung fehlgeschlagen: Reparatur prüfen und einen Restore-Test durchführen.",
+  "AgentOutdated"=>"Agent-Update freigeben.",
+  "BackupManualOnly"=>"Zeitplan eintragen oder Backup manuell starten.",
+  "ConfigurationFailed"=>"Konfiguration öffnen und Fehler beheben; das Gerät hat sie nicht übernommen.",
+  "ManagedJobMissing"=>"Der Job wurde auf dem Gerät entfernt. Konfiguration erneut speichern, damit das Gerät ihn wieder anlegt.",
+  "InventoryIncomplete"=>"Agent aktualisieren; die Job-Liste des Geräts enthält ungültige Einträge.",
+  "HandoverPending"=>"Altes Gerät einschalten, damit es den Stopp bestätigt – oder auf der Geräteseite manuell bestätigen, dass es nie wieder online kommt.",
+  _=>"Gerät öffnen und Details prüfen."
+ };
  public static string Ownership(string o)=>o=="Local"?"Lokal verwaltet":o=="Managed"?"Zentral verwaltet":o;
 
  public static string Ago(DateTimeOffset? t)

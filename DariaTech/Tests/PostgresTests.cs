@@ -104,6 +104,28 @@ public sealed class PostgresTests
   d.LastHeartbeat=now;db.Runs.Add(new BackupRun{TenantId=t.Id,JobId=job.Id,LocalRunId="ok",Started=now.AddMinutes(-10),Completed=now,Status=RunStatus.Success});await db.SaveChangesAsync();await Monitoring.Evaluate(db,new(),now.AddSeconds(2));
   Assert.That(await db.Alerts.CountAsync(x=>x.DeviceId==d.Id&&x.Resolved==null),Is.EqualTo(0));
  }
+ [Test]public async Task WorkListShowsAgeNextStepAndWhoIsOnItAndOnlyMonitoringResolves()
+ {
+  var(t,s)=await Customer();await using var db=Db();var now=DateTimeOffset.UtcNow;
+  var d=new Device{TenantId=t.Id,SiteId=s.Id,Name="Buchhaltung-PC",EngineReachable=true,LastHeartbeat=now};db.Devices.Add(d);db.Agents.Add(new DariaTech.Console.Data.Agent{TenantId=t.Id,DeviceId=d.Id,CredentialHash=Tokens.Hash(Tokens.Create())});
+  var job=new BackupJob{TenantId=t.Id,DeviceId=d.Id,Name="Backup",LocalId="1",NextRun=now.AddHours(3)};db.Jobs.Add(job);
+  db.Runs.Add(new BackupRun{TenantId=t.Id,JobId=job.Id,LocalRunId="ok",Started=now.AddDays(-3),Completed=now.AddDays(-3).AddMinutes(5),Status=RunStatus.Success});
+  db.Runs.Add(new BackupRun{TenantId=t.Id,JobId=job.Id,LocalRunId="full",Started=now.AddHours(-1),Completed=now.AddMinutes(-50),Status=RunStatus.Failed,ErrorCode="BackupFailed",QuotaTotalBytes=100,QuotaFreeBytes=0,QuotaError=true});
+  await db.SaveChangesAsync();await Monitoring.Evaluate(db,new(),now);
+  using var admin=await Login(UserRole.Technician);
+  string Form(string html){var m=Regex.Match(html,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");Assert.That(m.Success,Is.True);return WebUtility.HtmlDecode(m.Groups[1].Value);}
+  var page=WebUtility.HtmlDecode(await admin.GetStringAsync("/Alerts"));
+  Assert.That(page,Does.Contain("Buchhaltung-PC").And.Contain("Backup fehlgeschlagen").And.Contain("Speicher kritisch voll").And.Contain("Speicher erweitern").And.Contain("vor 2 Tagen").And.Contain("Offen"));
+  var alert=await db.Alerts.AsNoTracking().SingleAsync(x=>x.DeviceId==d.Id&&x.Code=="StorageCapacityCritical");
+  using(var take=await admin.PostAsync("/Alerts?handler=Take",new FormUrlEncodedContent(new Dictionary<string,string>{{"alertId",alert.Id.ToString()},{"__RequestVerificationToken",Form(page)}})))Assert.That(take.StatusCode,Is.EqualTo(HttpStatusCode.Redirect));
+  Assert.That(WebUtility.HtmlDecode(await admin.GetStringAsync("/Alerts")),Does.Contain("In Bearbeitung"));
+  Assert.That(await db.Alerts.AsNoTracking().Where(x=>x.Id==alert.Id).Select(x=>x.Resolved).SingleAsync(),Is.Null,"taking an alert does not resolve it");
+  // The storage is extended and the next backup succeeds: monitoring resolves the alerts; they show as fixed.
+  db.Runs.Add(new BackupRun{TenantId=t.Id,JobId=job.Id,LocalRunId="fixed",Started=now,Completed=now.AddMinutes(5),Status=RunStatus.Success,QuotaTotalBytes=100,QuotaFreeBytes=60,QuotaError=false});await db.SaveChangesAsync();
+  await Monitoring.Evaluate(db,new(),now.AddMinutes(6));
+  page=WebUtility.HtmlDecode(await admin.GetStringAsync("/Alerts"));
+  Assert.That(page,Does.Contain("Behoben (letzte 7 Tage)").And.Contain("behoben"));
+ }
  private async Task<HttpClient> Login(UserRole role,Guid? tenant=null,bool includeMfa=true,TestFactory? isolatedFactory=null)
  {
   var host=isolatedFactory??factory;using var scope=host.Services.CreateScope();var secrets=scope.ServiceProvider.GetRequiredService<ISecretStore>();await using var db=Db();

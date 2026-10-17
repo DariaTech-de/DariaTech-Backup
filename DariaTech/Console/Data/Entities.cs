@@ -86,6 +86,9 @@ public sealed class Alert : TenantEntity
  public DateTimeOffset Opened { get; set; } = DateTimeOffset.UtcNow;
  public DateTimeOffset LastSeen { get; set; } = DateTimeOffset.UtcNow;
  public DateTimeOffset? Resolved { get; set; }
+ // Work state: someone took the alert over ("In Bearbeitung"). It is resolved only by monitoring, when the
+ // problem is no longer detected ("behoben" is technical evidence); a new occurrence starts unassigned.
+ public string? AssignedTo { get; set; } public DateTimeOffset? InProgressSince { get; set; }
 }
 public sealed class AuditEvent
 {

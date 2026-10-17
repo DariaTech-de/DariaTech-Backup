@@ -76,6 +76,10 @@ namespace DariaTech.Console.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("AssignedTo")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(1000)
@@ -83,6 +87,9 @@ namespace DariaTech.Console.Data.Migrations
 
                     b.Property<Guid>("DeviceId")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("InProgressSince")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Key")
                         .IsRequired()

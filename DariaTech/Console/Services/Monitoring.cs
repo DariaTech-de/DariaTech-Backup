@@ -81,7 +81,7 @@ public sealed class Monitoring(IServiceScopeFactory scopes,Microsoft.Extensions.
    {
     var alert=alerts.SingleOrDefault(x=>x.DeviceId==d.Id&&x.Key==key);
     if(alert is null){alert=new Alert{TenantId=d.TenantId,DeviceId=d.Id,Key=key,Opened=now};db.Alerts.Add(alert);alerts.Add(alert);}
-    if(alert.Resolved is not null)alert.Opened=now;
+    if(alert.Resolved is not null){alert.Opened=now;alert.AssignedTo=null;alert.InProgressSince=null;}
     alert.LastSeen=now;alert.Resolved=null;alert.Severity=value.Severity;alert.Code=value.Code;
    }
    foreach(var alert in alerts.Where(x=>x.DeviceId==d.Id&&x.Resolved==null&&!problems.ContainsKey(x.Key)))alert.Resolved=now;
