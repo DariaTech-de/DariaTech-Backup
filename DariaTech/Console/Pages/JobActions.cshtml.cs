@@ -116,6 +116,9 @@ public sealed class JobActionsModel(ManagementDb db,CommandSigning signer,ISecre
    _=>null,
   };
   if(input is null){Error=step=="restore"?"Bitte mindestens eine Datei oder einen Ordner auswählen.":"Bitte zuerst eine Version wählen.";Point=at;await LoadGuide();return Page();}
+  // A recovery copy restores another device's backup: its original paths belong to that device (possibly another
+  // operating system or user), so it only restores into a new folder on this device.
+  if(input.Restore is {OriginalLocation:true}&&Managed?.RestoreOnly==true){Error="Bei einer Wiederherstellung auf einem anderen Gerät nur in einen neuen Ordner wiederherstellen – die ursprünglichen Pfade gehören zum Quellgerät.";Point=at;await LoadGuide();return Page();}
   if(input.Restore is {OriginalLocation:false} r&&!CommandProtocol.SafeFolder(r.DestinationFolder)){Error="Der Ordnername darf nur Buchstaben, Ziffern, - und _ enthalten.";Point=at;await LoadGuide();return Page();}
   var result=await CommandApi.Request(input,db,signer,secrets,HttpContext);
   if(result is IStatusCodeHttpResult {StatusCode:>=400} rejected)

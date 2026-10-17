@@ -68,8 +68,10 @@
     <label class="choice-option"><input type="radio" name="target" value="folder" checked />
      <span><strong>In einen neuen Wiederherstellungsordner (empfohlen)</strong><span class="sub">Nichts Vorhandenes wird verändert. Ort auf dem Gerät: <span class="code">@Model.RestoreRootHint</span></span>
       <input class="folder-input" type="text" name="folder" value="@Model.DefaultFolder" maxlength="100" aria-label="Name des Wiederherstellungsordners" pattern="[A-Za-z0-9_-]+" /></span></label>
+    @if(Model.Managed?.RestoreOnly!=true){
     <label class="choice-option"><input type="radio" name="target" value="original" />
-     <span><strong>An den ursprünglichen Ort</strong><span class="sub">Fehlende Dateien werden zurückgeschrieben. Vorhandene Dateien werden nicht überschrieben – die wiederhergestellte Fassung wird mit Zeitstempel daneben abgelegt.</span></span></label>
+     <span><strong>An den ursprünglichen Ort</strong><span class="sub">Fehlende Dateien werden zurückgeschrieben. Vorhandene Dateien werden nicht überschrieben – die wiederhergestellte Fassung wird mit Zeitstempel daneben abgelegt. Für viele Dateien nach Fehlbedienung oder Schadsoftware zuerst in einen neuen Ordner wiederherstellen und prüfen.</span></span></label>}
+    else{<p class="sub">@Ui.Icon("info")Dieses Backup stammt von einem anderen Gerät. Es wird nur in einen neuen Ordner auf diesem Gerät wiederhergestellt; Pfade und Betriebssystem des Quellgeräts können abweichen. Eine Wiederherstellung des ganzen Systems (Betriebssystem, Programme) ist mit Datei-Backups nicht möglich.</p>}
    </div>
    <div class="form-actions"><button class="button" type="submit">@Ui.Icon("check")Wiederherstellung starten</button></div>
    <p class="sub">@(Model.FourEyes?"Ein zweiter Administrator muss die Wiederherstellung unten unter „Verlauf“ freigeben.":"Es gibt nur einen Administrator; die Wiederherstellung startet ohne zweite Freigabe und wird protokolliert.")</p>

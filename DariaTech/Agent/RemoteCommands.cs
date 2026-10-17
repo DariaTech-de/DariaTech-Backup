@@ -11,6 +11,8 @@ public sealed partial class DuplicatiAdapter
   var jobs=await ReadJobs(ct);if(jobs.All(x=>x.LocalId!=command.LocalJobId))throw new InvalidOperationException("Backup job no longer exists");
   // Two devices writing to one destination would corrupt it; a recovery copy only restores.
   if(command.Action==RemoteAction.RunBackup&&IsRestoreOnly(command.LocalJobId))throw new InvalidOperationException("Recovery copy cannot run backups");
+  // Another device's original paths are not this device's; a recovery copy only restores into a new folder.
+  if(command.Action==RemoteAction.Restore&&command.Restore?.OriginalLocation==true&&IsRestoreOnly(command.LocalJobId))throw new InvalidOperationException("Recovery copy restores into a new folder only");
   if(command.Action is RemoteAction.RunBackup or RemoteAction.VerifyBackup&&IsAdopting(command.LocalJobId))throw new InvalidOperationException("Taken-over backup is still rebuilding its database");
   var cloudBindings=state.Read<Dictionary<string,SaasJobBinding>>("saas-bindings.bin")??[];
   if(command.Action==RemoteAction.RunBackup&&cloudBindings.TryGetValue(command.LocalJobId,out var cloud))await RequireSaasProvider(cloud.Source,false,ct);

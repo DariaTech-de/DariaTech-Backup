@@ -836,6 +836,10 @@ Assert.That(html,Does.Contain("Agent 0.2.0 · Pilot").And.Contain(url).And.Conta
   Assert.That(await db.Commands.AnyAsync(x=>x.DeviceId==newId.DeviceId&&x.Action==RemoteAction.RunBackup),Is.False,"no backup into another device's destination");
   using var list=await admin.PostAsync("/JobActions?handler=Request",new FormUrlEncodedContent(new Dictionary<string,string>{{"JobId",backup.Id.ToString()},{"Action","ListRestorePoints"},{"__RequestVerificationToken",Form(actions)}}));
   Assert.That(await db.Commands.AnyAsync(x=>x.DeviceId==newId.DeviceId&&x.Action==RemoteAction.ListRestorePoints),Is.True);
+  // Restoring another device's backup "to the original location" would write that device's paths here.
+  using(var original=await admin.PostAsync("/JobActions?handler=Guide",new FormUrlEncodedContent(new List<KeyValuePair<string,string>>{new("JobId",backup.Id.ToString()),new("step","restore"),new("point",DateTimeOffset.UtcNow.AddDays(-1).ToString("O")),new("paths","C:\\Data\\file.txt"),new("target","original"),new("__RequestVerificationToken",Form(actions))})))
+   Assert.That(WebUtility.HtmlDecode(await original.Content.ReadAsStringAsync()),Does.Contain("nur in einen neuen Ordner wiederherstellen"));
+  Assert.That(await db.Commands.AnyAsync(x=>x.DeviceId==newId.DeviceId&&x.Action==RemoteAction.Restore),Is.False);
   // The recovery flag cannot be removed by editing the job.
   using var edit=await admin.PutAsJsonAsync($"/api/v1/management/managed-jobs/{copy.Id}",new ConfigurationInput(1,assignment.Definition with{RestoreOnly=null}));
   Assert.That(edit.StatusCode,Is.EqualTo(HttpStatusCode.Conflict));
