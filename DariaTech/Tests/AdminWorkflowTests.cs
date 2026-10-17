@@ -75,3 +75,20 @@ public sealed class AdminWorkflowTests
   finally{Directory.Delete(directory,true);}
  }
 }
+
+public sealed class LoginLockTests
+{
+ [Test]public void AttemptsDuringALockNeitherCountNorExtendItAndTheCounterRestartsAfterwards()
+ {
+  var user=new DariaTech.Console.Data.User();var start=new DateTimeOffset(2026,10,1,8,0,0,TimeSpan.Zero);
+  for(var i=0;i<4;i++){Assert.That(DariaTech.Console.Pages.LoginLock.Locked(user,start),Is.False);DariaTech.Console.Pages.LoginLock.Failed(user,start);}
+  Assert.That(user.LockedUntil,Is.Null);
+  DariaTech.Console.Pages.LoginLock.Failed(user,start);var until=user.LockedUntil;Assert.That(until,Is.EqualTo(start.AddMinutes(30)));
+  // Attempts while locked: the page skips verification and does not call Failed, so the end stays fixed.
+  for(var i=1;i<=20;i++)Assert.That(DariaTech.Console.Pages.LoginLock.Locked(user,start.AddMinutes(i)),Is.True);
+  Assert.That(user.LockedUntil,Is.EqualTo(until));Assert.That(user.FailedLogins,Is.EqualTo(5));
+  Assert.That(DariaTech.Console.Pages.LoginLock.Locked(user,start.AddMinutes(30)),Is.False,"the lock ends exactly at its end time");
+  Assert.That(user.FailedLogins,Is.Zero);Assert.That(user.LockedUntil,Is.Null);
+  DariaTech.Console.Pages.LoginLock.Failed(user,start.AddMinutes(31));Assert.That(user.LockedUntil,Is.Null,"one failure after the lock does not lock again");
+ }
+}
