@@ -153,6 +153,18 @@ public sealed class JobActionsModel(ManagementDb db,CommandSigning signer,ISecre
   if(result is IStatusCodeHttpResult {StatusCode:>=400}){Error="Freigabe abgelehnt. Ein anderer Administrator muss den noch gültigen Restore bestätigen.";return Page();}
   return RedirectToPage(new{id=JobId});
  }
+ // After a completed restore an administrator or technician opens the restored files and confirms they are
+ // usable. This manual statement is what "Restore geprüft" in the setup overview means; the technical result
+ // alone ("Erfolgreich") does not prove that the files can be used.
+ public async Task<IActionResult> OnPostCheckRestoreAsync(Guid commandId,bool confirm)
+ {
+  if(!await Load())return NotFound(); // page policy: operators only
+  var command=await db.Commands.SingleOrDefaultAsync(x=>x.Id==commandId&&x.JobId==JobId&&x.Action==RemoteAction.Restore);if(command is null)return NotFound();
+  if(command.Status!="Completed"){Error="Nur eine technisch abgeschlossene Wiederherstellung kann als geprüft bestätigt werden.";return Page();}
+  if(!confirm){Error="Bitte bestätigen, dass die wiederhergestellten Dateien geöffnet wurden und nutzbar sind.";return Page();}
+  if(command.Checked is null){command.Checked=DateTimeOffset.UtcNow;command.CheckedBy=User.FindFirstValue(ClaimTypes.Name)??"";ManagementApi.Audit(db,HttpContext,command.TenantId,"restore.checked-usable",command.Id);await db.SaveChangesAsync();}
+  return RedirectToPage(new{id=JobId});
+ }
  private async Task<bool> Load()
  {
   Job=await db.Jobs.SingleOrDefaultAsync(x=>x.Id==JobId&&x.Active)??null!;if(Job is null)return false;

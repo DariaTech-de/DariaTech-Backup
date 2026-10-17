@@ -33,6 +33,22 @@
 
 @if(Model.Message is not null){<p class="notice-inline good" role="status">@Ui.Icon("check")@Model.Message</p>}
 @if(Model.Failure is not null){<p class="form-error" role="alert">@Model.Failure</p>}
+@if(Model.Protection is {} prot){
+<section class="card" id="protection">
+ <div class="card-head"><div><h2>Schutzstatus @if(prot.Accepted){<span class="status healthy">abgenommen</span>}else{<span class="status warning">noch nicht abgenommen</span>}</h2><span class="sub">Nächster Schritt: @prot.NextAction</span></div></div>
+ <ol class="steps-list">
+  <li><span class="status @(prot.Connected?"healthy":"offline")">@(prot.Connected?"Agent verbunden":"Agent nicht verbunden")</span> · <span class="status @(prot.EngineReady?"healthy":"offline")">@(prot.EngineReady?"Backup-Engine bereit":"Backup-Engine nicht bereit")</span></li>
+  @{var cfg=Onboarding.Label(prot.Configuration,"Konfiguration übernommen","Konfiguration ausstehend","Konfiguration wird übernommen","Konfiguration fehlgeschlagen");}
+  <li><span class="status @cfg.Css">@cfg.Text</span> – gespeichert heißt noch nicht angewendet; maßgeblich ist die Bestätigung des Geräts.</li>
+  <li><span class="status @(prot.StorageReached?"healthy":"offline")">@(prot.StorageReached?"Speicher vom Gerät erreicht":"Speicher-Erreichbarkeit nicht nachgewiesen")</span> – nachgewiesen durch einen Verbindungstest dieses Geräts oder eine erfolgreiche Sicherung. Das Gerät sichert direkt zum Speicher; die Daten laufen nicht über die Console.</li>
+  @{var fb=Onboarding.Label(prot.FirstBackup,"Erstsicherung erfolgreich","Erstsicherung ausstehend","Erstsicherung läuft","Erstsicherung fehlgeschlagen");}
+  <li><span class="status @fb.Css">@fb.Text</span>@if(prot.LastSuccess is {} at){<text> · zuletzt @Ui.Date(at)</text>} – große Erstsicherungen können Tage dauern; nach einer Unterbrechung setzt der nächste Lauf fort, bereits übertragene Blöcke werden nicht erneut hochgeladen.</li>
+  @{var rt=Onboarding.Label(prot.RestoreTest,"Restore-Test bestätigt (manuell)","Restore-Test ausstehend","Restore technisch abgeschlossen – Dateien noch prüfen","Wiederherstellung fehlgeschlagen");}
+  <li><span class="status @rt.Css">@rt.Text</span> – Beispieldatei in einen neuen Ordner wiederherstellen, öffnen und unter „Aktionen / Restore“ bestätigen. Eine Backup-Prüfung ersetzt keinen Restore-Test.</li>
+  <li><span class="status @(prot.NextRun is not null||prot.ManualOnly?"healthy":"offline")">@(prot.ManualOnly?"Nur manuell (kein Zeitplan)":prot.NextRun is {} next?$"Nächster automatischer Lauf {Ui.Date(next)}":"Kein nächster Lauf bekannt")</span></li>
+ </ol>
+</section>
+}
 @if(Model.IsMac){
 <section class="card">
  <div class="card-head"><div><h2>Mac: Festplattenvollzugriff</h2><span class="sub">Ohne diese Freigabe kann macOS Dokumente, Schreibtisch und Downloads nicht sichern lassen.</span></div></div>

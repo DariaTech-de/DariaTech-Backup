@@ -21,7 +21,7 @@ public static class AgentApi
    var e=await db.EnrollmentTokens.IgnoreQueryFilters().SingleAsync(x=>x.TokenHash==hash);scope.AgentTenant=e.TenantId;
    if(!await db.Customers.AnyAsync(x=>x.TenantId==scope.AgentTenant&&x.Active))return Results.Unauthorized();
    var d=new Device{TenantId=e.TenantId,SiteId=e.SiteId,Name=r.Hostname,Hostname=r.Hostname,OperatingSystem=r.OperatingSystem};var credential=Tokens.Create();
-   db.Devices.Add(d);db.Agents.Add(new Agent{TenantId=e.TenantId,DeviceId=d.Id,Version=r.AgentVersion,Platform=r.Platform??"",CredentialHash=Tokens.Hash(credential)});
+   e.DeviceId=d.Id;db.Devices.Add(d);db.Agents.Add(new Agent{TenantId=e.TenantId,DeviceId=d.Id,Version=r.AgentVersion,Platform=r.Platform??"",CredentialHash=Tokens.Hash(credential)});
    db.Audit.Add(new AuditEvent{TenantId=e.TenantId,Actor="enrollment",Action="device.registered",Resource=d.Id.ToString()});
    await db.SaveChangesAsync();await tx.CommitAsync();ctx.Response.Headers.CacheControl="no-store";return Results.Ok(new EnrollmentResponse(d.Id,credential));
   }).RequireRateLimiting("Enrollment");

@@ -541,6 +541,61 @@ public sealed class PostgresTests
   Assert.That(await Codes(away),Is.EqualTo(new[]{"BackupOverdue","DeviceOffline"}));
   Assert.That(await Codes(office),Is.EqualTo(new[]{"BackupOverdue","DeviceOffline"}),"Thursday without a run since Friday is overdue");
  }
+ [Test]public async Task FivePcCustomerIsInSetupUntilEveryDeviceIsProvenAndARestoreIsConfirmed()
+ {
+  var(t,site)=await Customer();await using var db=Db();var customer=await db.Customers.IgnoreQueryFilters().SingleAsync(x=>x.TenantId==t.Id);
+  using var admin=await Login(UserRole.SuperAdmin);
+  string Form(string html){var m=Regex.Match(html,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");Assert.That(m.Success,Is.True);return WebUtility.HtmlDecode(m.Groups[1].Value);}
+  async Task<string> Post(string url,Dictionary<string,string> fields,string formPage)
+  {
+   fields["__RequestVerificationToken"]=Form(await admin.GetStringAsync(formPage));using var response=await admin.PostAsync(url,new FormUrlEncodedContent(fields));
+   Assert.That((int)response.StatusCode,Is.LessThan(400));return WebUtility.HtmlDecode(response.StatusCode==HttpStatusCode.Redirect?await admin.GetStringAsync(response.Headers.Location!.ToString()):await response.Content.ReadAsStringAsync());
+  }
+  var customerPage=$"/Customer?id={customer.Id}";
+  await Post($"{customerPage}&handler=Expected",new(){{"id",customer.Id.ToString()},{"expectedDevices","5"}},customerPage);
+  // Five single-use codes in one step, each with its own command.
+  var issued=await Post($"{customerPage}&handler=Enroll",new(){{"id",customer.Id.ToString()},{"siteId",site.Id.ToString()},{"validMinutes","60"},{"platform","win-x64"},{"allowManaged","true"},{"allowRemote","true"},{"count","5"}},customerPage);
+  var codes=Regex.Matches(issued,"<code class=\"token\">([^<]{64})</code>").Select(x=>x.Groups[1].Value).ToList();
+  Assert.That(codes.Distinct().Count(),Is.EqualTo(5));Assert.That(issued,Does.Contain("5 Einmal-Codes").And.Contain("genau <strong>ein</strong> Gerät"));
+  var pcs=new List<(HttpClient Client,EnrollmentResponse Id)>();
+  foreach(var code in codes.Take(4))
+  {
+   var client=factory.CreateClient(new(){BaseAddress=new Uri("https://localhost")});
+   using var e=await client.PostAsJsonAsync("/api/v1/agent/enroll",new EnrollmentRequest(code,$"PC-{pcs.Count+1}","Windows 11","0.3.1","win-x64"));Assert.That(e.StatusCode,Is.EqualTo(HttpStatusCode.OK));
+   var identity=(await e.Content.ReadFromJsonAsync<EnrollmentResponse>())!;client.DefaultRequestHeaders.Authorization=new("Bearer",identity.Credential);client.DefaultRequestHeaders.Add("X-Device-Id",identity.DeviceId.ToString());pcs.Add((client,identity));
+  }
+  // A code is used up: a second installation with the same code is refused.
+  using(var again=factory.CreateClient(new(){BaseAddress=new Uri("https://localhost")}))using(var reuse=await again.PostAsJsonAsync("/api/v1/agent/enroll",new EnrollmentRequest(codes[0],"PC-1-copy","Windows 11","0.3.1","win-x64")))Assert.That(reuse.StatusCode,Is.EqualTo(HttpStatusCode.Unauthorized));
+  using var csrf=System.Text.Json.JsonDocument.Parse(await admin.GetStringAsync("/api/v1/management/csrf"));admin.DefaultRequestHeaders.Add("X-CSRF-Token",csrf.RootElement.GetProperty("token").GetString());
+  var definition=new ManagedBackupDefinition("Dokumente",["C:\\Users\\Public\\Documents"],"webdav://storage.example/dav/kunde/pc","five-pc-passphrase-24680",new(){{"use-ssl","true"},{"auth-username","u"},{"auth-password","p"}},30,[],new(DateTimeOffset.UtcNow.AddHours(2),24,Enum.GetValues<DayOfWeek>()));
+  var managed=new List<ManagedJob>();
+  for(var i=0;i<4;i++)
+  {
+   using var created=await admin.PostAsJsonAsync($"/api/v1/management/devices/{pcs[i].Id.DeviceId}/managed-jobs",new ConfigurationInput(0,definition with{TargetUrl=definition.TargetUrl+(i+1)}));managed.Add((await created.Content.ReadFromJsonAsync<ManagedJob>())!);
+  }
+  var now=DateTimeOffset.UtcNow;
+  // PC-1..3 apply their job; PC-4 is only connected. PC-1 and PC-2 finish a first backup; PC-3's first backup fails.
+  for(var i=0;i<3;i++)using(var applied=await pcs[i].Client.PostAsJsonAsync($"/api/v1/agent/configurations/{managed[i].Id}/receipt",new ConfigurationReceipt(1,"1","Applied")))Assert.That(applied.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  var runs=new RunReport?[]{new("r1",now.AddMinutes(-30),now.AddMinutes(-5),RunStatus.Success,10,1,10,null,null),new("r2",now.AddMinutes(-30),now.AddMinutes(-5),RunStatus.Success,10,1,10,null,null),new("r3",now.AddMinutes(-30),now.AddMinutes(-5),RunStatus.Failed,null,null,null,null,"BackupFailed"),null};
+  for(var i=0;i<4;i++)using(var hb=await pcs[i].Client.PostAsJsonAsync("/api/v1/agent/heartbeat",new HeartbeatRequest("0.3.1","Windows 11",true,i<3?[new("1","Dokumente",now.AddHours(2),runs[i])]:[],null,"win-x64")))Assert.That(hb.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  var page=WebUtility.HtmlDecode(await admin.GetStringAsync(customerPage));
+  Assert.That(page,Does.Contain("In Einrichtung").And.Contain("5 Geräte vorgesehen, 4 verbunden, 3 konfiguriert, 2 erfolgreich gesichert, 0 mit geprüftem Restore").And.Contain("1 vorgesehenes Gerät ist noch nicht registriert").And.Contain("1 Registrierungscode noch offen"));
+  Assert.That(page,Does.Contain("Fehlgeschlagene Erstsicherung prüfen").And.Contain("Backup-Job anlegen bzw. Übernahme abwarten").Or.Contain("Warten, bis das Gerät die Konfiguration übernimmt"));
+  // A completed restore is technical evidence only; the manual check makes it "Restore geprüft".
+  var job1=await db.Jobs.AsNoTracking().SingleAsync(x=>x.DeviceId==pcs[0].Id.DeviceId&&x.LocalId=="1");
+  var restore=new RemoteCommand{TenantId=t.Id,DeviceId=job1.DeviceId,JobId=job1.Id,Action=RemoteAction.Restore,Expires=now.AddMinutes(10),Status="Completed",RequestedBy="test"};db.Commands.Add(restore);await db.SaveChangesAsync();
+  Assert.That(WebUtility.HtmlDecode(await admin.GetStringAsync(customerPage)),Does.Contain("technisch abgeschlossen – Prüfung offen"));
+  var actions=$"/JobActions?id={job1.Id}";
+  Assert.That(await Post($"{actions}&handler=CheckRestore",new(){{"JobId",job1.Id.ToString()},{"commandId",restore.Id.ToString()}},actions),Does.Contain("Bitte bestätigen"));
+  await Post($"{actions}&handler=CheckRestore",new(){{"JobId",job1.Id.ToString()},{"commandId",restore.Id.ToString()},{"confirm","true"}},actions);
+  page=WebUtility.HtmlDecode(await admin.GetStringAsync(customerPage));
+  Assert.That(page,Does.Contain("1 mit geprüftem Restore").And.Contain("In Einrichtung"),"one accepted device does not make the customer operational");
+  Assert.That(await db.Audit.AnyAsync(x=>x.Action=="restore.checked-usable"&&x.Resource==restore.Id.ToString()),Is.True);
+  var device=WebUtility.HtmlDecode(await admin.GetStringAsync($"/Device?id={pcs[0].Id.DeviceId}"));
+  Assert.That(device,Does.Contain("Schutzstatus").And.Contain("abgenommen").And.Contain("Restore-Test bestätigt (manuell)").And.Contain("Speicher vom Gerät erreicht"));
+  Assert.That(WebUtility.HtmlDecode(await admin.GetStringAsync($"/Device?id={pcs[3].Id.DeviceId}")),Does.Contain("noch nicht abgenommen"),"a connection alone is no protection");
+  foreach(var (client,_) in pcs)client.Dispose();
+ }
  [Test]public async Task AddDeviceWizardShowsPlatformPackageAndInstallCommandWithOneTimeToken()
  {
   var(t,site)=await Customer();await using var db=Db();var customer=await db.Customers.IgnoreQueryFilters().SingleAsync(x=>x.TenantId==t.Id);

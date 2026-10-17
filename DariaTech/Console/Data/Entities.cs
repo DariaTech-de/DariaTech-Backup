@@ -14,6 +14,8 @@ public sealed class Customer : TenantEntity
  public string Contact { get; set; } = ""; public string Email { get; set; } = "";
  public string Phone { get; set; } = ""; public string Address { get; set; } = "";
  public string Notes { get; set; } = ""; public bool Active { get; set; } = true;
+ // Number of devices the contract covers; null: the devices registered so far.
+ public int? ExpectedDevices { get; set; }
 }
 public sealed class Site : TenantEntity { public string Name { get; set; } = ""; public string Address { get; set; } = ""; }
 public sealed class Device : TenantEntity
@@ -64,6 +66,7 @@ public sealed class EnrollmentToken : TenantEntity
 {
  public Guid SiteId { get; set; } public string TokenHash { get; set; } = "";
  public DateTimeOffset Expires { get; set; } public DateTimeOffset? Used { get; set; }
+ public DateTimeOffset Created { get; set; } = DateTimeOffset.UtcNow; public Guid? DeviceId { get; set; }
 }
 public enum UserRole { SuperAdmin, Administrator, Technician, ReadOnly, CustomerAdmin, CustomerReadOnly }
 public sealed class Role { public UserRole Id { get; set; } public string Name { get; set; } = ""; }
@@ -132,6 +135,9 @@ public sealed class RemoteCommand : TenantEntity
  public RemoteAction Action { get; set; } public DateTimeOffset Expires { get; set; }
  public string Status { get; set; } = "Pending"; public long? TaskId { get; set; }
  public string? ErrorCode { get; set; } public string? Detail { get; set; }
+ // Restore only: an administrator opened the restored files and confirmed that they are usable. This is a
+ // manual statement on top of the technical result (Status Completed) and is recorded separately.
+ public string? CheckedBy { get; set; } public DateTimeOffset? Checked { get; set; }
 }
 
 public sealed class NotificationDelivery : TenantEntity

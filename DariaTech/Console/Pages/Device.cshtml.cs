@@ -67,5 +67,7 @@ public sealed class DeviceModel(ManagementDb db,IOptions<MonitoringOptions> o,Da
   var from=Managed.Where(x=>x.HandoverFromDeviceId is not null).GroupBy(x=>x.HandoverFromDeviceId!.Value).ToDictionary(x=>x.Key,x=>x.Count());
   var olds=await db.Devices.Where(x=>from.Keys.Contains(x.Id)).ToListAsync();
   PendingHandovers=olds.Where(x=>x.RetirementPending).Select(x=>new Handover(x,from[x.Id])).ToList();
+  if(await db.Customers.SingleOrDefaultAsync(x=>x.TenantId==row.Device.TenantId) is {} customer)Protection=(await Onboarding.Load(db,customer,o.Value)).Devices.FirstOrDefault(x=>x.Device.Id==id);
   return Page();}
+ public DeviceProtection? Protection{get;private set;}
 }

@@ -366,6 +366,9 @@ namespace DariaTech.Console.Data.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
+                    b.Property<int?>("ExpectedDevices")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(1000)
@@ -538,6 +541,12 @@ namespace DariaTech.Console.Data.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("Created")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeviceId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("Expires")
@@ -741,6 +750,13 @@ namespace DariaTech.Console.Data.Migrations
                         .HasColumnType("integer");
 
                     b.Property<string>("ApprovedBy")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset?>("Checked")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CheckedBy")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 

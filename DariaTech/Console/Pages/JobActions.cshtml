@@ -92,6 +92,11 @@
    <td>@(command.RequestedBy==DariaTech.Console.Api.CommandApi.Scheduler?"Monatliche Prüfung (automatisch)":command.RequestedBy==Model.Actor?"Sie":"Kollege")</td>
    <td class="row-actions">
     @if(command.EncryptedCatalog is not null&&command.Action is not (DariaTech.Contracts.RemoteAction.ListRestorePoints or DariaTech.Contracts.RemoteAction.ListRestoreFiles)){<a class="button secondary" asp-route-id="@Model.JobId" asp-route-catalogId="@command.Id">Katalog</a>}
+    @if(command.Action==DariaTech.Contracts.RemoteAction.Restore&&command.Status=="Completed"){
+     if(command.Checked is {} checkedAt){<span class="sub">Dateien als nutzbar bestätigt @Ui.Ago(checkedAt) (manuell)</span>}
+     else{<form method="post" asp-page-handler="CheckRestore" class="form-grid"><input type="hidden" name="JobId" value="@Model.JobId" /><input type="hidden" name="commandId" value="@command.Id" />
+      <label class="check"><input type="checkbox" name="confirm" value="true" /> Wiederhergestellte Dateien geöffnet – sie sind vollständig und nutzbar.</label><button class="button secondary" type="submit">Restore-Test bestätigen</button></form>}
+    }
     @if(Model.Administrator&&command.Status=="AwaitingApproval"&&command.Expires>DateTimeOffset.UtcNow&&command.RequestedBy!=Model.Actor){
     <form method="post" asp-page-handler="Approve"><input type="hidden" name="JobId" value="@Model.JobId" /><input type="hidden" name="commandId" value="@command.Id" /><button class="button" type="submit">Wiederherstellung freigeben</button></form>}
    </td></tr>}</tbody>
