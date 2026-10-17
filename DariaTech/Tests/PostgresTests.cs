@@ -126,6 +126,36 @@ public sealed class PostgresTests
   page=WebUtility.HtmlDecode(await admin.GetStringAsync("/Alerts"));
   Assert.That(page,Does.Contain("Behoben (letzte 7 Tage)").And.Contain("behoben"));
  }
+ [Test]public async Task SharedSettingsChangeOnlyTheTickedSettingsAfterAPreview()
+ {
+  var(t,site)=await Customer();await using var db=Db();var customer=await db.Customers.IgnoreQueryFilters().SingleAsync(x=>x.TenantId==t.Id);
+  var a=new Device{TenantId=t.Id,SiteId=site.Id,Name="PC-A"};var b=new Device{TenantId=t.Id,SiteId=site.Id,Name="PC-B"};db.Devices.AddRange(a,b);await db.SaveChangesAsync();
+  using var admin=await Login(UserRole.Administrator);using var csrf=System.Text.Json.JsonDocument.Parse(await admin.GetStringAsync("/api/v1/management/csrf"));admin.DefaultRequestHeaders.Add("X-CSRF-Token",csrf.RootElement.GetProperty("token").GetString());
+  ManagedBackupDefinition Def(string source,string passphrase)=>new("Dokumente",[source],"webdav://storage.example/dav/k/"+passphrase[..4],passphrase,new(){{"use-ssl","true"},{"auth-username","u"},{"auth-password","p"}},30,[new(false,"*.tmp")],null);
+  var jobs=new List<ManagedJob>();
+  foreach(var (device,def) in new[]{(a,Def("C:\\Users\\Anna\\Documents","anna-passphrase-12345")),(b,Def("C:\\Users\\Ben\\Desktop","benb-passphrase-12345"))})
+  {using var created=await admin.PostAsJsonAsync($"/api/v1/management/devices/{device.Id}/managed-jobs",new ConfigurationInput(0,def));jobs.Add((await created.Content.ReadFromJsonAsync<ManagedJob>())!);}
+  string Form(string html){var m=Regex.Match(html,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");Assert.That(m.Success,Is.True);return WebUtility.HtmlDecode(m.Groups[1].Value);}
+  var url=$"/SharedSettings?id={customer.Id}";var page=WebUtility.HtmlDecode(await admin.GetStringAsync(url));Assert.That(page,Does.Contain("PC-A").And.Contain("PC-B").And.Contain("Manuell"));
+  List<KeyValuePair<string,string>> Fields(bool confirm){var f=new List<KeyValuePair<string,string>>{new("id",customer.Id.ToString()),new("JobIds",jobs[0].Id.ToString()),new("JobIds",jobs[1].Id.ToString()),new("ChangeSchedule","true"),new("FirstRun","2026-11-02T22:00"),new("RepeatHours","24"),new("StaggerMinutes","30"),new("ChangeRetention","true"),new("KeepVersions","90"),new("__RequestVerificationToken",Form(page))};
+   foreach(var day in new[]{"Monday","Tuesday","Wednesday","Thursday","Friday"})f.Add(new("Days",day));if(confirm)f.Add(new("Confirm","true"));return f;}
+  using(var preview=await admin.PostAsync(url+"&handler=Preview",new FormUrlEncodedContent(Fields(false))))
+  {
+   var html=WebUtility.HtmlDecode(await preview.Content.ReadAsStringAsync());Assert.That(html,Does.Contain("Vorschau – diese Backups ändern sich").And.Contain("2 Backups auf 2 Gerät(en)").And.Contain("90 Versionen"));
+  }
+  Assert.That(await db.ConfigurationRevisions.CountAsync(x=>x.ManagedJobId==jobs[0].Id),Is.EqualTo(1),"a preview changes nothing");
+  using(var unconfirmed=await admin.PostAsync(url+"&handler=Apply",new FormUrlEncodedContent(Fields(false))))Assert.That(WebUtility.HtmlDecode(await unconfirmed.Content.ReadAsStringAsync()),Does.Contain("Bitte die Änderung"));
+  using(var applied=await admin.PostAsync(url+"&handler=Apply",new FormUrlEncodedContent(Fields(true))))Assert.That(WebUtility.HtmlDecode(await applied.Content.ReadAsStringAsync()),Does.Contain("wird beim nächsten Kontakt des Geräts angewendet"));
+  var secrets=factory.Services.GetRequiredService<ISecretStore>();
+  ManagedBackupDefinition Latest(Guid id){var r=db.ConfigurationRevisions.AsNoTracking().Where(x=>x.ManagedJobId==id).OrderByDescending(x=>x.Revision).First();return DariaTech.Console.Api.ConfigurationApi.Read(secrets,r);}
+  var first=Latest(jobs[0].Id);var second=Latest(jobs[1].Id);
+  Assert.That(first.Sources,Is.EqualTo(new[]{"C:\\Users\\Anna\\Documents"}));Assert.That(second.Sources,Is.EqualTo(new[]{"C:\\Users\\Ben\\Desktop"}),"individual sources are kept");
+  Assert.That(second.Passphrase,Is.EqualTo("benb-passphrase-12345"));Assert.That(first.Filters.Single().Expression,Is.EqualTo("*.tmp"));Assert.That(first.KeepVersions,Is.EqualTo(90));
+  Assert.That(first.Schedule!.Days,Has.Length.EqualTo(5));Assert.That(second.Schedule!.Start-first.Schedule.Start,Is.EqualTo(TimeSpan.FromMinutes(30)),"start times are staggered");
+  if(DariaTech.Console.Services.Ui.Zone!=TimeZoneInfo.Utc)Assert.That(first.Schedule.Start,Is.EqualTo(new DateTimeOffset(2026,11,2,21,0,0,TimeSpan.Zero)),"22:00 German winter time");
+  var stored=await db.ManagedJobs.AsNoTracking().SingleAsync(x=>x.Id==jobs[0].Id);Assert.That(stored.LatestRevision,Is.EqualTo(2));Assert.That(stored.AppliedRevision,Is.Zero,"saved is not applied");
+  Assert.That(stored.ScheduleRepeatHours,Is.EqualTo(24));Assert.That(stored.KeepVersions,Is.EqualTo(90));
+ }
  private async Task<HttpClient> Login(UserRole role,Guid? tenant=null,bool includeMfa=true,TestFactory? isolatedFactory=null)
  {
   var host=isolatedFactory??factory;using var scope=host.Services.CreateScope();var secrets=scope.ServiceProvider.GetRequiredService<ISecretStore>();await using var db=Db();

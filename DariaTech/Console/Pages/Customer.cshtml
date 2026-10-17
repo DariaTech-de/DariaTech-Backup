@@ -14,7 +14,7 @@
    @if(!string.IsNullOrEmpty(c.Address)){<li>@Ui.Icon("pin")@c.Address</li>}
   </ul></div>
  </div>
- @if(Model.CanManage){<div class="actions"><a class="button" href="#enroll">@Ui.Icon("plus")Gerät hinzufügen</a></div>}
+ @if(Model.CanManage){<div class="actions"><a class="button" href="#enroll">@Ui.Icon("plus")Gerät hinzufügen</a>@if(Model.IsAdmin){<a class="button secondary" href="/SharedSettings?id=@c.Id">Gemeinsame Einstellungen</a>}</div>}
 </div>
 @{var setup=Model.Setup;}
 <section class="card@(setup.Operational?"":" highlight")" id="setup">
