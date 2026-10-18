@@ -6,6 +6,10 @@ using Microsoft.EntityFrameworkCore;
 namespace DariaTech.Console.Api;
 public static class CommandApi
 {
+ // The engine matches a plain restore path exactly, so a selected folder (ending with a separator) would restore
+ // nothing. Like the engine's own restore dialog, a folder becomes a filter for the folder and everything below
+ // it. Files and filters an API caller already wrote stay unchanged.
+ public static string[] EngineRestorePaths(string[] paths)=>paths.Select(p=>p.EndsWith('/')||p.EndsWith('\\')?"["+System.Text.RegularExpressions.Regex.Replace(p,@"[.*+?^${}()|[\]\\]",@"\$&")+".*]":p).ToArray();
  public static void MapCommandApi(this WebApplication app)
  {
   var g=app.MapGroup("/api/v1/management").RequireAuthorization();
@@ -76,7 +80,8 @@ public static class CommandApi
     var revision=await db.ConfigurationRevisions.SingleAsync(x=>x.ManagedJobId==managed.Id&&x.Revision==managed.AppliedRevision);
     if(ConfigurationApi.Read(secrets,revision).Proxmox is null)return Results.BadRequest();
    }
-   var now=DateTimeOffset.UtcNow;var command=new DeviceCommand(Guid.NewGuid(),job.TenantId,job.DeviceId,job.LocalId,input.Action,input.Restore,now,now.AddMinutes(input.ValidMinutes),input.Catalog,input.SaasRestore,input.ProxmoxRestore);
+   var selection=input.Restore is {Paths:{} chosenPaths} chosen?chosen with{Paths=EngineRestorePaths(chosenPaths)}:input.Restore;
+   var now=DateTimeOffset.UtcNow;var command=new DeviceCommand(Guid.NewGuid(),job.TenantId,job.DeviceId,job.LocalId,input.Action,selection,now,now.AddMinutes(input.ValidMinutes),input.Catalog,input.SaasRestore,input.ProxmoxRestore);
    if(!CommandProtocol.Valid(command,job.DeviceId,now))return Results.BadRequest();
    // Restores need a second administrator's approval; with a single administrator account that would make
    // restores impossible, so then the request is approved by its author and audited as such.

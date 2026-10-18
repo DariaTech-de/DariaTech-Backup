@@ -63,6 +63,37 @@ public sealed class PostgresTests
   await using var db=Db();var credential=await responses.Single(x=>x.IsSuccessStatusCode).Content.ReadFromJsonAsync<EnrollmentResponse>();
   var agent=await db.Agents.SingleAsync(x=>x.DeviceId==credential!.DeviceId);Assert.That(agent.CredentialHash,Is.Not.EqualTo(credential!.Credential));
  }
+ [Test]public async Task AJobAppliedWhileTheAgentReportsAnOlderSnapshotIsNotTakenForRemoved()
+ {
+  var(t,s)=await Customer();using var c=factory.CreateClient(new(){BaseAddress=new Uri("https://localhost")});
+  using var e=await c.PostAsJsonAsync("/api/v1/agent/enroll",new EnrollmentRequest(await Token(t,s),"DEVICE05","Windows","0.4.0"));var identity=(await e.Content.ReadFromJsonAsync<EnrollmentResponse>())!;
+  c.DefaultRequestHeaders.Authorization=new("Bearer",identity.Credential);c.DefaultRequestHeaders.Add("X-Device-Id",identity.DeviceId.ToString());
+  var snapshot=new HeartbeatRequest("0.4.0","Windows",true,[new("1","Bestand",null,null)]);
+  using var first=await c.PostAsJsonAsync("/api/v1/agent/heartbeat",snapshot);Assert.That(first.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  await using var db=Db();var managed=new ManagedJob{TenantId=t.Id,DeviceId=identity.DeviceId,Name="Neu",LatestRevision=1};db.ManagedJobs.Add(managed);await db.SaveChangesAsync();
+  // The job list is read, then the new configuration is applied and confirmed, then the heartbeats carry lists
+  // read before the job existed: the one of this cycle (agents up to 0.4.0) and older ones queued while the
+  // device could not reach the Console.
+  using var applied=await c.PostAsJsonAsync($"/api/v1/agent/configurations/{managed.Id}/receipt",new ConfigurationReceipt(1,"5","Applied"));Assert.That(applied.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  for(var queued=0;queued<3;queued++){using var stale=await c.PostAsJsonAsync("/api/v1/agent/heartbeat",snapshot);Assert.That(stale.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));}
+  var now=DateTimeOffset.UtcNow;
+  await using(var check=Db())
+  {
+   Assert.That(await check.Jobs.Where(x=>x.DeviceId==identity.DeviceId&&x.Active).Select(x=>x.LocalId).OrderBy(x=>x).ToListAsync(),Is.EqualTo(new[]{"1","5"}));
+   Assert.That(await check.Audit.AnyAsync(x=>x.Action=="job.removed-from-device"),Is.False);
+   await Monitoring.Evaluate(check,new(),now);
+   Assert.That(await check.Alerts.AnyAsync(x=>x.DeviceId==identity.DeviceId&&x.Code=="ManagedJobMissing"),Is.False,"no alarm for a job the device has just created");
+  }
+  // Once a report has listed the job, a later complete report without it does show that it is gone from the device.
+  using var listed=await c.PostAsJsonAsync("/api/v1/agent/heartbeat",snapshot with{Jobs=[new("1","Bestand",null,null),new("5","Neu",null,null)]});Assert.That(listed.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  using var later=await c.PostAsJsonAsync("/api/v1/agent/heartbeat",snapshot);Assert.That(later.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  await using(var check=Db())
+  {
+   Assert.That((await check.Jobs.SingleAsync(x=>x.DeviceId==identity.DeviceId&&x.LocalId=="5")).Active,Is.False);
+   await Monitoring.Evaluate(check,new(),DateTimeOffset.UtcNow);
+   Assert.That(await check.Alerts.AnyAsync(x=>x.DeviceId==identity.DeviceId&&x.Code=="ManagedJobMissing"&&x.Resolved==null),Is.True);
+  }
+ }
  [Test]public async Task DeviceCredentialsCannotImpersonateAnotherDeviceAndRunsAreIdempotent()
  {
   var(t,s)=await Customer();var token=await Token(t,s);using var c=factory.CreateClient(new(){BaseAddress=new Uri("https://localhost")});
@@ -522,12 +553,14 @@ public sealed class PostgresTests
   agent.DefaultRequestHeaders.Authorization=new("Bearer",identity.Credential);agent.DefaultRequestHeaders.Add("X-Device-Id",identity.DeviceId.ToString());
   await using var db=Db();var job=new BackupJob{TenantId=t.Id,DeviceId=identity.DeviceId,LocalId="1",Name="Remote"};db.Jobs.Add(job);await db.SaveChangesAsync();
   using var admin=await Login(UserRole.SuperAdmin);using var csrf=System.Text.Json.JsonDocument.Parse(await admin.GetStringAsync("/api/v1/management/csrf"));admin.DefaultRequestHeaders.Add("X-CSRF-Token",csrf.RootElement.GetProperty("token").GetString());
-  using var created=await admin.PostAsJsonAsync("/api/v1/management/commands",new CommandInput(job.Id,RemoteAction.Restore,new(DateTimeOffset.UtcNow.AddDays(-1),["C:\\Data\\file"],"recovery-1"),15));Assert.That(created.StatusCode,Is.EqualTo(HttpStatusCode.Created));
+  using var created=await admin.PostAsJsonAsync("/api/v1/management/commands",new CommandInput(job.Id,RemoteAction.Restore,new(DateTimeOffset.UtcNow.AddDays(-1),["C:\\Data\\file","C:\\Data (alt)\\"],"recovery-1"),15));Assert.That(created.StatusCode,Is.EqualTo(HttpStatusCode.Created));
   using var doc=System.Text.Json.JsonDocument.Parse(await created.Content.ReadAsStringAsync());var id=doc.RootElement.GetProperty("id").GetGuid();
   Assert.That(await agent.GetFromJsonAsync<SignedCommand[]>("/api/v1/agent/commands"),Is.Empty);
   using var self=await admin.PostAsync($"/api/v1/management/commands/{id}/approve",null);Assert.That(self.StatusCode,Is.EqualTo(HttpStatusCode.Conflict));
   using var second=await Login(UserRole.Administrator);using var secondCsrf=System.Text.Json.JsonDocument.Parse(await second.GetStringAsync("/api/v1/management/csrf"));second.DefaultRequestHeaders.Add("X-CSRF-Token",secondCsrf.RootElement.GetProperty("token").GetString());using var approved=await second.PostAsync($"/api/v1/management/commands/{id}/approve",null);Assert.That(approved.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
   var envelopes=await agent.GetFromJsonAsync<SignedCommand[]>("/api/v1/agent/commands");using var key=System.Security.Cryptography.ECDsa.Create();key.ImportFromPem(File.ReadAllText(Path.Combine(directory,"commands.pem")));var command=CommandProtocol.Verify(envelopes!.Single(),key,identity.DeviceId,DateTimeOffset.UtcNow);Assert.That(command.Id,Is.EqualTo(id));
+  // The engine matches plain paths exactly: a file stays as it is, a folder becomes a filter for everything below it.
+  Assert.That(command.Restore!.Paths,Is.EqualTo(new[]{"C:\\Data\\file","[C:\\\\Data \\(alt\\)\\\\.*]"}));
   using var receipt=await agent.PostAsJsonAsync($"/api/v1/agent/commands/{id}/receipt",new CommandReceipt("Accepted",19,null));Assert.That(receipt.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
   using var complete=await agent.PostAsJsonAsync($"/api/v1/agent/commands/{id}/receipt",new CommandReceipt("Completed",19,null));Assert.That(complete.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
   using var replay=await agent.PostAsJsonAsync($"/api/v1/agent/commands/{id}/receipt",new CommandReceipt("Accepted",19,null));Assert.That(replay.StatusCode,Is.EqualTo(HttpStatusCode.Conflict));

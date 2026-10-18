@@ -120,4 +120,9 @@ public sealed partial class DuplicatiAdapter
   using var response=await client.GetAsync("/api/v1/tasks",ct);response.EnsureSuccessStatusCode();using var data=System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStreamAsync(ct));
   return data.RootElement.EnumerateArray().Any(x=>Get(x,"Status").GetString() is "Running" or "Waiting");
  }
+ public async Task<bool> HasRunningTask(CancellationToken ct)
+ {
+  using var response=await client.GetAsync("/api/v1/tasks",ct);response.EnsureSuccessStatusCode();using var data=System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStreamAsync(ct));
+  return data.RootElement.EnumerateArray().Any(x=>Get(x,"Status").GetString()=="Running");
+ }
 }

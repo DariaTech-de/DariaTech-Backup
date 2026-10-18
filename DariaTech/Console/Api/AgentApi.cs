@@ -51,8 +51,14 @@ public static class AgentApi
     // Only a complete job list proves that a job no longer exists on the device. When jobs had to be dropped
     // from the report, known jobs stay monitored and the device is marked as reporting an incomplete inventory.
     var reportedIds=r.Jobs.Select(x=>x.LocalId).ToHashSet(StringComparer.Ordinal);
+    // A job the device confirmed is kept until a heartbeat lists it: agents up to 0.4.0 report the job list taken
+    // before applying new configurations, and an agent that was disconnected sends its queued older snapshots after
+    // confirming. The agent queues at most a day of snapshots, so the protection ends after a day.
+    var managedJobs=await db.ManagedJobs.Where(x=>x.DeviceId==id&&x.LocalJobId!=null&&x.UnreportedSince!=null).ToListAsync();
+    foreach(var reported in managedJobs.Where(x=>reportedIds.Contains(x.LocalJobId!)))reported.UnreportedSince=null;
+    var unreported=managedJobs.Where(x=>x.UnreportedSince>DateTimeOffset.UtcNow.AddDays(-1)).Select(x=>x.LocalJobId!).ToHashSet(StringComparer.Ordinal);
     if(complete)
-     foreach(var job in jobs.Where(x=>x.Active&&!reportedIds.Contains(x.LocalId)))
+     foreach(var job in jobs.Where(x=>x.Active&&!reportedIds.Contains(x.LocalId)&&!unreported.Contains(x.LocalId)))
      {job.Active=false;db.Audit.Add(new AuditEvent{TenantId=d.TenantId,Actor=id.ToString(),Action="job.removed-from-device",Resource=job.Id.ToString()});}
     if(complete)d.InventoryIncompleteSince=null;else d.InventoryIncompleteSince??=DateTimeOffset.UtcNow;
     foreach(var report in r.Jobs)

@@ -67,7 +67,7 @@
    <div class="choice">
     <label class="choice-option"><input type="radio" name="target" value="folder" checked />
      <span><strong>In einen neuen Wiederherstellungsordner (empfohlen)</strong><span class="sub">Nichts Vorhandenes wird verändert. Ort auf dem Gerät: <span class="code">@Model.RestoreRootHint</span></span>
-      <input class="folder-input" type="text" name="folder" value="@Model.DefaultFolder" maxlength="100" aria-label="Name des Wiederherstellungsordners" pattern="[A-Za-z0-9_-]+" /></span></label>
+      <input class="folder-input" type="text" name="folder" value="@Model.DefaultFolder" maxlength="100" aria-label="Name des Wiederherstellungsordners" pattern="[A-Za-z0-9_\-]+" /></span></label>
     @if(Model.Managed?.RestoreOnly!=true){
     <label class="choice-option"><input type="radio" name="target" value="original" />
      <span><strong>An den ursprünglichen Ort</strong><span class="sub">Fehlende Dateien werden zurückgeschrieben. Vorhandene Dateien werden nicht überschrieben – die wiederhergestellte Fassung wird mit Zeitstempel daneben abgelegt. Für viele Dateien nach Fehlbedienung oder Schadsoftware zuerst in einen neuen Ordner wiederherstellen und prüfen.</span></span></label>}

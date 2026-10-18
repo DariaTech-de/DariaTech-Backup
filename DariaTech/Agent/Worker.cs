@@ -50,6 +50,9 @@ public sealed class Worker(AgentOptions options,ProtectedState state,ILogger<Wor
      try{await ManagedConfiguration.Synchronize(client,adapter,options,state,ct);}
      catch(OperationCanceledException)when(ct.IsCancellationRequested){throw;}
      catch(Exception ex){log.LogWarning("Managed configuration synchronization failed ({Type})",ex.GetType().Name);}
+     // Report the jobs as they are after applying: a job created just now must not look removed to the Console.
+     try{jobs=await adapter.ReadJobs(ct);}
+     catch(Exception ex)when(ex is HttpRequestException or InvalidOperationException or System.Text.Json.JsonException||ex is TaskCanceledException&&!ct.IsCancellationRequested){log.LogWarning("Local engine job list unavailable after configuration ({Type})",ex.GetType().Name);}
     }
     if(reachable&&!updating)
     {
