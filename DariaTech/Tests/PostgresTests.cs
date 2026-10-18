@@ -71,10 +71,11 @@ public sealed class PostgresTests
   var snapshot=new HeartbeatRequest("0.4.0","Windows",true,[new("1","Bestand",null,null)]);
   using var first=await c.PostAsJsonAsync("/api/v1/agent/heartbeat",snapshot);Assert.That(first.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
   await using var db=Db();var managed=new ManagedJob{TenantId=t.Id,DeviceId=identity.DeviceId,Name="Neu",LatestRevision=1};db.ManagedJobs.Add(managed);await db.SaveChangesAsync();
-  // One agent cycle: the job list is read, then the new configuration is applied and confirmed, then the
-  // heartbeat carries the list read before the job existed.
+  // The job list is read, then the new configuration is applied and confirmed, then the heartbeats carry lists
+  // read before the job existed: the one of this cycle (agents up to 0.4.0) and older ones queued while the
+  // device could not reach the Console.
   using var applied=await c.PostAsJsonAsync($"/api/v1/agent/configurations/{managed.Id}/receipt",new ConfigurationReceipt(1,"5","Applied"));Assert.That(applied.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
-  using var stale=await c.PostAsJsonAsync("/api/v1/agent/heartbeat",snapshot);Assert.That(stale.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  for(var queued=0;queued<3;queued++){using var stale=await c.PostAsJsonAsync("/api/v1/agent/heartbeat",snapshot);Assert.That(stale.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));}
   var now=DateTimeOffset.UtcNow;
   await using(var check=Db())
   {
@@ -83,7 +84,8 @@ public sealed class PostgresTests
    await Monitoring.Evaluate(check,new(),now);
    Assert.That(await check.Alerts.AnyAsync(x=>x.DeviceId==identity.DeviceId&&x.Code=="ManagedJobMissing"),Is.False,"no alarm for a job the device has just created");
   }
-  // A later complete report without the job does show that it is gone from the device.
+  // Once a report has listed the job, a later complete report without it does show that it is gone from the device.
+  using var listed=await c.PostAsJsonAsync("/api/v1/agent/heartbeat",snapshot with{Jobs=[new("1","Bestand",null,null),new("5","Neu",null,null)]});Assert.That(listed.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
   using var later=await c.PostAsJsonAsync("/api/v1/agent/heartbeat",snapshot);Assert.That(later.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
   await using(var check=Db())
   {

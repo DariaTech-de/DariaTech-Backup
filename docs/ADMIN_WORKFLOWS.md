@@ -242,8 +242,8 @@ lock, the legacy-agent rule, agent removal with the Linux commands from `/AgentR
 against a real `docker compose` deployment (a missing bind address stops it before anything changes). Found and
 fixed on the way: the stop confirmation of agent 0.4.0 (see I), folder restore (see H), and a one-minute false
 "Verwalteter Backup-Job fehlt" alarm with a wrong `job.removed-from-device` audit right after a job was first
-applied (the agent reported its job list from before applying; the Console now ignores that for a job applied
-since the previous heartbeat, and agents from 0.4.1 report the list after applying). Not covered: Windows and macOS
+applied (the agent reported its job list from before applying; the Console now keeps a confirmed job until a
+heartbeat lists it, at most a day, and agents from 0.4.1 report the list after applying). Not covered: Windows and macOS
 devices, approved remote agent updates, credential rotation at a real provider, a real DST change, e-mail delivery.
 
 On a device whose clock runs in another time zone than the Console (for example a Linux server on UTC), the engine

@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace DariaTech.Console.Data.Migrations
 {
     [DbContext(typeof(ManagementDb))]
-    [Migration("20261018065356_ManagedJobApplied")]
-    partial class ManagedJobApplied
+    [Migration("20261018072130_ManagedJobUnreportedSince")]
+    partial class ManagedJobUnreportedSince
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -625,9 +625,6 @@ namespace DariaTech.Console.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<DateTimeOffset?>("Applied")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<long>("AppliedRevision")
                         .HasColumnType("bigint");
 
@@ -683,6 +680,9 @@ namespace DariaTech.Console.Data.Migrations
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UnreportedSince")
+                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 

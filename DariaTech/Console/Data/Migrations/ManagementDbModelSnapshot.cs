@@ -622,9 +622,6 @@ namespace DariaTech.Console.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<DateTimeOffset?>("Applied")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<long>("AppliedRevision")
                         .HasColumnType("bigint");
 
@@ -680,6 +677,9 @@ namespace DariaTech.Console.Data.Migrations
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UnreportedSince")
+                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
