@@ -117,6 +117,8 @@ public sealed class ManagedJob : TenantEntity
  public Guid DeviceId { get; set; } public string Name { get; set; } = "";
  public long LatestRevision { get; set; } public long AppliedRevision { get; set; } public long LastReportedRevision { get; set; }
  public string? LocalJobId { get; set; } public string Status { get; set; } = "Pending";
+ // When the device last confirmed applying a revision. A heartbeat snapshot taken before that may still lack the job.
+ public DateTimeOffset? Applied { get; set; }
  // Recovery copy of another device's job: same destination and passphrase, never backs up.
  public bool RestoreOnly { get; set; } public Guid? SourceManagedJobId { get; set; }
  // Taken over from this device: the configuration is held back until that device's stop is confirmed, so the

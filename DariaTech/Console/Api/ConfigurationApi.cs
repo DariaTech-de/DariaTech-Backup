@@ -38,9 +38,9 @@ public static class ConfigurationApi
    {
     if(job.LocalJobId is not null&&job.LocalJobId!=receipt.LocalJobId)return Results.Conflict();
     if(job.AppliedRevision==receipt.Revision)return Results.NoContent();
-    job.AppliedRevision=receipt.Revision;job.LocalJobId=receipt.LocalJobId;
+    job.AppliedRevision=receipt.Revision;job.LocalJobId=receipt.LocalJobId;job.Applied=DateTimeOffset.UtcNow;
     var backup=await db.Jobs.SingleOrDefaultAsync(x=>x.DeviceId==agent.DeviceId&&x.LocalId==receipt.LocalJobId);
-    if(backup is null){backup=new BackupJob{TenantId=job.TenantId,DeviceId=agent.DeviceId,LocalId=receipt.LocalJobId!,Name=job.Name};db.Jobs.Add(backup);}backup.Ownership="Managed";
+    if(backup is null){backup=new BackupJob{TenantId=job.TenantId,DeviceId=agent.DeviceId,LocalId=receipt.LocalJobId!,Name=job.Name};db.Jobs.Add(backup);}backup.Ownership="Managed";backup.Active=true;
    }
    if(receipt.Revision==job.LatestRevision){job.Status=receipt.Status;job.LastReportedRevision=receipt.Revision;}
    db.Audit.Add(new AuditEvent{TenantId=job.TenantId,Actor=agent.DeviceId.ToString(),Action="backup.configuration-"+receipt.Status.ToLowerInvariant(),Resource=id.ToString()});
@@ -114,7 +114,7 @@ public static class ConfigurationApi
    // Cloud and Proxmox jobs depend on the host they were provisioned on; they are set up again on the new device.
    if(definition.Saas is not null||definition.Proxmox is not null)continue;
    var adopted=definition with{Adopted=true};if(!ConfigurationPolicy.Valid(adopted))continue;
-   job.DeviceId=target.Id;job.LatestRevision++;job.AppliedRevision=0;job.LastReportedRevision=0;job.LocalJobId=null;job.Status="Pending";job.HandoverFromDeviceId=old.Id;
+   job.DeviceId=target.Id;job.LatestRevision++;job.AppliedRevision=0;job.LastReportedRevision=0;job.LocalJobId=null;job.Applied=null;job.Status="Pending";job.HandoverFromDeviceId=old.Id;
    AddRevision(db,secrets,job,adopted);ManagementApi.Audit(db,ctx,job.TenantId,"backup.taken-over",job.Id);moved++;
   }
   if(moved==0)return (0,"Auf dem alten Gerät gibt es keine Datei-Backups, die übernommen werden können.");

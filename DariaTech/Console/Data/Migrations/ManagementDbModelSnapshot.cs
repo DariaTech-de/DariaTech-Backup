@@ -622,6 +622,9 @@ namespace DariaTech.Console.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset?>("Applied")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<long>("AppliedRevision")
                         .HasColumnType("bigint");
 

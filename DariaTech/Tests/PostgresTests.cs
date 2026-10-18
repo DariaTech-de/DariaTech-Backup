@@ -63,6 +63,35 @@ public sealed class PostgresTests
   await using var db=Db();var credential=await responses.Single(x=>x.IsSuccessStatusCode).Content.ReadFromJsonAsync<EnrollmentResponse>();
   var agent=await db.Agents.SingleAsync(x=>x.DeviceId==credential!.DeviceId);Assert.That(agent.CredentialHash,Is.Not.EqualTo(credential!.Credential));
  }
+ [Test]public async Task AJobAppliedWhileTheAgentReportsAnOlderSnapshotIsNotTakenForRemoved()
+ {
+  var(t,s)=await Customer();using var c=factory.CreateClient(new(){BaseAddress=new Uri("https://localhost")});
+  using var e=await c.PostAsJsonAsync("/api/v1/agent/enroll",new EnrollmentRequest(await Token(t,s),"DEVICE05","Windows","0.4.0"));var identity=(await e.Content.ReadFromJsonAsync<EnrollmentResponse>())!;
+  c.DefaultRequestHeaders.Authorization=new("Bearer",identity.Credential);c.DefaultRequestHeaders.Add("X-Device-Id",identity.DeviceId.ToString());
+  var snapshot=new HeartbeatRequest("0.4.0","Windows",true,[new("1","Bestand",null,null)]);
+  using var first=await c.PostAsJsonAsync("/api/v1/agent/heartbeat",snapshot);Assert.That(first.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  await using var db=Db();var managed=new ManagedJob{TenantId=t.Id,DeviceId=identity.DeviceId,Name="Neu",LatestRevision=1};db.ManagedJobs.Add(managed);await db.SaveChangesAsync();
+  // One agent cycle: the job list is read, then the new configuration is applied and confirmed, then the
+  // heartbeat carries the list read before the job existed.
+  using var applied=await c.PostAsJsonAsync($"/api/v1/agent/configurations/{managed.Id}/receipt",new ConfigurationReceipt(1,"5","Applied"));Assert.That(applied.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  using var stale=await c.PostAsJsonAsync("/api/v1/agent/heartbeat",snapshot);Assert.That(stale.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  var now=DateTimeOffset.UtcNow;
+  await using(var check=Db())
+  {
+   Assert.That(await check.Jobs.Where(x=>x.DeviceId==identity.DeviceId&&x.Active).Select(x=>x.LocalId).OrderBy(x=>x).ToListAsync(),Is.EqualTo(new[]{"1","5"}));
+   Assert.That(await check.Audit.AnyAsync(x=>x.Action=="job.removed-from-device"),Is.False);
+   await Monitoring.Evaluate(check,new(),now);
+   Assert.That(await check.Alerts.AnyAsync(x=>x.DeviceId==identity.DeviceId&&x.Code=="ManagedJobMissing"),Is.False,"no alarm for a job the device has just created");
+  }
+  // A later complete report without the job does show that it is gone from the device.
+  using var later=await c.PostAsJsonAsync("/api/v1/agent/heartbeat",snapshot);Assert.That(later.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  await using(var check=Db())
+  {
+   Assert.That((await check.Jobs.SingleAsync(x=>x.DeviceId==identity.DeviceId&&x.LocalId=="5")).Active,Is.False);
+   await Monitoring.Evaluate(check,new(),DateTimeOffset.UtcNow);
+   Assert.That(await check.Alerts.AnyAsync(x=>x.DeviceId==identity.DeviceId&&x.Code=="ManagedJobMissing"&&x.Resolved==null),Is.True);
+  }
+ }
  [Test]public async Task DeviceCredentialsCannotImpersonateAnotherDeviceAndRunsAreIdempotent()
  {
   var(t,s)=await Customer();var token=await Token(t,s);using var c=factory.CreateClient(new(){BaseAddress=new Uri("https://localhost")});

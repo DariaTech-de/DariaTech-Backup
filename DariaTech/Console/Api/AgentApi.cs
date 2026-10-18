@@ -43,7 +43,7 @@ public static class AgentApi
    await using var tx=await db.Database.BeginTransactionAsync();
    await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({BitConverter.ToInt64(id.ToByteArray())})");
    var d=await db.Devices.SingleOrDefaultAsync(x=>x.Id==id&&x.Active);if(d is null)return Results.Unauthorized();
-   d.LastHeartbeat=DateTimeOffset.UtcNow;d.EngineReachable=r.EngineReachable;d.OperatingSystem=r.OperatingSystem;a.Version=r.AgentVersion;if(r.Platform is not null)a.Platform=r.Platform;
+   var previousHeartbeat=d.LastHeartbeat;d.LastHeartbeat=DateTimeOffset.UtcNow;d.EngineReachable=r.EngineReachable;d.OperatingSystem=r.OperatingSystem;a.Version=r.AgentVersion;if(r.Platform is not null)a.Platform=r.Platform;
    d.ActiveJobLocalId=r.ActiveOperation?.LocalJobId;d.Progress=r.ActiveOperation?.Fraction;d.ActiveTaskId=r.ActiveOperation?.TaskId;d.ProgressBytes=r.ActiveOperation?.Bytes??0;d.ProgressFiles=r.ActiveOperation?.Files??0;
    if(r.EngineReachable)
    {
@@ -51,8 +51,11 @@ public static class AgentApi
     // Only a complete job list proves that a job no longer exists on the device. When jobs had to be dropped
     // from the report, known jobs stay monitored and the device is marked as reporting an incomplete inventory.
     var reportedIds=r.Jobs.Select(x=>x.LocalId).ToHashSet(StringComparer.Ordinal);
+    // Agents up to 0.4.0 report the job snapshot they took before applying new configurations in the same cycle,
+    // so a job applied since the previous heartbeat may be missing without having been removed from the device.
+    var justApplied=complete?await db.ManagedJobs.Where(x=>x.DeviceId==id&&x.LocalJobId!=null&&x.Applied!=null&&(previousHeartbeat==null||x.Applied>previousHeartbeat)).Select(x=>x.LocalJobId!).ToListAsync():[];
     if(complete)
-     foreach(var job in jobs.Where(x=>x.Active&&!reportedIds.Contains(x.LocalId)))
+     foreach(var job in jobs.Where(x=>x.Active&&!reportedIds.Contains(x.LocalId)&&!justApplied.Contains(x.LocalId)))
      {job.Active=false;db.Audit.Add(new AuditEvent{TenantId=d.TenantId,Actor=id.ToString(),Action="job.removed-from-device",Resource=job.Id.ToString()});}
     if(complete)d.InventoryIncompleteSince=null;else d.InventoryIncompleteSince??=DateTimeOffset.UtcNow;
     foreach(var report in r.Jobs)
