@@ -133,7 +133,13 @@ Fehler (`BackupFailed`, `RepeatedBackupFailures`), Ergebnis unbekannt / abgebroc
 ## H — Restore
 
 Guided restore (job → "Aktionen / Restore"): load versions → choose version → choose files/folders → choose target →
-(second administrator approves, if there is one) → follow progress → confirm usability (impl., auto).
+(second administrator approves, if there is one) → follow progress → confirm usability (impl., auto; manual on Linux
+with the real engine: single files, a folder with brackets in its name and a whole top-level folder restored into a new
+folder with identical checksums).
+
+- A selected folder is restored with everything below it: the Console sends it to the engine as a folder filter, as
+  the engine's own restore dialog does. Until 18.10.2026 a selected folder restored nothing and the restore failed
+  with an engine error; single files were not affected.
 
 - Default target: a new folder below the device's protected restore root. **Original location** writes missing files
   back and never overwrites existing ones: the restored version is placed next to them with a timestamp suffix
@@ -168,7 +174,12 @@ Guided restore (job → "Aktionen / Restore"): load versions → choose version 
   come back, it is still told to stop. Revoking alone never
   stops local schedules and never removes the old device's direct access to the storage; change the storage
   credentials where that matters. Before the new device resumes, check its sources and schedule on its device page.
-  (impl., auto; open: real old device coming back online, agents ≤ 0.3.1 do not understand the stop.)
+  (impl., auto; manual on Linux with the real engine: the old device confirmed the stop within seconds, its engine
+  stopped, and the new device continued the same version chain, uploading only new blocks; open: an old device that
+  comes back online after a long time, agents ≤ 0.3.1 do not understand the stop.)
+- Agent 0.4.0 pauses on the stop but never confirms it once it has run any backup or restore: it took the engine's
+  last progress report, which the engine keeps after a task ends, for a running task. Fixed in 0.4.1. For an old
+  device with 0.4.0, install 0.4.1 there (it then confirms at once) or confirm the stop manually on the new device.
 - **Decommission** ("Gerät stilllegen"): the same stop without a replacement; backups stay restorable.
 - **Removing the agent from a device** (device page "Agent vom Gerät entfernen", overview `/AgentRemoval` for
   Windows, Linux and macOS): first decommission or replace in the Console, then remove locally with the commands
@@ -219,6 +230,25 @@ Management data is erased only with the separate `--erase-customer` command (dry
 - With the Console down, devices keep backing up on their local schedules; restores are possible without the
   Console as described in H.
 - Logs, test output and documentation never contain passphrases or credentials; receipts carry only error codes.
+
+## Runtime validation on 18.10.2026
+
+Built from `master` and run end to end on Linux (x64, real engine, PostgreSQL, HTTPS), driven through the Console in a
+browser: installation with the command the Console generates (published 0.4.0 package), onboarding of a customer
+with expected devices up to acceptance, single-use codes (a used code is refused), a managed job applied on the
+device, first backup, restore and its manual confirmation, device replacement and decommissioning through contract
+end, schedule-aware overdue (Mon–Fri vs. daily via "Gemeinsame Einstellungen"), planned absence, work list, account
+lock, the legacy-agent rule, agent removal with the Linux commands from `/AgentRemoval`, and the update command
+against a real `docker compose` deployment (a missing bind address stops it before anything changes). Found and
+fixed on the way: the stop confirmation of agent 0.4.0 (see I), folder restore (see H), and a one-minute false
+"Verwalteter Backup-Job fehlt" alarm with a wrong `job.removed-from-device` audit right after a job was first
+applied (the agent reported its job list from before applying; the Console now ignores that for a job applied
+since the previous heartbeat, and agents from 0.4.1 report the list after applying). Not covered: Windows and macOS
+devices, approved remote agent updates, credential rotation at a real provider, a real DST change, e-mail delivery.
+
+On a device whose clock runs in another time zone than the Console (for example a Linux server on UTC), the engine
+evaluates the allowed weekdays in the device's local time, so a "Mon–Fri 01:00" job runs Tue–Sat 01:00 German time;
+the Console's overdue rule assumes German weekdays. Set such servers to Europe/Berlin or choose all days.
 
 ## Remaining gaps and practical tests still needed
 
