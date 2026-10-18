@@ -107,7 +107,9 @@ public sealed class RetirementTests
     "/api/v1/backups"=>Json(Array.Empty<object>()),
     "/api/v1/serverstate"=>Json(new{ProgramState=Paused?"Paused":"Running",EstimatedPauseEnd="0001-01-01T00:00:00Z",ProposedSchedule=Array.Empty<object>()}),
     "/api/v1/serverstate/pause"=>Pause(),
-    "/api/v1/progressstate"=>Running?Json(new{BackupID="1",TaskID=4,OverallProgress=0.5}):new HttpResponseMessage(HttpStatusCode.NotFound),
+    // Like the real engine: the progress state keeps the last task after it ended; only the task list shows what runs.
+    "/api/v1/progressstate"=>Json(new{BackupID="1",TaskID=4,OverallProgress=Running?0.5:1}),
+    "/api/v1/tasks"=>Json(new[]{new{Status=Running?"Running":"Completed",ID=4},new{Status="Waiting",ID=5}}),
     "/api/v1/agent/retired"=>Confirm(),
     _=>new HttpResponseMessage(HttpStatusCode.NotFound)
    });

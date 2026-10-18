@@ -23,8 +23,9 @@ public static class Retirement
    await adapter.ReadJobs(ct); // signs in to the engine; a retired agent skips the normal telemetry cycle
    if(await adapter.PauseState(ct) is not {Paused:true,Until:null})await adapter.SetPause(true,ct,null,true);
    if(await adapter.PauseState(ct) is not {Paused:true,Until:null}){log("Device retirement: the backup engine could not be paused; retrying");return false;}
-   // A backup that was already running finishes first; the stop is confirmed only once nothing runs.
-   if(await adapter.ReadProgress(ct) is not null){log("Device retirement: waiting for the running operation to finish before confirming the stop");return false;}
+   // A backup that was already running finishes first; the stop is confirmed only once nothing runs. The engine's
+   // progress state keeps the last task after it ended, so its task list decides. Queued tasks never start while paused.
+   if(await adapter.HasRunningTask(ct)){log("Device retirement: waiting for the running operation to finish before confirming the stop");return false;}
   }
   catch(Exception ex)when(ex is HttpRequestException or InvalidOperationException or TaskCanceledException or System.Text.Json.JsonException)
   {log($"Device retirement: local engine unavailable ({ex.GetType().Name}); retrying");return false;}
