@@ -93,7 +93,7 @@
  <div class="table-wrap"><table class="table">
   <thead><tr><th scope="col">Backup</th><th scope="col">Gerät</th><th scope="col">Speicherziel</th><th scope="col">Letzte Version</th><th scope="col"><span class="sr-only">Aktionen</span></th></tr></thead>
   <tbody>@foreach(var b in Model.DeletedBackups){<tr>
-   <td><strong>@b.Job.Name</strong><span class="sub">Gelöscht @Ui.Date(b.Job.Deleted)@(string.IsNullOrEmpty(b.Job.DeletedBy)?"":$" von {b.Job.DeletedBy}") · @(b.Job.LocalJobId is null?"war noch nicht auf dem Gerät eingerichtet":b.DeviceDeleted||!b.DeviceActive?"Gerät nicht mehr aktiv":b.Job.Status=="Pending"?"Zeitplan wird beim nächsten Kontakt des Geräts entfernt":"auf dem Gerät gestoppt")</span></td>
+   <td><strong>@b.Job.Name</strong><span class="sub">Gelöscht @Ui.Date(b.Job.Deleted)@(string.IsNullOrEmpty(b.Job.DeletedBy)?"":$" von {b.Job.DeletedBy}") · @if(b.Job.LocalJobId is null){<text>war noch nicht auf dem Gerät eingerichtet</text>}else if(b.DeviceDeleted||!b.DeviceActive){<text>Gerät nicht mehr aktiv</text>}else if(b.Job.Status=="Pending"){<text>Zeitplan wird beim nächsten Kontakt des Geräts entfernt</text>}else if(b.Job.Status=="Applied"){<text>auf dem Gerät gestoppt</text>}else{<span class="error-text">Zeitplan konnte auf dem Gerät nicht entfernt werden – Gerät prüfen</span>}</span></td>
    <td>@b.DeviceName<span class="sub">@DeviceLine(b)</span></td>
    <td>@b.Destination</td>
    <td>@Ui.Ago(b.LastSuccess)</td>

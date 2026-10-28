@@ -25,7 +25,9 @@ public static class CommandApi
   app.MapGet("/api/v1/agent/commands",async(ManagementDb db,TenantScope scope,ISecretStore secrets,HttpContext ctx)=>
   {
    var agent=await DeviceAuthentication.Authenticate(ctx,db,scope);if(agent is null)return Results.Unauthorized();
-   var now=DateTimeOffset.UtcNow;var records=await db.Commands.Where(x=>x.DeviceId==agent.DeviceId&&x.Status=="Pending"&&x.Expires>now).OrderBy(x=>x.Expires).Take(10).ToListAsync();
+   // Backups and checks queued before a backup was deleted are no longer delivered; its restores still are.
+   var deleted=db.Jobs.Where(j=>j.DeviceId==agent.DeviceId&&db.ManagedJobs.Any(m=>m.DeviceId==j.DeviceId&&m.LocalJobId==j.LocalId&&m.Deleted!=null)).Select(j=>(Guid?)j.Id);
+   var now=DateTimeOffset.UtcNow;var records=await db.Commands.Where(x=>x.DeviceId==agent.DeviceId&&x.Status=="Pending"&&x.Expires>now&&!((x.Action==RemoteAction.RunBackup||x.Action==RemoteAction.VerifyBackup)&&deleted.Contains(x.JobId))).OrderBy(x=>x.Expires).Take(10).ToListAsync();
    return Results.Ok(records.Select(x=>new SignedCommand(secrets.Unprotect(x.TenantId,$"command:{x.Id}",x.EncryptedPayload),x.Signature)));
   }).RequireRateLimiting("Agent");
   app.MapPost("/api/v1/agent/commands/{id:guid}/receipt",async(Guid id,CommandReceipt receipt,ManagementDb db,TenantScope scope,ISecretStore secrets,HttpContext ctx)=>

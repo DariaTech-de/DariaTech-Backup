@@ -192,10 +192,13 @@ folder with identical checksums).
 - **Delete a backup** ("Backup löschen" on the job's actions and configuration pages, "Löschen" in the customer's
   backup list, `DELETE /api/v1/management/managed-jobs/{id}`): the job leaves lists and monitoring at once and
   gets a new revision without a schedule; the device keeps the engine job and its local database, so it no longer
-  backs up on its own, and the Console refuses `RunBackup` and `VerifyBackup`. The versions at the destination are
+  backs up on its own, and the Console refuses `RunBackup` and `VerifyBackup` (also ones queued before the deletion
+  are no longer delivered). If the device does not accept the schedule removal, the customer page says so and
+  monitoring raises "Gelöschtes Backup: Zeitplan nicht entfernt". The versions at the destination are
   never touched, and the passphrase stays encrypted in the Console. The backup is listed under "Gelöschte Backups"
   on the customer page and stays restorable on its own device (also to the original paths) and through "Auf anderes
-  Gerät wiederherstellen". Deleting a recovery copy ("Verbindung entfernen") only hides that connection. Deleting
+  Gerät wiederherstellen". Deleting a recovery copy ("Verbindung entfernen") only hides that connection; connecting
+  the same backup to that device again restores it. Deleting
   cannot be undone in the Console; to protect the data again create a new job. To remove the data, delete it at the
   destination. (impl., auto; manual on Linux with the real engine and agent 0.4.1: the engine schedule was removed,
   a file was restored byte-identically to its original path afterwards.)

@@ -16,7 +16,7 @@
 @if(Model.Error is not null){<p role="alert">@Model.Error</p>}
 @if(Model.Waiting){<p class="notice-inline" data-auto-refresh role="status">@Ui.Icon("activity")Warte auf Antwort des Geräts … die Seite aktualisiert sich automatisch.</p>}
 @if(recoveryCopy){<p class="notice-inline">@Ui.Icon("info")Dieses Gerät liest das Backup eines anderen Geräts direkt aus dem Speicherziel. Es sichert darüber nichts.</p>}
-@if(deleted&&!recoveryCopy){<p class="notice-inline">@Ui.Icon("info")Gelöscht @Ui.Date(Model.Managed!.Deleted)@(string.IsNullOrEmpty(Model.Managed.DeletedBy)?"":$" von {Model.Managed.DeletedBy}"). Dieses Backup sichert nicht mehr@(Model.Managed.Status=="Pending"?" (der Zeitplan wird beim nächsten Kontakt des Geräts entfernt)":""); die vorhandenen Versionen im Speicherziel bleiben erhalten und lassen sich hier wiederherstellen.</p>}
+@if(deleted&&!recoveryCopy){<p class="notice-inline">@Ui.Icon("info")Gelöscht @Ui.Date(Model.Managed!.Deleted)@(string.IsNullOrEmpty(Model.Managed.DeletedBy)?"":$" von {Model.Managed.DeletedBy}"). Dieses Backup sichert nicht mehr@(Model.Managed.Status switch{"Pending"=>" (der Zeitplan wird beim nächsten Kontakt des Geräts entfernt)","Failed" or "Rejected"=>" – Achtung: Das Gerät hat das Entfernen des Zeitplans nicht übernommen und sichert womöglich weiter",_=>""}); die vorhandenen Versionen im Speicherziel bleiben erhalten und lassen sich hier wiederherstellen.</p>}
 
 <section class="card restore-guide" id="restore">
  <div class="card-head"><div><h2>Wiederherstellen</h2><span class="sub">In drei Schritten: Version wählen, Dateien wählen, Ziel wählen.</span></div></div>

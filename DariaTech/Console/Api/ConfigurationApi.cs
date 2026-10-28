@@ -89,11 +89,19 @@ public static class ConfigurationApi
   var revision=await db.ConfigurationRevisions.SingleAsync(x=>x.ManagedJobId==source.Id&&x.Revision==source.LatestRevision);
   var original=Read(secrets,revision);
   if(original.Saas is not null||original.Proxmox is not null)return (null,"Cloud- und Proxmox-Backups werden über ihre eigene Wiederherstellung zurückgeholt.");
-  if(await db.ManagedJobs.AnyAsync(x=>x.DeviceId==target.Id&&x.SourceManagedJobId==source.Id))return (null,"Dieses Backup ist auf dem Gerät bereits zur Wiederherstellung verbunden.");
+  var existing=await db.ManagedJobs.SingleOrDefaultAsync(x=>x.DeviceId==target.Id&&x.SourceManagedJobId==source.Id);
+  if(existing is {Deleted:null})return (null,"Dieses Backup ist auf dem Gerät bereits zur Wiederherstellung verbunden.");
   var sourceDevice=await db.Devices.Where(x=>x.Id==source.DeviceId).Select(x=>x.Name).SingleAsync();
   var name=$"Wiederherstellung: {original.Name} (von {sourceDevice})";if(name.Length>200)name=name[..200];
   var copy=original with{Name=name,Schedule=null,SourceMounts=null,RestoreOnly=true,Adopted=null};
   if(!ConfigurationPolicy.Valid(copy))return (null,"Die Konfiguration des Backups ist ungültig.");
+  if(existing is not null)
+  {
+   // A removed connection is restored: its engine job is still on the device and gets the current definition again.
+   existing.Deleted=null;existing.DeletedBy=null;existing.Name=name;existing.LatestRevision++;existing.Status="Pending";AddRevision(db,secrets,existing,copy);
+   if(existing.LocalJobId is {} local)foreach(var reported in await db.Jobs.Where(x=>x.DeviceId==target.Id&&x.LocalId==local).ToListAsync())reported.Active=true;
+   ManagementApi.Audit(db,ctx,existing.TenantId,"backup.recovery-copy-restored",existing.Id);await db.SaveChangesAsync();return (existing,null);
+  }
   var job=new ManagedJob{TenantId=target.TenantId,DeviceId=target.Id,Name=name,LatestRevision=1,RestoreOnly=true,SourceManagedJobId=source.Id};db.ManagedJobs.Add(job);
   AddRevision(db,secrets,job,copy);ManagementApi.Audit(db,ctx,job.TenantId,"backup.recovery-copy-created",job.Id);
   await db.SaveChangesAsync();return (job,null);
