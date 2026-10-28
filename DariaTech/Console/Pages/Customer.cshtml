@@ -46,33 +46,71 @@
  <article class="kpi"><span class="kpi-label">Speicherverbrauch</span><strong>@Ui.Size(Model.Rows.Sum(x=>x.Storage))</strong><span class="sub">Letzter Erfolg @Ui.Ago(Model.Rows.Select(x=>x.LastSuccess).Max())</span></article>
 </section>
 <section class="card card-flush"><div class="card-head padded"><h2>Geräte</h2></div><partial name="_Devices" model="Model.Rows" /></section>
+@{
+ async Task Recover(CustomerModel.BackupRow b)
+ {
+  if(Model.ActiveDevices.All(x=>x.Id==b.Job.DeviceId)){<span class="sub">Für eine Wiederherstellung auf einem anderen Gerät zuerst ein Gerät hinzufügen.</span>return;}
+  <details class="recover"><summary class="button secondary">Auf anderes Gerät wiederherstellen</summary>
+   <form method="post" asp-page-handler="Recover" class="inline-form">
+    <input type="hidden" name="id" value="@Model.Customer.Id"><input type="hidden" name="sourceJobId" value="@b.Job.Id">
+    <div class="field"><label for="target-@b.Job.Id">Zielgerät</label><select id="target-@b.Job.Id" name="targetDeviceId">@foreach(var d in Model.ActiveDevices.Where(x=>x.Id!=b.Job.DeviceId)){<option value="@d.Id">@d.Name</option>}</select></div>
+    <button class="button" type="submit">Verbinden</button>
+   </form>
+   <span class="sub">Das Zielgerät erhält Ziel und Backup-Passwort dieses Backups und liest die Versionen direkt aus dem Speicherziel – wie „Ordner verbinden + Passwort“ in Duplicati. Es sichert darüber nicht.</span>
+  </details>
+ }
+ string DeviceLine(CustomerModel.BackupRow b)=>b.DeviceActive?$"Zuletzt online {Ui.Ago(b.LastSeen)}":b.DeviceDeleted?"Gerät gelöscht":"Deaktiviert";
+}
 <section class="card card-flush" id="backups">
- <div class="card-head padded"><div><h2>Backups &amp; Wiederherstellung</h2><span class="sub">Alle Backups dieses Kunden mit ihrem Speicherziel – auch von Geräten, die offline oder ersetzt sind. Wiederherstellen geht auf jedes aktive Gerät dieses Kunden.</span></div></div>
+ <div class="card-head padded"><div><h2>Backups &amp; Wiederherstellung</h2><span class="sub">Alle Backups dieses Kunden mit ihrem Speicherziel – auch von Geräten, die offline, ersetzt oder gelöscht sind. Wiederherstellen geht auf jedes aktive Gerät dieses Kunden.</span></div></div>
  @if(Model.RecoveryMessage is not null){<p class="@(Model.RecoveryFailed?"form-error":"notice") padded" role="status">@Model.RecoveryMessage</p>}
- @if(Model.Backups.Count==0){<p class="card-empty padded">@Ui.Icon("info")Noch keine Backup-Jobs. Legen Sie auf einem Gerät einen Job an.</p>}
+ @if(Model.Backups.Count==0){<p class="card-empty padded">@Ui.Icon("info")Keine aktiven Backup-Jobs. Legen Sie auf einem Gerät einen Job an.</p>}
  else{
  <div class="table-wrap"><table class="table">
   <thead><tr><th scope="col">Backup</th><th scope="col">Gerät</th><th scope="col">Speicherziel</th><th scope="col">Letzter Erfolg</th><th scope="col"><span class="sr-only">Aktionen</span></th></tr></thead>
   <tbody>@foreach(var b in Model.Backups){<tr>
    <td><strong>@b.Job.Name</strong>@if(b.Job.RestoreOnly){<span class="sub">Wiederherstellungs-Verbindung zu „@(b.SourceName??"Backup")“ · @(b.Job.Status=="Applied"?"bereit":b.Job.Status=="Pending"?"wird eingerichtet":"Fehler")</span>}</td>
-   <td>@b.DeviceName<span class="sub">@(b.DeviceActive?$"Zuletzt online {Ui.Ago(b.LastSeen)}":"Deaktiviert")</span></td>
+   <td>@b.DeviceName<span class="sub">@DeviceLine(b)</span></td>
    <td>@b.Destination</td>
    <td>@(b.Job.RestoreOnly?"–":Ui.Ago(b.LastSuccess))</td>
    <td class="row-actions">
-    @if(b.ActionsJobId is {} actions){<a class="button secondary" href="/JobActions?id=@actions">@(b.Job.RestoreOnly?"Wiederherstellen":"Aktionen")</a>}
-    @if(Model.IsAdmin&&!b.Job.RestoreOnly&&b.Job.LocalJobId is not null){
-    <details class="recover"><summary class="button secondary">Auf anderes Gerät wiederherstellen</summary>
-     <form method="post" asp-page-handler="Recover" class="inline-form">
-      <input type="hidden" name="id" value="@c.Id"><input type="hidden" name="sourceJobId" value="@b.Job.Id">
-      <div class="field"><label for="target-@b.Job.Id">Zielgerät</label><select id="target-@b.Job.Id" name="targetDeviceId">@foreach(var d in Model.ActiveDevices.Where(x=>x.Id!=b.Job.DeviceId)){<option value="@d.Id">@d.Name</option>}</select></div>
-      <button class="button" type="submit">Verbinden</button>
+    @if(b.ActionsJobId is {} actions&&b.DeviceActive){<a class="button secondary" href="/JobActions?id=@actions">@(b.Job.RestoreOnly?"Wiederherstellen":"Aktionen")</a>}
+    @if(Model.IsAdmin&&!b.Job.RestoreOnly&&b.Job.LocalJobId is not null){await Recover(b);}
+    @if(Model.IsAdmin){
+    <details class="recover"><summary class="button secondary">@(b.Job.RecoveryCopy?"Entfernen":"Löschen")</summary>
+     <form method="post" asp-page-handler="DeleteBackup" class="form-grid">
+      <input type="hidden" name="id" value="@c.Id"><input type="hidden" name="jobId" value="@b.Job.Id">
+      <label class="check"><input type="checkbox" name="confirm" value="true" required> „@b.Job.Name“ @(b.Job.RecoveryCopy?"entfernen.":"löschen.")</label>
+      <div><button class="button danger" type="submit">@(b.Job.RecoveryCopy?"Verbindung entfernen":"Backup löschen")</button></div>
      </form>
-     <span class="sub">Das Zielgerät erhält Ziel und Backup-Passwort dieses Backups und liest die Versionen direkt aus dem Speicherziel – wie „Ordner verbinden + Passwort“ in Duplicati. Es sichert darüber nicht.</span>
+     <span class="sub">@(b.Job.RecoveryCopy?"Nur die Verbindung verschwindet; das Original-Backup bleibt unverändert.":"Das Gerät sichert ab dem nächsten Kontakt nicht mehr. Die Versionen im Speicherziel bleiben erhalten und lassen sich unten unter „Gelöschte Backups“ wiederherstellen.")</span>
     </details>}
    </td>
   </tr>}</tbody>
  </table></div>}
+ @if(Model.DeletedBackups.Count>0){
+ <div class="card-head padded" id="deleted-backups"><div><h3>Gelöschte Backups</h3><span class="sub">Laufen nicht mehr. Die Versionen im Speicherziel bleiben erhalten und lassen sich weiter wiederherstellen; gelöscht werden sie nur am Speicherziel selbst.</span></div></div>
+ <div class="table-wrap"><table class="table">
+  <thead><tr><th scope="col">Backup</th><th scope="col">Gerät</th><th scope="col">Speicherziel</th><th scope="col">Letzte Version</th><th scope="col"><span class="sr-only">Aktionen</span></th></tr></thead>
+  <tbody>@foreach(var b in Model.DeletedBackups){<tr>
+   <td><strong>@b.Job.Name</strong><span class="sub">Gelöscht @Ui.Date(b.Job.Deleted)@(string.IsNullOrEmpty(b.Job.DeletedBy)?"":$" von {b.Job.DeletedBy}") · @if(b.Job.LocalJobId is null){<text>war noch nicht auf dem Gerät eingerichtet</text>}else if(b.DeviceDeleted||!b.DeviceActive){<text>Gerät nicht mehr aktiv</text>}else if(b.Job.Status=="Pending"){<text>Zeitplan wird beim nächsten Kontakt des Geräts entfernt</text>}else if(b.Job.Status=="Applied"){<text>auf dem Gerät gestoppt</text>}else{<span class="error-text">Zeitplan konnte auf dem Gerät nicht entfernt werden – Gerät prüfen</span>}</span></td>
+   <td>@b.DeviceName<span class="sub">@DeviceLine(b)</span></td>
+   <td>@b.Destination</td>
+   <td>@Ui.Ago(b.LastSuccess)</td>
+   <td class="row-actions">
+    @if(b.ActionsJobId is {} actions&&b.DeviceActive){<a class="button secondary" href="/JobActions?id=@actions">Wiederherstellen</a>}
+    @if(Model.IsAdmin&&b.Job.LocalJobId is not null){await Recover(b);}
+   </td>
+  </tr>}</tbody>
+ </table></div>}
 </section>
+@if(Model.DeletedDevices.Count>0){
+<section class="card" id="deleted-devices">
+ <div class="card-head"><div><h2>Gelöschte Geräte</h2><span class="sub">Nicht mehr in Listen und Überwachung. Ein eingeschaltetes Gerät hält beim nächsten Kontakt seine Sicherungen an und bestätigt das; bei einem Gerät, das nicht mehr online kommt, ist nichts weiter nötig. Die Backups stehen oben unter „Backups &amp; Wiederherstellung“.</span></div><a class="button secondary small" href="/AgentRemoval">Agent vom Gerät entfernen</a></div>
+ @if(Model.Notice is not null){<p class="notice-inline good" role="status">@Model.Notice</p>}
+ <ul class="site-list">@foreach(var g in Model.DeletedDevices){
+  <li>@Ui.Icon("device")<span><strong>@g.Device.Name</strong><span class="sub">Gelöscht @Ui.Date(g.Device.Deleted)@(string.IsNullOrEmpty(g.Device.DeletedBy)?"":$" von {g.Device.DeletedBy}") · zuletzt online @Ui.Ago(g.Device.LastHeartbeat)@(g.SelfStopping||g.Device.RetireConfirmed is not null?"":$" · Agent {(string.IsNullOrEmpty(g.AgentVersion)?"unbekannt":g.AgentVersion)} hält sich nicht selbst an – Agent auf dem Gerät deinstallieren")</span></span><span class="chip">@g.StopState</span></li>}</ul>
+</section>}
 <section class="card" id="locations">
  <div class="card-head"><div><h2>Speicherorte</h2><span class="sub">Wohin neue Backups dieses Kunden gehen. Kundeneigene Ziele haben Vorrang vor den Zielen für alle Kunden.</span></div>
   @if(Model.CanManageLocations){<a class="button secondary" href="/Targets?customer=@c.TenantId">@Ui.Icon("plus")Eigenes Ziel für diesen Kunden</a>}</div>

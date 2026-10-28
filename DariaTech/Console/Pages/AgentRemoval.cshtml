@@ -4,13 +4,13 @@
 @{ ViewData["Title"] = "Agent entfernen"; }
 <nav class="breadcrumb" aria-label="Brotkrümel"><a href="/Devices">Geräte</a><span aria-hidden="true">/</span><span aria-current="page">Agent entfernen</span></nav>
 <div class="page-heading"><div><span class="eyebrow">Geräte</span><h1>Agent sauber von einem Gerät entfernen</h1>
- <p class="lead">Für Windows, Linux und macOS. Reihenfolge einhalten: zuerst in der Console stilllegen, dann lokal entfernen.</p></div></div>
+ <p class="lead">Für Windows, Linux und macOS. Reihenfolge einhalten: zuerst in der Console löschen, dann lokal entfernen.</p></div></div>
 <section class="card">
  <h2>Ablauf</h2>
  <ol class="steps-list">
-  <li><strong>In der Console stilllegen:</strong> Geräteseite → „Gerät stilllegen“ (oder beim Nachfolger „Gerät ersetzen“). Das Gerät hält beim nächsten Kontakt seine Zeitpläne an und bestätigt das; die Geräteseite zeigt „Stopp vom Gerät bestätigt“. So sichert es nicht weiter, falls die Entfernung unvollständig bleibt.</li>
+  <li><strong>In der Console löschen:</strong> Geräteseite → „Gerät löschen“ (oder beim Nachfolger „Gerät ersetzen“). Das Gerät verschwindet sofort aus Listen und Überwachung. Ist es eingeschaltet, hält es beim nächsten Kontakt seine Zeitpläne an und bestätigt das; beim Kunden unter „Gelöschte Geräte“ steht dann „Stopp vom Gerät bestätigt“. So sichert es nicht weiter, falls die Entfernung unvollständig bleibt.</li>
   <li><strong>Auf dem Gerät entfernen</strong> mit den Befehlen unten. Ohne Schritt 2 bleiben Geräte-Identität und lokale Job-Datenbanken erhalten – das ist nur für eine Neuinstallation desselben PCs gedacht.</li>
-  <li><strong>Prüfen:</strong> War das Gerät offline oder hatte es einen alten Agenten (bis 0.3.1), auf der Geräteseite bestätigen, dass der Agent entfernt wurde. Diese Bestätigung ist manuell, nicht technisch.</li>
+  <li><strong>Alter Agent (bis 0.3.1):</strong> Er hält sich nicht selbst an und sichert nach dem Einschalten weiter. Auf solchen Geräten den Agenten unbedingt entfernen. Wird das Gerät ersetzt, am Nachfolger bestätigen, dass der Agent entfernt wurde (manuelle, keine technische Bestätigung).</li>
   <li><strong>Speicherzugang:</strong> Das Entfernen löscht keine Backups im Speicherziel; sie bleiben über die Kundenseite auf einem anderen Gerät wiederherstellbar. Hatte das Gerät eigene Zugangsdaten zum Speicher, diese beim Anbieter widerrufen, wenn das Gerät nicht mehr vertrauenswürdig ist (Verkauf, Verlust, ehemaliger Mitarbeiter).</li>
  </ol>
 </section>

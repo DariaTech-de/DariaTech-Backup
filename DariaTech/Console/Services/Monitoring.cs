@@ -36,6 +36,7 @@ public sealed class Monitoring(IServiceScopeFactory scopes,Microsoft.Extensions.
   jobs=jobs.Where(j=>!recoveryCopies.Contains((j.DeviceId,j.LocalId))).ToList();
   var managedByJob=managed.Where(x=>!x.RestoreOnly&&x.LocalJobId!=null).GroupBy(x=>(x.DeviceId,x.LocalJobId!)).ToDictionary(x=>x.Key,x=>x.First());
   var facts=await JobFacts.Load(db,jobs.Select(x=>x.Id).ToList(),ct);var jobsByDevice=jobs.ToLookup(x=>x.DeviceId);var managedByDevice=managed.Where(x=>!x.RestoreOnly).ToLookup(x=>x.DeviceId);
+  var deletedByDevice=managed.Where(x=>x.Deleted is not null&&!x.RecoveryCopy).ToLookup(x=>x.DeviceId);
   var agents=await db.Agents.ToListAsync(ct);var alerts=await db.Alerts.ToListAsync(ct);
   // Latest update attempt per device: a failed or rejected one stays visible until a newer attempt replaces it.
   var deployments=(await db.UpdateDeployments.ToListAsync(ct)).GroupBy(x=>x.DeviceId).ToDictionary(g=>g.Key,g=>g.OrderByDescending(x=>x.Approved).First());
@@ -76,6 +77,8 @@ public sealed class Monitoring(IServiceScopeFactory scopes,Microsoft.Extensions.
     else if(!offline&&d.EngineReachable&&m.AppliedRevision>0&&m.LocalJobId is {} local&&dj.All(x=>x.LocalId!=local))problems[$"missing:{m.Id}"]=("Critical","ManagedJobMissing");
     if(m.HandoverFromDeviceId is {} from&&retiring.Contains(from))problems["handover"]=("Warning","HandoverPending");
    }
+   // A deleted backup whose schedule could not be removed may still be backing up.
+   foreach(var m in deletedByDevice[d.Id].Where(x=>x.Status is "Failed" or "Rejected"))problems[$"config:{m.Id}"]=("Critical","BackupDeletionFailed");
    var a=agents.FirstOrDefault(x=>x.DeviceId==d.Id);
    var platform=a?.Platform is {Length:>0} actual?actual:"win-x64";var approvedVersion=releases.FirstOrDefault(x=>x.Platform==platform)?.Version??(platform=="win-x64"?o.LatestApprovedVersion:"");
    if(Version.TryParse(approvedVersion,out var approved)&&Version.TryParse(a?.Version,out var installed)&&installed<approved)problems["outdated"]=("Warning","AgentOutdated");

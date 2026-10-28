@@ -22,6 +22,7 @@ public static class Ui
   "RepeatedBackupFailures"=>"Wiederholt fehlgeschlagene Backups","BackupVerificationFailed"=>"Backup-Prüfung fehlgeschlagen","RetentionFailed"=>"Aufbewahrung fehlgeschlagen",
   "StorageCapacityWarning"=>"Speicher fast voll","StorageCapacityCritical"=>"Speicher kritisch voll",
   "BackupManualOnly"=>"Kein Zeitplan – noch nie gesichert","ConfigurationFailed"=>"Konfiguration auf dem Gerät fehlgeschlagen",
+  "BackupDeletionFailed"=>"Gelöschtes Backup: Zeitplan nicht entfernt",
   "ManagedJobMissing"=>"Verwalteter Backup-Job fehlt auf dem Gerät","InventoryIncomplete"=>"Gerät meldet eine unvollständige Job-Liste",
   "HandoverPending"=>"Geräteübernahme wartet auf Stopp des Altgeräts","AgentUpdateFailed"=>"Agent-Update fehlgeschlagen",_=>code
  };
@@ -43,6 +44,7 @@ public static class Ui
   "AgentUpdateFailed"=>"Fehlercode auf der Geräteseite prüfen. Der bisherige Agent läuft weiter und sichert. Danach ein neueres Release freigeben oder den Agenten mit dem aktuellen Befehl aus „Gerät hinzufügen“ neu installieren.",
   "BackupManualOnly"=>"Zeitplan eintragen oder Backup manuell starten.",
   "ConfigurationFailed"=>"Konfiguration öffnen und Fehler beheben; das Gerät hat sie nicht übernommen.",
+  "BackupDeletionFailed"=>"Das Gerät hat das Entfernen des Zeitplans nicht übernommen und sichert womöglich weiter. Der Agent versucht es beim nächsten Abgleich erneut; sonst den Agenten aktualisieren oder den Job auf dem Gerät entfernen.",
   "ManagedJobMissing"=>"Der Job wurde auf dem Gerät entfernt. Konfiguration erneut speichern, damit das Gerät ihn wieder anlegt.",
   "InventoryIncomplete"=>"Agent aktualisieren; die Job-Liste des Geräts enthält ungültige Einträge.",
   "HandoverPending"=>"Altes Gerät einschalten, damit es den Stopp bestätigt – oder auf der Geräteseite manuell bestätigen, dass es nie wieder online kommt.",

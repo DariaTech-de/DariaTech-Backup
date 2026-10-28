@@ -1,10 +1,10 @@
 @page
 @model JobActionsModel
 @using DariaTech.Console.Services
-@{ ViewData["Title"] = Model.Job.Name; var restoreOnly = Model.Managed?.RestoreOnly == true; var pointValue = Model.Point?.ToString("O"); }
+@{ ViewData["Title"] = Model.Job.Name; var restoreOnly = Model.Managed?.RestoreOnly == true; var recoveryCopy = Model.Managed?.RecoveryCopy == true; var deleted = Model.Managed?.Deleted is not null; var pointValue = Model.Point?.ToString("O"); }
 <nav class="breadcrumb" aria-label="Brotkrümel"><a asp-page="/Device" asp-route-id="@Model.Device.Id">@Model.Device.Name</a><span aria-hidden="true">/</span><span aria-current="page">@Model.Job.Name</span></nav>
 <div class="page-heading">
- <div><span class="eyebrow">@(restoreOnly?"Wiederherstellungs-Verbindung":"Backup-Job")</span><h1>@Model.Job.Name</h1>
+ <div><span class="eyebrow">@(recoveryCopy?"Wiederherstellungs-Verbindung":deleted?"Gelöschtes Backup":"Backup-Job")</span><h1>@Model.Job.Name</h1>
   <p class="lead">Gerät @Model.Device.Name@(Model.LastCheck is {} check?$" · letzte Prüfung ({check.Expires.ToLocalTime():dd.MM.yyyy}): {JobActionsModel.StatusLabel(check).Text}":" · noch nicht geprüft – die Prüfung läuft automatisch einmal im Monat")</p></div>
  @if(!restoreOnly){
  <div class="actions">
@@ -15,7 +15,8 @@
 </div>
 @if(Model.Error is not null){<p role="alert">@Model.Error</p>}
 @if(Model.Waiting){<p class="notice-inline" data-auto-refresh role="status">@Ui.Icon("activity")Warte auf Antwort des Geräts … die Seite aktualisiert sich automatisch.</p>}
-@if(restoreOnly){<p class="notice-inline">@Ui.Icon("info")Dieses Gerät liest das Backup eines anderen Geräts direkt aus dem Speicherziel. Es sichert darüber nichts.</p>}
+@if(recoveryCopy){<p class="notice-inline">@Ui.Icon("info")Dieses Gerät liest das Backup eines anderen Geräts direkt aus dem Speicherziel. Es sichert darüber nichts.</p>}
+@if(deleted&&!recoveryCopy){<p class="notice-inline">@Ui.Icon("info")Gelöscht @Ui.Date(Model.Managed!.Deleted)@(string.IsNullOrEmpty(Model.Managed.DeletedBy)?"":$" von {Model.Managed.DeletedBy}"). Dieses Backup sichert nicht mehr@(Model.Managed.Status switch{"Pending"=>" (der Zeitplan wird beim nächsten Kontakt des Geräts entfernt)","Failed" or "Rejected"=>" – Achtung: Das Gerät hat das Entfernen des Zeitplans nicht übernommen und sichert womöglich weiter",_=>""}); die vorhandenen Versionen im Speicherziel bleiben erhalten und lassen sich hier wiederherstellen.</p>}
 
 <section class="card restore-guide" id="restore">
  <div class="card-head"><div><h2>Wiederherstellen</h2><span class="sub">In drei Schritten: Version wählen, Dateien wählen, Ziel wählen.</span></div></div>
@@ -44,7 +45,7 @@
   <h3><span class="step-no">2</span>Dateien wählen <span class="sub inline">Version vom @point.ToLocalTime().ToString("dd.MM.yyyy HH:mm") Uhr</span></h3>
   <form method="post" asp-page-handler="Guide" class="inline-form">
    <input type="hidden" name="JobId" value="@Model.JobId" /><input type="hidden" name="step" value="files" /><input type="hidden" name="point" value="@pointValue" />
-   <div class="field"><label for="filter">@(restoreOnly?"Suchen (Duplicati-Filter, z. B. *Rechnung* oder C:\\Daten\\*)":"Ordner öffnen (leer = oberste Ebene)")</label><input id="filter" name="filter" value="@Model.FilesFilter" placeholder="@(restoreOnly?"*":"z. B. C:\\Users\\Name\\Documents\\")" /></div>
+   <div class="field"><label for="filter">@(recoveryCopy?"Suchen (Duplicati-Filter, z. B. *Rechnung* oder C:\\Daten\\*)":"Ordner öffnen (leer = oberste Ebene)")</label><input id="filter" name="filter" value="@Model.FilesFilter" placeholder="@(recoveryCopy?"*":"z. B. C:\\Users\\Name\\Documents\\")" /></div>
    <button class="button @(Model.Files is null?"":"secondary")" type="submit">Dateien laden</button>
   </form>
   @if(Model.Files is {} files){
@@ -58,7 +59,7 @@
     <div class="file-row">
      <label><input type="checkbox" name="paths" value="@f.Path" data-file />@Ui.Icon(f.Directory?"server":"backups")<span class="file-path">@f.Path</span></label>
      <span class="file-size">@(f.Directory?"Ordner":Ui.Size(f.Bytes??0))</span>
-     @if(f.Directory&&!restoreOnly){<button class="link-button" type="submit" form="open-@f.Path.GetHashCode()">Öffnen</button>}
+     @if(f.Directory&&!recoveryCopy){<button class="link-button" type="submit" form="open-@f.Path.GetHashCode()">Öffnen</button>}
     </div>}
    </div>
    @if(files.Truncated){<p class="sub">Es werden nur die ersten Einträge angezeigt. Ordner öffnen oder Filter eingrenzen.</p>}
@@ -68,7 +69,7 @@
     <label class="choice-option"><input type="radio" name="target" value="folder" checked />
      <span><strong>In einen neuen Wiederherstellungsordner (empfohlen)</strong><span class="sub">Nichts Vorhandenes wird verändert. Ort auf dem Gerät: <span class="code">@Model.RestoreRootHint</span></span>
       <input class="folder-input" type="text" name="folder" value="@Model.DefaultFolder" maxlength="100" aria-label="Name des Wiederherstellungsordners" pattern="[A-Za-z0-9_\-]+" /></span></label>
-    @if(Model.Managed?.RestoreOnly!=true){
+    @if(!recoveryCopy){
     <label class="choice-option"><input type="radio" name="target" value="original" />
      <span><strong>An den ursprünglichen Ort</strong><span class="sub">Fehlende Dateien werden zurückgeschrieben. Vorhandene Dateien werden nicht überschrieben – die wiederhergestellte Fassung wird mit Zeitstempel daneben abgelegt. Für viele Dateien nach Fehlbedienung oder Schadsoftware zuerst in einen neuen Ordner wiederherstellen und prüfen.</span></span></label>}
     else{<p class="sub">@Ui.Icon("info")Dieses Backup stammt von einem anderen Gerät. Es wird nur in einen neuen Ordner auf diesem Gerät wiederhergestellt; Pfade und Betriebssystem des Quellgeräts können abweichen. Eine Wiederherstellung des ganzen Systems (Betriebssystem, Programme) ist mit Datei-Backups nicht möglich.</p>}
@@ -76,7 +77,7 @@
    <div class="form-actions"><button class="button" type="submit">@Ui.Icon("check")Wiederherstellung starten</button></div>
    <p class="sub">@(Model.FourEyes?"Ein zweiter Administrator muss die Wiederherstellung unten unter „Verlauf“ freigeben.":"Es gibt nur einen Administrator; die Wiederherstellung startet ohne zweite Freigabe und wird protokolliert.")</p>
   </form>
-  @foreach(var f in files.Files.Where(x=>x.Directory&&!restoreOnly)){
+  @foreach(var f in files.Files.Where(x=>x.Directory&&!recoveryCopy)){
   <form method="post" asp-page-handler="Guide" id="open-@f.Path.GetHashCode()" hidden><input type="hidden" name="JobId" value="@Model.JobId" /><input type="hidden" name="step" value="files" /><input type="hidden" name="point" value="@pointValue" /><input type="hidden" name="filter" value="@f.Path" /></form>}
   }
  </div>}
@@ -134,3 +135,4 @@
   <div class="form-actions"><button class="button" type="submit">Aktion anfordern</button></div>
  </form>
 </details>}
+@if(Model.Administrator&&Model.Managed is {Deleted:null} managed){<partial name="_DeleteBackup" model="(managed,Model.CustomerId)" />}

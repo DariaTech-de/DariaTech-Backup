@@ -266,15 +266,16 @@ public sealed class PostgresTests
   var page=WebUtility.HtmlDecode(await admin.GetStringAsync($"/Device?id={id}"));
   Assert.That(page,Does.Contain("Agent vom Gerät entfernen").And.Contain("launchctl bootout system/de.dariatech.dariatechbackupagent").And.Contain("Festplattenvollzugriff").And.Not.Contain("unins000.exe"));
   var all=WebUtility.HtmlDecode(await technician.GetStringAsync("/AgentRemoval"));
-  Assert.That(all,Does.Contain("unins000.exe").And.Contain("systemctl disable --now DariaTechBackupAgent.service").And.Contain("launchctl bootout").And.Contain("zuerst in der Console stilllegen"));
+  Assert.That(all,Does.Contain("unins000.exe").And.Contain("systemctl disable --now DariaTechBackupAgent.service").And.Contain("launchctl bootout").And.Contain("zuerst in der Console löschen"));
   using(var denied=await portal.GetAsync("/AgentRemoval"))Assert.That(denied.StatusCode,Is.EqualTo(HttpStatusCode.Forbidden));
   async Task<HttpResponseMessage> Post(string handler,bool confirm)
   {
    var fields=new Dictionary<string,string>{{"__RequestVerificationToken",Form(await admin.GetStringAsync($"/Device?id={id}"))}};if(confirm)fields["confirm"]="true";
    return await admin.PostAsync($"/Device?id={id}&handler={handler}",new FormUrlEncodedContent(fields));
   }
-  using(await Post("Decommission",true)){}
-  // The Mac is already switched off, so it cannot confirm its stop; the administrator confirms the removal.
+  // A stop requested with an earlier Console version left the device listed until it confirmed. The Mac is already
+  // switched off, so it cannot confirm its stop; the administrator confirms the removal.
+  await using(var arrange=Db()){var stopping=await arrange.Devices.SingleAsync(x=>x.Id==id);stopping.RetireRequested=DateTimeOffset.UtcNow;await arrange.SaveChangesAsync();}
   page=WebUtility.HtmlDecode(await admin.GetStringAsync($"/Device?id={id}"));Assert.That(page,Does.Contain("angefordert, vom Gerät noch nicht bestätigt").And.Contain("Entfernung bestätigen"));
   using(var confirmed=await Post("ConfirmRemoved",true))
   {
@@ -418,6 +419,7 @@ public sealed class PostgresTests
   var managed=await db.ManagedJobs.SingleAsync(x=>x.DeviceId==device.Id);
   var edit=await admin.GetStringAsync($"/BackupEdit?deviceId={device.Id}&id={managed.Id}");
   Assert.That(edit,Does.Not.Contain("test-form-passphrase-987654").And.Not.Contain(source.Credentials["office365-client-secret"]));
+  Assert.That(edit,Does.Match("name=\"Provider\" value=\"Microsoft365\""),"an existing job keeps its source type in the form");
   var job=new BackupJob{TenantId=t.Id,DeviceId=device.Id,Name="Cloud form job",LocalId="1",Ownership="Managed"};db.Jobs.Add(job);await db.SaveChangesAsync();
   var actions=await admin.GetStringAsync($"/JobActions?id={job.Id}");
   match=Regex.Match(actions,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");
@@ -1037,13 +1039,118 @@ Assert.That(html,Does.Contain("Agent 0.2.0 · Pilot").And.Contain(url).And.Conta
   Assert.That(await db.Audit.AnyAsync(x=>x.Action=="device.agent-removal-confirmed"&&x.Resource==oldId.DeviceId.ToString()),Is.True);
   // The old PC is switched on again later: it is still told to stop.
   using(var told=await oldPc.PostAsJsonAsync("/api/v1/agent/heartbeat",new HeartbeatRequest("0.3.0","Windows 11",true,[])))Assert.That(told.StatusCode,Is.EqualTo(HttpStatusCode.Gone));
-  // Decommission without replacement keeps the device's access until it confirms.
-  Assert.That(await Post(spareId.DeviceId,"Decommission",new(){{"confirm","true"}}),Does.Contain("Stilllegung angefordert"));
+  // Deleting a device without replacement hides it at once; it keeps its access until it confirms the stop.
+  Assert.That(await Post(spareId.DeviceId,"Delete",new()),Does.Contain("Bitte bestätigen, dass das Gerät gelöscht werden soll"));
+  var deleted=await Post(spareId.DeviceId,"Delete",new(){{"confirm","true"}});
+  Assert.That(deleted,Does.Contain("Gelöschte Geräte").And.Contain("„PC-Lager“ wurde gelöscht").And.Contain("Stopp angefordert – noch nicht bestätigt").And.Contain("Agent 0.3.0 hält sich nicht selbst an"));
+  Assert.That(await db.Devices.AsNoTracking().Where(x=>x.Id==spareId.DeviceId).Select(x=>x.Active).SingleAsync(),Is.False,"hidden at once");
+  using(var gone=await admin.GetAsync($"/Device?id={spareId.DeviceId}"))Assert.That(gone.StatusCode,Is.EqualTo(HttpStatusCode.NotFound));
+  Assert.That(await admin.GetStringAsync("/Devices"),Does.Not.Contain("PC-Lager"));
   using(var told=await spare.PostAsJsonAsync("/api/v1/agent/heartbeat",new HeartbeatRequest("0.3.0","Windows 11",true,[])))Assert.That(told.StatusCode,Is.EqualTo(HttpStatusCode.Gone));
-  Assert.That(await db.Devices.AsNoTracking().Where(x=>x.Id==spareId.DeviceId).Select(x=>x.Active).SingleAsync(),Is.True,"still listed until the stop is confirmed");
+  using(var none=await spare.GetAsync("/api/v1/agent/configurations"))Assert.That(none.StatusCode,Is.EqualTo(HttpStatusCode.Unauthorized),"a deleted device gets no configurations or passphrases");
   using(var stopped=await spare.PostAsync("/api/v1/agent/retired",null))Assert.That(stopped.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
-  var spareDevice=await db.Devices.AsNoTracking().SingleAsync(x=>x.Id==spareId.DeviceId);Assert.That(spareDevice.Active,Is.False);Assert.That(spareDevice.RetireConfirmed,Is.Not.Null);
+  var spareDevice=await db.Devices.AsNoTracking().SingleAsync(x=>x.Id==spareId.DeviceId);Assert.That(spareDevice.Active,Is.False);Assert.That(spareDevice.RetireConfirmed,Is.Not.Null);Assert.That(spareDevice.Deleted,Is.Not.Null);
+  var customerId=await db.Customers.IgnoreQueryFilters().Where(x=>x.TenantId==t.Id).Select(x=>x.Id).SingleAsync();
+  Assert.That(WebUtility.HtmlDecode(await admin.GetStringAsync($"/Customer?id={customerId}")),Does.Contain("Stopp vom Gerät bestätigt"));
+  using(var unknown=await admin.DeleteAsync($"/api/v1/management/devices/{Guid.NewGuid()}"))Assert.That(unknown.StatusCode,Is.EqualTo(HttpStatusCode.NotFound));
+  using(var twice=await admin.DeleteAsync($"/api/v1/management/devices/{spareId.DeviceId}"))Assert.That(twice.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
   using(var again=await spare.PostAsync("/api/v1/agent/retired",null))Assert.That(again.StatusCode,Is.EqualTo(HttpStatusCode.Unauthorized));
+  }
+ }
+ [Test]public async Task ADeletedBackupStopsOnTheDeviceLeavesMonitoringAndStaysRestorable()
+ {
+  var(t,site)=await Customer();await using var db=Db();var customer=await db.Customers.IgnoreQueryFilters().SingleAsync(x=>x.TenantId==t.Id);
+  async Task<(HttpClient Client,Guid Id)> Enroll(string name)
+  {
+   var client=factory.CreateClient(new(){BaseAddress=new Uri("https://localhost")});
+   using var e=await client.PostAsJsonAsync("/api/v1/agent/enroll",new EnrollmentRequest(await Token(t,site),name,"Windows 11","0.4.1","win-x64"));var identity=(await e.Content.ReadFromJsonAsync<EnrollmentResponse>())!;
+   client.DefaultRequestHeaders.Authorization=new("Bearer",identity.Credential);client.DefaultRequestHeaders.Add("X-Device-Id",identity.DeviceId.ToString());return (client,identity.DeviceId);
+  }
+  var (pc,pcId)=await Enroll("PC-Buchhaltung");var (other,otherId)=await Enroll("PC-Ersatz");
+  using(pc)using(other){
+  using var admin=await Login(UserRole.Administrator);using var csrf=System.Text.Json.JsonDocument.Parse(await admin.GetStringAsync("/api/v1/management/csrf"));admin.DefaultRequestHeaders.Add("X-CSRF-Token",csrf.RootElement.GetProperty("token").GetString());
+  var definition=new ManagedBackupDefinition("Buchhaltung-Daten",["C:\\Buchhaltung"],"webdav://storage.example/dav/k1/buchhaltung","delete-test-passphrase-2468",new(){{"use-ssl","true"},{"auth-username","u"},{"auth-password","p"}},30,[],new(DateTimeOffset.UtcNow.AddHours(1),24,Enum.GetValues<DayOfWeek>()));
+  using var created=await admin.PostAsJsonAsync($"/api/v1/management/devices/{pcId}/managed-jobs",new ConfigurationInput(0,definition));var job=(await created.Content.ReadFromJsonAsync<ManagedJob>())!;
+  using(var applied=await pc.PostAsJsonAsync($"/api/v1/agent/configurations/{job.Id}/receipt",new ConfigurationReceipt(1,"7","Applied")))Assert.That(applied.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  var now=DateTimeOffset.UtcNow;
+  var failing=new HeartbeatRequest("0.4.1","Windows 11",true,[new("7","Buchhaltung-Daten",now.AddHours(1),new RunReport("r1",now.AddMinutes(-20),now.AddMinutes(-10),RunStatus.Failed,null,null,null,null,"BackupFailed"))]);
+  using(var beat=await pc.PostAsJsonAsync("/api/v1/agent/heartbeat",failing))Assert.That(beat.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  var backup=await db.Jobs.AsNoTracking().SingleAsync(x=>x.DeviceId==pcId&&x.LocalId=="7");
+  await using(var check=Db()){await Monitoring.Evaluate(check,new(),DateTimeOffset.UtcNow);}
+  Assert.That(await db.Alerts.AnyAsync(x=>x.Key==$"failed:{backup.Id}"&&x.Resolved==null),Is.True);
+  string Form(string html){var m=Regex.Match(html,"name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");Assert.That(m.Success,Is.True);return WebUtility.HtmlDecode(m.Groups[1].Value);}
+  // The delete card is on the backup's own pages and posts to the customer page.
+  var actions=WebUtility.HtmlDecode(await admin.GetStringAsync($"/JobActions?id={backup.Id}"));Assert.That(actions,Does.Contain("Backup löschen").And.Contain("Versionen im Speicherziel bleiben erhalten"));
+  Assert.That(WebUtility.HtmlDecode(await admin.GetStringAsync($"/BackupEdit?deviceId={pcId}&id={job.Id}")),Does.Contain("Backup löschen"));
+  async Task<HttpResponseMessage> Delete(bool confirm)
+  {
+   var fields=new Dictionary<string,string>{{"id",customer.Id.ToString()},{"jobId",job.Id.ToString()},{"__RequestVerificationToken",Form(await admin.GetStringAsync($"/JobActions?id={backup.Id}"))}};if(confirm)fields["confirm"]="true";
+   return await admin.PostAsync("/Customer?handler=DeleteBackup",new FormUrlEncodedContent(fields));
+  }
+  // A backup queued before the deletion must not run after it.
+  using(var queued=await admin.PostAsJsonAsync("/api/v1/management/commands",new CommandInput(backup.Id,RemoteAction.RunBackup,null,15)))Assert.That(queued.StatusCode,Is.EqualTo(HttpStatusCode.Created));
+  Assert.That(await pc.GetFromJsonAsync<SignedCommand[]>("/api/v1/agent/commands"),Has.Length.EqualTo(1));
+  using(var unconfirmed=await Delete(false))Assert.That(WebUtility.HtmlDecode(await unconfirmed.Content.ReadAsStringAsync()),Does.Contain("Bitte bestätigen, dass das Backup gelöscht werden soll"));
+  Assert.That((await db.ManagedJobs.AsNoTracking().SingleAsync(x=>x.Id==job.Id)).Deleted,Is.Null);
+  string page;
+  using(var deleted=await Delete(true)){Assert.That(deleted.StatusCode,Is.EqualTo(HttpStatusCode.Redirect));page=WebUtility.HtmlDecode(await admin.GetStringAsync(deleted.Headers.Location!.ToString()));}
+  Assert.That(page,Does.Contain("„Buchhaltung-Daten“ wurde gelöscht").And.Contain("Gelöschte Backups").And.Contain("Zeitplan wird beim nächsten Kontakt des Geräts entfernt"));
+  Assert.That(await pc.GetFromJsonAsync<SignedCommand[]>("/api/v1/agent/commands"),Is.Empty,"the queued backup is not delivered any more");
+  var stored=await db.ManagedJobs.AsNoTracking().SingleAsync(x=>x.Id==job.Id);
+  Assert.That(stored.Deleted,Is.Not.Null);Assert.That(stored.RestoreOnly,Is.True);Assert.That(stored.LatestRevision,Is.EqualTo(2));
+  Assert.That(await db.Audit.AnyAsync(x=>x.Action=="backup.deleted"&&x.Resource==job.Id.ToString()),Is.True);
+  // The device gets the same job without a schedule: same destination and passphrase, so the versions stay readable.
+  var assignment=(await pc.GetFromJsonAsync<ConfigurationAssignment[]>("/api/v1/agent/configurations"))!.Single();
+  Assert.That(assignment.Revision,Is.EqualTo(2));Assert.That(assignment.Definition.Schedule,Is.Null);Assert.That(assignment.Definition.RestoreOnly,Is.Null,"the device keeps its local database and restores normally");
+  Assert.That(assignment.Definition.TargetUrl,Is.EqualTo(definition.TargetUrl));Assert.That(assignment.Definition.Passphrase,Is.EqualTo(definition.Passphrase));Assert.That(assignment.Definition.Sources,Is.EqualTo(definition.Sources));
+  // If the device cannot remove the schedule, the page says so and monitoring alerts instead of reporting a stop.
+  using(var refused=await pc.PostAsJsonAsync($"/api/v1/agent/configurations/{job.Id}/receipt",new ConfigurationReceipt(2,"7","Failed")))Assert.That(refused.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  Assert.That(WebUtility.HtmlDecode(await admin.GetStringAsync($"/Customer?id={customer.Id}")),Does.Contain("Zeitplan konnte auf dem Gerät nicht entfernt werden").And.Not.Contain("auf dem Gerät gestoppt"));
+  await using(var check=Db()){await Monitoring.Evaluate(check,new(),DateTimeOffset.UtcNow);}
+  Assert.That(await db.Alerts.AnyAsync(x=>x.Key==$"config:{job.Id}"&&x.Code=="BackupDeletionFailed"&&x.Resolved==null),Is.True);
+  using(var applied=await pc.PostAsJsonAsync($"/api/v1/agent/configurations/{job.Id}/receipt",new ConfigurationReceipt(2,"7","Applied")))Assert.That(applied.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  using(var beat=await pc.PostAsJsonAsync("/api/v1/agent/heartbeat",failing with{Jobs=[failing.Jobs[0] with{NextRun=null}]}))Assert.That(beat.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  Assert.That((await db.Jobs.AsNoTracking().SingleAsync(x=>x.Id==backup.Id)).Active,Is.False,"still reported by the device, but no longer listed");
+  await using(var check=Db()){await Monitoring.Evaluate(check,new(),DateTimeOffset.UtcNow);}
+  Assert.That(await db.Alerts.AnyAsync(x=>x.DeviceId==pcId&&x.Resolved==null&&(x.Key==$"failed:{backup.Id}"||x.Key==$"stale:{backup.Id}"||x.Key==$"missing:{job.Id}"||x.Key==$"config:{job.Id}")),Is.False,"no alerts for a deleted backup");
+  var device=WebUtility.HtmlDecode(await admin.GetStringAsync($"/Device?id={pcId}"));Assert.That(device,Does.Not.Contain("Buchhaltung-Daten"));
+  Assert.That(WebUtility.HtmlDecode(await admin.GetStringAsync("/Backups")),Does.Not.Contain("Buchhaltung-Daten"));
+  page=WebUtility.HtmlDecode(await admin.GetStringAsync($"/Customer?id={customer.Id}"));Assert.That(page,Does.Contain("auf dem Gerät gestoppt"));
+  // No more backups, but restores on the device itself still work.
+  using(var run=await admin.PostAsJsonAsync("/api/v1/management/commands",new CommandInput(backup.Id,RemoteAction.RunBackup,null,15)))Assert.That(run.StatusCode,Is.EqualTo(HttpStatusCode.Conflict));
+  using(var verify=await admin.PostAsJsonAsync("/api/v1/management/commands",new CommandInput(backup.Id,RemoteAction.VerifyBackup,null,15)))Assert.That(verify.StatusCode,Is.EqualTo(HttpStatusCode.Conflict));
+  using(var versions=await admin.PostAsJsonAsync("/api/v1/management/commands",new CommandInput(backup.Id,RemoteAction.ListRestorePoints,null,15)))Assert.That(versions.StatusCode,Is.EqualTo(HttpStatusCode.Created));
+  actions=WebUtility.HtmlDecode(await admin.GetStringAsync($"/JobActions?id={backup.Id}"));
+  Assert.That(actions,Does.Contain("Gelöschtes Backup").And.Contain("lassen sich hier wiederherstellen").And.Not.Contain("Backup jetzt starten").And.Not.Contain("Backup löschen"));
+  // Its own device has the local database, so unlike a recovery copy it may restore to the original paths.
+  var restoreFields=new Dictionary<string,string>{{"JobId",backup.Id.ToString()},{"step","restore"},{"point",now.AddMinutes(-20).ToString("O")},{"paths","C:\\Buchhaltung\\"},{"target","original"},{"__RequestVerificationToken",Form(actions)}};
+  using(var restore=await admin.PostAsync("/JobActions?handler=Guide",new FormUrlEncodedContent(restoreFields)))Assert.That(restore.StatusCode,Is.EqualTo(HttpStatusCode.Redirect));
+  Assert.That(await db.Commands.AnyAsync(x=>x.JobId==backup.Id&&x.Action==RemoteAction.Restore),Is.True);
+  using(var edit=await admin.GetAsync($"/BackupEdit?deviceId={pcId}&id={job.Id}"))Assert.That(edit.StatusCode,Is.EqualTo(HttpStatusCode.NotFound));
+  using(var update=await admin.PutAsJsonAsync($"/api/v1/management/managed-jobs/{job.Id}",new ConfigurationInput(2,definition)))Assert.That(update.StatusCode,Is.EqualTo(HttpStatusCode.Conflict));
+  // ... and on another device of the customer.
+  var recoverFields=new Dictionary<string,string>{{"id",customer.Id.ToString()},{"sourceJobId",job.Id.ToString()},{"targetDeviceId",otherId.ToString()},{"__RequestVerificationToken",Form(page)}};
+  using(var recovered=await admin.PostAsync("/Customer?handler=Recover",new FormUrlEncodedContent(recoverFields)))Assert.That(recovered.StatusCode,Is.EqualTo(HttpStatusCode.Redirect));
+  var copy=await db.ManagedJobs.AsNoTracking().SingleAsync(x=>x.SourceManagedJobId==job.Id);Assert.That(copy.DeviceId,Is.EqualTo(otherId));Assert.That(copy.RestoreOnly,Is.True);
+  var copyDefinition=(await other.GetFromJsonAsync<ConfigurationAssignment[]>("/api/v1/agent/configurations"))!.Single().Definition;
+  Assert.That(copyDefinition.RestoreOnly,Is.True);Assert.That(copyDefinition.Passphrase,Is.EqualTo(definition.Passphrase));Assert.That(copyDefinition.TargetUrl,Is.EqualTo(definition.TargetUrl));
+  // Removing the recovery connection again takes it out of every list; deleting is idempotent.
+  using(var removeCopy=await admin.DeleteAsync($"/api/v1/management/managed-jobs/{copy.Id}"))Assert.That(removeCopy.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  page=WebUtility.HtmlDecode(await admin.GetStringAsync($"/Customer?id={customer.Id}"));Assert.That(page,Does.Not.Contain("Wiederherstellungs-Verbindung zu"));
+  // Connecting the same backup to the same device again restores the removed connection with the current definition.
+  recoverFields["__RequestVerificationToken"]=Form(page);
+  using(var reconnected=await admin.PostAsync("/Customer?handler=Recover",new FormUrlEncodedContent(recoverFields)))Assert.That(reconnected.StatusCode,Is.EqualTo(HttpStatusCode.Redirect));
+  var restored=await db.ManagedJobs.AsNoTracking().SingleAsync(x=>x.SourceManagedJobId==job.Id);Assert.That(restored.Id,Is.EqualTo(copy.Id));Assert.That(restored.Deleted,Is.Null);Assert.That(restored.LatestRevision,Is.EqualTo(2));
+  Assert.That((await other.GetFromJsonAsync<ConfigurationAssignment[]>("/api/v1/agent/configurations"))!.Single().Revision,Is.EqualTo(2));
+  using(var removeAgain=await admin.DeleteAsync($"/api/v1/management/managed-jobs/{copy.Id}"))Assert.That(removeAgain.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  using(var again=await admin.DeleteAsync($"/api/v1/management/managed-jobs/{job.Id}"))Assert.That(again.StatusCode,Is.EqualTo(HttpStatusCode.NoContent));
+  using(var unknown=await admin.DeleteAsync($"/api/v1/management/managed-jobs/{Guid.NewGuid()}"))Assert.That(unknown.StatusCode,Is.EqualTo(HttpStatusCode.NotFound));
+  page=WebUtility.HtmlDecode(await admin.GetStringAsync($"/Customer?id={customer.Id}"));Assert.That(page,Does.Not.Contain("Wiederherstellungs-Verbindung zu"));
+  Assert.That(Regex.Matches(page,"Buchhaltung-Daten").Count,Is.GreaterThan(0),"the deleted backup itself stays listed");
+  Assert.That((await db.ManagedJobs.AsNoTracking().SingleAsync(x=>x.Id==job.Id)).LatestRevision,Is.EqualTo(2),"a second delete changes nothing");
+  // Technicians cannot delete.
+  using var technician=await Login(UserRole.Technician);using var techCsrf=System.Text.Json.JsonDocument.Parse(await technician.GetStringAsync("/api/v1/management/csrf"));technician.DefaultRequestHeaders.Add("X-CSRF-Token",techCsrf.RootElement.GetProperty("token").GetString());
+  using(var denied=await technician.DeleteAsync($"/api/v1/management/managed-jobs/{job.Id}"))Assert.That(denied.StatusCode,Is.EqualTo(HttpStatusCode.Forbidden));
   }
  }
  [Test]public async Task GuidedRestoreAndMonthlyCheckUseSignedCommands()

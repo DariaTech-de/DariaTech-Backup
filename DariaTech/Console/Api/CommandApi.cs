@@ -25,7 +25,9 @@ public static class CommandApi
   app.MapGet("/api/v1/agent/commands",async(ManagementDb db,TenantScope scope,ISecretStore secrets,HttpContext ctx)=>
   {
    var agent=await DeviceAuthentication.Authenticate(ctx,db,scope);if(agent is null)return Results.Unauthorized();
-   var now=DateTimeOffset.UtcNow;var records=await db.Commands.Where(x=>x.DeviceId==agent.DeviceId&&x.Status=="Pending"&&x.Expires>now).OrderBy(x=>x.Expires).Take(10).ToListAsync();
+   // Backups and checks queued before a backup was deleted are no longer delivered; its restores still are.
+   var deleted=db.Jobs.Where(j=>j.DeviceId==agent.DeviceId&&db.ManagedJobs.Any(m=>m.DeviceId==j.DeviceId&&m.LocalJobId==j.LocalId&&m.Deleted!=null)).Select(j=>(Guid?)j.Id);
+   var now=DateTimeOffset.UtcNow;var records=await db.Commands.Where(x=>x.DeviceId==agent.DeviceId&&x.Status=="Pending"&&x.Expires>now&&!((x.Action==RemoteAction.RunBackup||x.Action==RemoteAction.VerifyBackup)&&deleted.Contains(x.JobId))).OrderBy(x=>x.Expires).Take(10).ToListAsync();
    return Results.Ok(records.Select(x=>new SignedCommand(secrets.Unprotect(x.TenantId,$"command:{x.Id}",x.EncryptedPayload),x.Signature)));
   }).RequireRateLimiting("Agent");
   app.MapPost("/api/v1/agent/commands/{id:guid}/receipt",async(Guid id,CommandReceipt receipt,ManagementDb db,TenantScope scope,ISecretStore secrets,HttpContext ctx)=>
@@ -62,7 +64,11 @@ public static class CommandApi
    if(!signer.Enabled)return Results.Problem(statusCode:503,title:"Command signing is not configured");
    if(!Enum.IsDefined(input.Action)||input.ValidMinutes is <1 or >30)return Results.BadRequest();
    if(input.Action is RemoteAction.Restore or RemoteAction.RestoreSaas or RemoteAction.RestoreProxmox&&!ctx.User.IsInRole("Administrator")&&!ctx.User.IsInRole("SuperAdmin"))return Results.Forbid();
-   var job=await db.Jobs.SingleOrDefaultAsync(x=>x.Id==input.JobId&&x.Active);if(job is null)return Results.NotFound();
+   var job=await db.Jobs.SingleOrDefaultAsync(x=>x.Id==input.JobId);if(job is null)return Results.NotFound();
+   // A deleted backup stays on its device only for restores: it is no longer listed, but its versions can still be restored.
+   var deleted=await db.ManagedJobs.AnyAsync(x=>x.DeviceId==job.DeviceId&&x.LocalJobId==job.LocalId&&x.Deleted!=null&&x.SourceManagedJobId==null);
+   if(!job.Active&&!deleted)return Results.NotFound();
+   if(deleted&&input.Action is not (RemoteAction.Restore or RemoteAction.RestoreSaas or RemoteAction.RestoreProxmox or RemoteAction.ListRestorePoints or RemoteAction.ListRestoreFiles or RemoteAction.StopBackup))return Results.Conflict(new{code="BackupDeleted"});
    var device=await db.Devices.SingleOrDefaultAsync(x=>x.Id==job.DeviceId&&x.Active);if(device is null||!await db.Customers.AnyAsync(x=>x.TenantId==job.TenantId&&x.Active))return Results.NotFound();
    // A recovery copy shares the original device's destination; backing up into it would mix two devices' data.
    if(input.Action==RemoteAction.RunBackup&&await db.ManagedJobs.AnyAsync(x=>x.DeviceId==job.DeviceId&&x.LocalJobId==job.LocalId&&x.RestoreOnly))return Results.Conflict(new{code="RestoreOnly"});

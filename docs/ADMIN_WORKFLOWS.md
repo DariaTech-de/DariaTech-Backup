@@ -180,15 +180,36 @@ folder with identical checksums).
 - Agent 0.4.0 pauses on the stop but never confirms it once it has run any backup or restore: it took the engine's
   last progress report, which the engine keeps after a task ends, for a running task. Fixed in 0.4.1. For an old
   device with 0.4.0, install 0.4.1 there (it then confirms at once) or confirm the stop manually on the new device.
-- **Decommission** ("Gerät stilllegen"): the same stop without a replacement; backups stay restorable.
+- **Delete a device** ("Gerät löschen" on the device page, `DELETE /api/v1/management/devices/{id}`): the same stop
+  without a replacement. The device leaves lists and monitoring at once (its open alerts are closed) and is listed
+  under "Gelöschte Geräte" on the customer page with its stop state. If it is still switched on it pauses its
+  schedules on its next contact and confirms; its credential is revoked then. A device that never comes back needs
+  nothing more; a deleted device gets no configurations or commands. Its backups stay under "Backups &
+  Wiederherstellung" and can be restored on another device. Agents ≤ 0.3.1 do not understand the stop and must be
+  uninstalled (the customer page says so). A deleted device can still be chosen in "Gerät ersetzen".
+  (impl., auto; manual on Linux with the real engine and agent 0.4.1: hidden at once, the agent confirmed the stop
+  within a minute, archives untouched.)
+- **Delete a backup** ("Backup löschen" on the job's actions and configuration pages, "Löschen" in the customer's
+  backup list, `DELETE /api/v1/management/managed-jobs/{id}`): the job leaves lists and monitoring at once and
+  gets a new revision without a schedule; the device keeps the engine job and its local database, so it no longer
+  backs up on its own, and the Console refuses `RunBackup` and `VerifyBackup` (also ones queued before the deletion
+  are no longer delivered). If the device does not accept the schedule removal, the customer page says so and
+  monitoring raises "Gelöschtes Backup: Zeitplan nicht entfernt". The versions at the destination are
+  never touched, and the passphrase stays encrypted in the Console. The backup is listed under "Gelöschte Backups"
+  on the customer page and stays restorable on its own device (also to the original paths) and through "Auf anderes
+  Gerät wiederherstellen". Deleting a recovery copy ("Verbindung entfernen") only hides that connection; connecting
+  the same backup to that device again restores it. Deleting
+  cannot be undone in the Console; to protect the data again create a new job. To remove the data, delete it at the
+  destination. (impl., auto; manual on Linux with the real engine and agent 0.4.1: the engine schedule was removed,
+  a file was restored byte-identically to its original path afterwards.)
 - **Removing the agent from a device** (device page "Agent vom Gerät entfernen", overview `/AgentRemoval` for
-  Windows, Linux and macOS): first decommission or replace in the Console, then remove locally with the commands
+  Windows, Linux and macOS): first delete or replace the device in the Console, then remove locally with the commands
   shown for the device's platform — they use fixed paths and work for every agent version. Removal keeps the local
   identity and job databases for a reinstallation of the same PC; the second command deletes them (clean removal),
   the third one also the restored files. Agents from 0.4 install `/usr/local/sbin/dariatech-agent-uninstall`
   (`--purge`, `--purge-restores`) on Linux and macOS; on Windows the uninstaller in "Apps" is used. A device that
-  could not confirm its stop (offline, agent ≤ 0.3.1) is confirmed manually after removal; if it does come back
-  with an agent, it is still stopped. Backups at the storage are never touched
+  could not confirm its stop (offline, agent ≤ 0.3.1) needs no further step when it was deleted; when it was
+  replaced, the removal is confirmed on the new device. If it does come back with an agent, it is still stopped. Backups at the storage are never touched
   (impl., auto for the Console; the scripts are covered by the native Linux/macOS smoke test in CI; open: Windows
   data deletion on a real PC).
 - Changing sources, schedule or retention: new revision of the same chain. Changing destination or passphrase

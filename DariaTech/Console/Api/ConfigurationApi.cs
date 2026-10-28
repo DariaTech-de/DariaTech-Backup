@@ -13,6 +13,8 @@ public static class ConfigurationApi
   g.MapGet("/managed-jobs",async(ManagementDb db)=>await db.ManagedJobs.ToListAsync());
   g.MapPost("/devices/{deviceId:guid}/managed-jobs",Create).RequireAuthorization("Admin");
   g.MapPut("/managed-jobs/{id:guid}",Update).RequireAuthorization("Admin");
+  g.MapDelete("/managed-jobs/{id:guid}",async(Guid id,ManagementDb db,ISecretStore secrets,HttpContext ctx)=>
+   !await db.ManagedJobs.AnyAsync(x=>x.Id==id)?Results.NotFound():await DeleteBackup(id,db,secrets,ctx) is {} error?Results.Conflict(new{error}):Results.NoContent()).RequireAuthorization("Admin");
   app.MapGet("/api/v1/agent/configurations",async(ManagementDb db,TenantScope scope,ISecretStore secrets,HttpContext ctx)=>
   {
    var agent=await DeviceAuthentication.Authenticate(ctx,db,scope);if(agent is null)return Results.Unauthorized();
@@ -40,7 +42,7 @@ public static class ConfigurationApi
     if(job.AppliedRevision==receipt.Revision)return Results.NoContent();
     job.AppliedRevision=receipt.Revision;job.LocalJobId=receipt.LocalJobId;job.UnreportedSince=DateTimeOffset.UtcNow;
     var backup=await db.Jobs.SingleOrDefaultAsync(x=>x.DeviceId==agent.DeviceId&&x.LocalId==receipt.LocalJobId);
-    if(backup is null){backup=new BackupJob{TenantId=job.TenantId,DeviceId=agent.DeviceId,LocalId=receipt.LocalJobId!,Name=job.Name};db.Jobs.Add(backup);}backup.Ownership="Managed";backup.Active=true;
+    if(backup is null){backup=new BackupJob{TenantId=job.TenantId,DeviceId=agent.DeviceId,LocalId=receipt.LocalJobId!,Name=job.Name};db.Jobs.Add(backup);}backup.Ownership="Managed";backup.Active=job.Deleted is null;
    }
    if(receipt.Revision==job.LatestRevision){job.Status=receipt.Status;job.LastReportedRevision=receipt.Revision;}
    db.Audit.Add(new AuditEvent{TenantId=job.TenantId,Actor=agent.DeviceId.ToString(),Action="backup.configuration-"+receipt.Status.ToLowerInvariant(),Resource=id.ToString()});
@@ -62,6 +64,7 @@ public static class ConfigurationApi
    if(input.ExpectedRevision<1||!ConfigurationPolicy.Valid(input.Definition))return Results.BadRequest();
    await using var tx=await db.Database.BeginTransactionAsync();await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({BitConverter.ToInt64(id.ToByteArray())})");
    var job=await db.ManagedJobs.SingleOrDefaultAsync(x=>x.Id==id);if(job is null)return Results.NotFound();
+   if(job.Deleted is not null)return Results.Conflict(new{code="BackupDeleted"});
    if(job.LatestRevision!=input.ExpectedRevision)return Results.Conflict(new{code="RevisionConflict"});
    var old=await db.ConfigurationRevisions.SingleAsync(x=>x.ManagedJobId==id&&x.Revision==job.LatestRevision);
    var definition=Read(secrets,old);
@@ -79,17 +82,26 @@ public static class ConfigurationApi
  public static async Task<(ManagedJob? Job,string? Error)> CreateRecoveryCopy(Guid sourceId,Guid targetDeviceId,ManagementDb db,ISecretStore secrets,HttpContext ctx)
  {
   if(!ctx.User.IsInRole("SuperAdmin")&&!ctx.User.IsInRole("Administrator"))return (null,"Keine Berechtigung.");
-  var source=await db.ManagedJobs.SingleOrDefaultAsync(x=>x.Id==sourceId&&!x.RestoreOnly);if(source is null)return (null,"Backup nicht gefunden.");
+  // A deleted backup stays restorable; a recovery copy itself is not a source.
+  var source=await db.ManagedJobs.SingleOrDefaultAsync(x=>x.Id==sourceId&&(!x.RestoreOnly||x.Deleted!=null&&x.SourceManagedJobId==null));if(source is null)return (null,"Backup nicht gefunden.");
   var target=await db.Devices.SingleOrDefaultAsync(x=>x.Id==targetDeviceId&&x.Active&&x.TenantId==source.TenantId);
   if(target is null||target.Id==source.DeviceId)return (null,"Bitte ein anderes aktives Gerät desselben Kunden wählen.");
   var revision=await db.ConfigurationRevisions.SingleAsync(x=>x.ManagedJobId==source.Id&&x.Revision==source.LatestRevision);
   var original=Read(secrets,revision);
   if(original.Saas is not null||original.Proxmox is not null)return (null,"Cloud- und Proxmox-Backups werden über ihre eigene Wiederherstellung zurückgeholt.");
-  if(await db.ManagedJobs.AnyAsync(x=>x.DeviceId==target.Id&&x.SourceManagedJobId==source.Id))return (null,"Dieses Backup ist auf dem Gerät bereits zur Wiederherstellung verbunden.");
+  var existing=await db.ManagedJobs.SingleOrDefaultAsync(x=>x.DeviceId==target.Id&&x.SourceManagedJobId==source.Id);
+  if(existing is {Deleted:null})return (null,"Dieses Backup ist auf dem Gerät bereits zur Wiederherstellung verbunden.");
   var sourceDevice=await db.Devices.Where(x=>x.Id==source.DeviceId).Select(x=>x.Name).SingleAsync();
   var name=$"Wiederherstellung: {original.Name} (von {sourceDevice})";if(name.Length>200)name=name[..200];
   var copy=original with{Name=name,Schedule=null,SourceMounts=null,RestoreOnly=true,Adopted=null};
   if(!ConfigurationPolicy.Valid(copy))return (null,"Die Konfiguration des Backups ist ungültig.");
+  if(existing is not null)
+  {
+   // A removed connection is restored: its engine job is still on the device and gets the current definition again.
+   existing.Deleted=null;existing.DeletedBy=null;existing.Name=name;existing.LatestRevision++;existing.Status="Pending";AddRevision(db,secrets,existing,copy);
+   if(existing.LocalJobId is {} local)foreach(var reported in await db.Jobs.Where(x=>x.DeviceId==target.Id&&x.LocalId==local).ToListAsync())reported.Active=true;
+   ManagementApi.Audit(db,ctx,existing.TenantId,"backup.recovery-copy-restored",existing.Id);await db.SaveChangesAsync();return (existing,null);
+  }
   var job=new ManagedJob{TenantId=target.TenantId,DeviceId=target.Id,Name=name,LatestRevision=1,RestoreOnly=true,SourceManagedJobId=source.Id};db.ManagedJobs.Add(job);
   AddRevision(db,secrets,job,copy);ManagementApi.Audit(db,ctx,job.TenantId,"backup.recovery-copy-created",job.Id);
   await db.SaveChangesAsync();return (job,null);
@@ -144,14 +156,36 @@ public static class ConfigurationApi
   device.RetireManuallyConfirmed=DateTimeOffset.UtcNow;device.RetireManuallyConfirmedBy=ctx.User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value??"";device.Active=false;
   ManagementApi.Audit(db,ctx,device.TenantId,"device.retire-manually-confirmed",device.Id);await db.SaveChangesAsync();return null;
  }
- // Decommission without replacement: the device keeps its backups at the destination (restorable from another
- // device), but stops its own schedules on its next contact.
- public static async Task<string?> Decommission(Guid deviceId,ManagementDb db,HttpContext ctx)
+ // Delete a device without replacement: it leaves lists and monitoring at once and is told to stop its own schedules
+ // on its next contact; its credential is revoked when it confirms. A device that never comes back needs nothing
+ // more. Its backups stay at the destination and restorable from the customer page.
+ public static async Task<string?> DeleteDevice(Guid deviceId,ManagementDb db,HttpContext ctx)
  {
   if(!ctx.User.IsInRole("SuperAdmin")&&!ctx.User.IsInRole("Administrator"))return "Keine Berechtigung.";
   var device=await db.Devices.SingleOrDefaultAsync(x=>x.Id==deviceId);if(device is null)return "Gerät nicht gefunden.";
-  if(device.RetireRequested is not null)return null;
-  RequestRetirement(device);ManagementApi.Audit(db,ctx,device.TenantId,"device.retire-requested",device.Id);await db.SaveChangesAsync();return null;
+  if(device.Deleted is not null)return null;
+  RequestRetirement(device);device.Active=false;device.Deleted=DateTimeOffset.UtcNow;device.DeletedBy=ctx.User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value??"";
+  foreach(var alert in await db.Alerts.Where(x=>x.DeviceId==device.Id&&x.Resolved==null).ToListAsync())alert.Resolved=device.Deleted;
+  ManagementApi.Audit(db,ctx,device.TenantId,"device.deleted",device.Id);await db.SaveChangesAsync();return null;
+ }
+ // Delete a backup: the device keeps the job without a schedule, so it no longer backs up on its own, and the Console
+ // refuses to start it; it leaves lists and monitoring. The backups at the destination are never touched and stay
+ // restorable, on the device itself (its local database is kept) or on another device of the customer.
+ public static async Task<string?> DeleteBackup(Guid id,ManagementDb db,ISecretStore secrets,HttpContext ctx)
+ {
+  if(!ctx.User.IsInRole("SuperAdmin")&&!ctx.User.IsInRole("Administrator"))return "Keine Berechtigung.";
+  await using var tx=await db.Database.BeginTransactionAsync();await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({BitConverter.ToInt64(id.ToByteArray())})");
+  var job=await db.ManagedJobs.SingleOrDefaultAsync(x=>x.Id==id);if(job is null)return "Backup nicht gefunden.";
+  if(job.Deleted is not null)return null;
+  var latest=Read(secrets,await db.ConfigurationRevisions.SingleAsync(x=>x.ManagedJobId==job.Id&&x.Revision==job.LatestRevision));
+  if(latest.Schedule is not null)
+  {
+   var unscheduled=latest with{Schedule=null};if(!ConfigurationPolicy.Valid(unscheduled))return "Die Konfiguration des Backups ist ungültig.";
+   job.LatestRevision++;job.Status="Pending";AddRevision(db,secrets,job,unscheduled);
+  }
+  job.RestoreOnly=true;job.Deleted=DateTimeOffset.UtcNow;job.DeletedBy=ctx.User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value??"";
+  if(job.LocalJobId is {} local)foreach(var reported in await db.Jobs.Where(x=>x.DeviceId==job.DeviceId&&x.LocalId==local).ToListAsync())reported.Active=false;
+  ManagementApi.Audit(db,ctx,job.TenantId,"backup.deleted",job.Id);await db.SaveChangesAsync();await tx.CommitAsync();return null;
  }
  private static void AddRevision(ManagementDb db,ISecretStore secrets,ManagedJob job,ManagedBackupDefinition definition)
  {

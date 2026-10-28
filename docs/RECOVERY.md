@@ -74,8 +74,14 @@ storage. Where that matters (stolen device, untrusted former owner), change the 
 storage provider and update the job on the new device with them. Agents of version 0.3.1 and older do not understand
 `410 Gone` and keep backing up until they are updated or uninstalled; the stop stays unconfirmed for them.
 
-"Gerät stilllegen" (device page, or `DELETE /api/v1/management/devices/{id}`) requests the same stop without a
-replacement. The backups stay at the destination and can be restored on another device of the customer.
+"Gerät löschen" (device page, or `DELETE /api/v1/management/devices/{id}`) requests the same stop without a
+replacement and hides the device at once. The backups stay at the destination and can be restored on another device
+of the customer ("Backups & Wiederherstellung" on the customer page).
+
+"Backup löschen" (`DELETE /api/v1/management/managed-jobs/{id}`) removes only the job's schedule on the device; the
+engine job, its local database and the versions at the destination stay. A deleted backup is listed under
+"Gelöschte Backups" on the customer page and restores like any other backup, on its own device or as a recovery
+copy on another one.
 
 On the new device the agent creates the engine job **without a schedule**, removes any local database of that
 job and runs the engine's repair, which recreates the database from the destination. Until that has succeeded

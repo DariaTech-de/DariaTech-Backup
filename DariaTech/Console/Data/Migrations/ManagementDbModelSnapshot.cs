@@ -513,6 +513,13 @@ namespace DariaTech.Console.Data.Migrations
                     b.Property<long?>("ActiveTaskId")
                         .HasColumnType("bigint");
 
+                    b.Property<DateTimeOffset?>("Deleted")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeletedBy")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.Property<bool>("EngineReachable")
                         .HasColumnType("boolean");
 
@@ -624,6 +631,13 @@ namespace DariaTech.Console.Data.Migrations
 
                     b.Property<long>("AppliedRevision")
                         .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("Deleted")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeletedBy")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<Guid>("DeviceId")
                         .HasColumnType("uuid");

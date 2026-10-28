@@ -28,6 +28,7 @@ public sealed class JobActionsModel(ManagementDb db,CommandSigning signer,ISecre
  public BackupJob Job {get;private set;}=null!;
  public Device Device {get;private set;}=null!;
  public ManagedJob? Managed {get;private set;}
+ public Guid CustomerId {get;private set;}
  public SaasProvider? Provider {get;private set;}
  public string? DirectoryTenant {get;private set;}
  public List<RemoteCommand> Commands {get;private set;}=[];
@@ -118,7 +119,7 @@ public sealed class JobActionsModel(ManagementDb db,CommandSigning signer,ISecre
   if(input is null){Error=step=="restore"?"Bitte mindestens eine Datei oder einen Ordner auswählen.":"Bitte zuerst eine Version wählen.";Point=at;await LoadGuide();return Page();}
   // A recovery copy restores another device's backup: its original paths belong to that device (possibly another
   // operating system or user), so it only restores into a new folder on this device.
-  if(input.Restore is {OriginalLocation:true}&&Managed?.RestoreOnly==true){Error="Bei einer Wiederherstellung auf einem anderen Gerät nur in einen neuen Ordner wiederherstellen – die ursprünglichen Pfade gehören zum Quellgerät.";Point=at;await LoadGuide();return Page();}
+  if(input.Restore is {OriginalLocation:true}&&Managed?.RecoveryCopy==true){Error="Bei einer Wiederherstellung auf einem anderen Gerät nur in einen neuen Ordner wiederherstellen – die ursprünglichen Pfade gehören zum Quellgerät.";Point=at;await LoadGuide();return Page();}
   if(input.Restore is {OriginalLocation:false} r&&!CommandProtocol.SafeFolder(r.DestinationFolder)){Error="Der Ordnername darf nur Buchstaben, Ziffern, - und _ enthalten.";Point=at;await LoadGuide();return Page();}
   var result=await CommandApi.Request(input,db,signer,secrets,HttpContext);
   if(result is IStatusCodeHttpResult {StatusCode:>=400} rejected)
@@ -170,9 +171,11 @@ public sealed class JobActionsModel(ManagementDb db,CommandSigning signer,ISecre
  }
  private async Task<bool> Load()
  {
-  Job=await db.Jobs.SingleOrDefaultAsync(x=>x.Id==JobId&&x.Active)??null!;if(Job is null)return false;
+  Job=await db.Jobs.SingleOrDefaultAsync(x=>x.Id==JobId)??null!;if(Job is null)return false;
   Device=await db.Devices.SingleOrDefaultAsync(x=>x.Id==Job.DeviceId&&x.Active)??null!;if(Device is null)return false;
   Managed=await db.ManagedJobs.SingleOrDefaultAsync(x=>x.DeviceId==Job.DeviceId&&x.LocalJobId==Job.LocalId);
+  // A deleted backup is no longer listed, but its versions stay restorable on its own device.
+  if(!Job.Active&&Managed is not {Deleted:not null,RecoveryCopy:false})return false;
   if(Managed is {} managed)
   {
    var revision=await db.ConfigurationRevisions.SingleAsync(x=>x.ManagedJobId==managed.Id&&x.Revision==managed.LatestRevision);
@@ -180,6 +183,7 @@ public sealed class JobActionsModel(ManagementDb db,CommandSigning signer,ISecre
    var source=definition.Saas;Provider=source?.Provider;DirectoryTenant=source?.DirectoryTenant;
   }
   Commands=await db.Commands.Where(x=>x.JobId==JobId).OrderByDescending(x=>x.Expires).Take(50).ToListAsync();
+  CustomerId=await db.Customers.Where(x=>x.TenantId==Job.TenantId).Select(x=>x.Id).SingleOrDefaultAsync();
   return true;
  }
 }

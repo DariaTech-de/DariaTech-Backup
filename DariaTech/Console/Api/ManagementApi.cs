@@ -60,10 +60,10 @@ public static class ManagementApi
   }).RequireAuthorization("Operator");
   g.MapDelete("/devices/{id:guid}",async(Guid id,ManagementDb db,HttpContext ctx)=>
   {
-   // Decommission: the device leaves monitoring and is told to stop its own schedules on its next contact.
-   // Its agent credential is revoked once it confirms the stop (revoking first would leave it backing up).
-   var d=await db.Devices.SingleOrDefaultAsync(x=>x.Id==id);if(d is null)return Results.NotFound();d.Active=false;ConfigurationApi.RequestRetirement(d);
-   Audit(db,ctx,d.TenantId,"device.retire-requested",d.Id);await db.SaveChangesAsync();return Results.NoContent();
+   // The device leaves lists and monitoring and is told to stop its own schedules on its next contact. Its agent
+   // credential is revoked once it confirms the stop (revoking first would leave it backing up).
+   if(!await db.Devices.AnyAsync(x=>x.Id==id))return Results.NotFound();
+   return await ConfigurationApi.DeleteDevice(id,db,ctx) is {} error?Results.Conflict(new{error}):Results.NoContent();
   }).RequireAuthorization("Admin");
   g.MapDelete("/customers/{id:guid}",async(Guid id,ManagementDb db,HttpContext ctx)=>
   {

@@ -86,7 +86,7 @@ install -m 755 -o 0 -g 0 "$package_dir/uninstall.sh" /usr/local/sbin/dariatech-a
 printf '\n%s\n%s\n%s\n' \
  '✔ Installation erfolgreich: Der DariaTech Backup Agent läuft als Hintergrunddienst und ist mit der Console verbunden.' \
  '  Das Gerät erscheint jetzt in der DariaTech Console beim Kunden. Ein Programmfenster gibt es nicht – alles wird über die Console gesteuert.' \
- '  Entfernen: zuerst in der Console „Gerät stilllegen“, dann sudo /usr/local/sbin/dariatech-agent-uninstall (Anleitung auf der Geräteseite).'
+ '  Entfernen: zuerst in der Console „Gerät löschen“, dann sudo /usr/local/sbin/dariatech-agent-uninstall (Anleitung auf der Geräteseite).'
 if [[ "$expected" == osx-* ]]; then
  # macOS protects Documents, Desktop, Downloads etc. even from root; only the user can grant Full Disk Access.
  printf '\n%s\n%s\n%s\n%s\n%s\n' \

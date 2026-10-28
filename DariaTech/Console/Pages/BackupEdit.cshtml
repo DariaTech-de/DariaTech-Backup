@@ -127,3 +127,4 @@
  </div>
  <p class="sub">Der Agent übernimmt die Konfiguration beim nächsten Abgleich, sofern die zentrale Konfiguration auf dem Gerät freigegeben ist. SaaS-Quellen benötigen zusätzlich die lokale Tenant-Freigabe.</p>
 </form>
+@if(Model.Existing is {} existing){<partial name="_DeleteBackup" model="(existing,Model.CustomerId)" />}

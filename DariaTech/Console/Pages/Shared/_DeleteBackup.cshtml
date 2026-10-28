@@ -1,0 +1,17 @@
+@model (ManagedJob Job,Guid CustomerId)
+@{ var copy = Model.Job.RecoveryCopy; }
+<section class="card" id="delete-backup">
+ <div class="card-head"><div><h2>@(copy?"Wiederherstellungs-Verbindung entfernen":"Backup löschen")</h2><span class="sub">@(copy?"Die Verbindung verschwindet aus den Listen. Das Original-Backup und seine Versionen bleiben unverändert.":"Für ein Backup, das nicht mehr laufen soll. Gelöscht wird nur der Job, nicht die gesicherten Daten.")</span></div></div>
+ @if(!copy){
+ <ul class="steps-list">
+  <li>Der Job verschwindet sofort aus den Listen und aus der Überwachung.</li>
+  <li>Das Gerät sichert ab dem nächsten Kontakt nicht mehr (der Zeitplan wird entfernt); die Console startet keine Läufe mehr.</li>
+  <li>Die Versionen im Speicherziel bleiben erhalten. Sie lassen sich beim Kunden unter „Gelöschte Backups“ wiederherstellen, auch auf einem anderen Gerät. Passwort und Ziel bleiben verschlüsselt in der Console gespeichert.</li>
+  <li>Um auch die Daten zu entfernen, die Dateien am Speicherziel selbst löschen.</li>
+ </ul>}
+ <form method="post" asp-page="/Customer" asp-page-handler="DeleteBackup" class="form-grid">
+  <input type="hidden" name="id" value="@Model.CustomerId" /><input type="hidden" name="jobId" value="@Model.Job.Id" />
+  <label class="check"><input type="checkbox" name="confirm" value="true" required /> „@Model.Job.Name“ @(copy?"entfernen.":"löschen. Die Versionen im Speicherziel bleiben erhalten.")</label>
+  <div><button type="submit" class="button danger">@(copy?"Verbindung entfernen":"Backup löschen")</button></div>
+ </form>
+</section>
