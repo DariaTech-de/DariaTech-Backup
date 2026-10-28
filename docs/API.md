@@ -14,7 +14,7 @@ GET `/api/v1/management/csrf` returns a token. POST/PUT/DELETE management reques
 | /api/v1/management/customers/{id} | PUT / DELETE | Admin updates / archives customer: ends management access and monitoring; does not stop local schedules, revoke storage access or delete archives |
 | /api/v1/management/sites | GET / POST | Scoped sites / operator creates within customer |
 | /api/v1/management/devices | GET | Scoped devices |
-| /api/v1/management/devices/{id} | GET / PUT / DELETE | Detail/history / operator renames or moves within tenant / admin decommissions: the device is told to pause its schedules and is revoked once it confirms |
+| /api/v1/management/devices/{id} | GET / PUT / DELETE | Detail/history / operator renames or moves within tenant / admin deletes: the device leaves lists and monitoring at once, is told to pause its schedules and is revoked once it confirms; backups stay restorable; repeating it is a no-op (204) |
 | /api/v1/management/enrollment-tokens | POST | Operator issues tenant/site-bound token, returned once |
 | /api/v1/management/alerts | GET | Scoped unresolved alerts |
 | /api/v1/management/audit | GET | Latest 500 scoped audit events |
@@ -47,7 +47,9 @@ A generic engine error without a verified backup result is an EngineOperationFai
 
 `POST /api/v1/management/devices/{deviceId}/managed-jobs` (Admin, cookie + CSRF): `{ expectedRevision: 0, definition: { name, sources, targetUrl, passphrase, backendOptions, keepVersions, filters: [{include,expression}], schedule: null | {start,repeatHours,days} } }`. Passphrase: 14–200 characters. Schedule days use .NET DayOfWeek integers (Sunday=0). Source paths must be absolute, target URL must not embed credentials. Supported managed targets: file, s3, ssh, webdav/webdavs; S3/WebDAV require `use-ssl=true`, SSH requires an explicit `ssh-fingerprint`. Credential options are encrypted with the entire immutable revision, not returned by management reads. No script/custom module/DB-path options are accepted.
 
-`PUT /api/v1/management/managed-jobs/{id}` uses the same envelope with the current expectedRevision. A stale writer receives 409. Changing passphrase or destination requires creating a new job/chain; changing them in place receives `NewBackupChainRequired`. `GET /managed-jobs` returns metadata and application state only.
+`PUT /api/v1/management/managed-jobs/{id}` uses the same envelope with the current expectedRevision. A stale writer receives 409; a deleted job receives 409 `BackupDeleted`.
+
+`DELETE /api/v1/management/managed-jobs/{id}` (Admin, cookie + CSRF) deletes a backup: a new revision without a schedule is sent to the device, the job leaves lists and monitoring, and only restore commands (`Restore`, `ListRestorePoints`, `ListRestoreFiles`, cloud/Proxmox restores) and `StopBackup` are accepted for it afterwards (others: 409 `BackupDeleted`). The destination is never touched. 204 on success and on repetition, 404 for an unknown job. Changing passphrase or destination requires creating a new job/chain; changing them in place receives `NewBackupChainRequired`. `GET /managed-jobs` returns metadata and application state only.
 
 `GET /api/v1/agent/configurations` requires the device's Bearer credential AND X-Device-Id. It returns at most 20 pending latest assignments, exclusively for that active device and active customer. Contains credentials: HTTPS only; no-store; never print responses in RMM logs. `POST /api/v1/agent/configurations/{jobId}/receipt`: `{revision,localJobId,status}`; status Applied/Rejected/Failed. Applied receipts are idempotent, audit logged, and mark the corresponding telemetry job Managed. Local jobs are not automatically adopted or overwritten.
 
