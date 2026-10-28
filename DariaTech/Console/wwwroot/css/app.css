@@ -121,9 +121,10 @@ main{padding:32px;display:flex;flex-direction:column;gap:24px;width:100%;max-wid
 .button .icon{width:16px;height:16px}
 .button.secondary{background:var(--panel);color:var(--ink)!important;border:1px solid var(--line-strong);box-shadow:none}
 .button.secondary:hover{background:var(--sunken);filter:none}
+.button.danger{background:var(--crit);box-shadow:none}
 .button.locked,.button[disabled]{background:var(--panel-2);color:var(--muted)!important;border:1px dashed var(--line-strong);box-shadow:none;cursor:not-allowed;filter:none}
 .button-lg{min-height:52px;border-radius:14px;font-size:15px}
-body.dark .button:not(.secondary):not(.locked){background:var(--primary)}
+body.dark .button:not(.secondary):not(.locked):not(.danger){background:var(--primary)}
 label{display:block;font-size:13px;font-weight:500;margin-bottom:6px}
 .field{display:flex;flex-direction:column;min-width:0}
 .field label{display:flex;justify-content:space-between;gap:12px}

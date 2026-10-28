@@ -61,11 +61,13 @@ public static class AgentApi
      foreach(var job in jobs.Where(x=>x.Active&&!reportedIds.Contains(x.LocalId)&&!unreported.Contains(x.LocalId)))
      {job.Active=false;db.Audit.Add(new AuditEvent{TenantId=d.TenantId,Actor=id.ToString(),Action="job.removed-from-device",Resource=job.Id.ToString()});}
     if(complete)d.InventoryIncompleteSince=null;else d.InventoryIncompleteSince??=DateTimeOffset.UtcNow;
+    // A deleted backup stays on the device for restores only and stays out of lists and monitoring.
+    var deleted=(await db.ManagedJobs.Where(x=>x.DeviceId==id&&x.Deleted!=null&&x.LocalJobId!=null).Select(x=>x.LocalJobId!).ToListAsync()).ToHashSet(StringComparer.Ordinal);
     foreach(var report in r.Jobs)
     {
      var job=jobs.SingleOrDefault(x=>x.LocalId==report.LocalId);
      if(job is null){job=new BackupJob{TenantId=d.TenantId,DeviceId=id,LocalId=report.LocalId};db.Jobs.Add(job);}
-     job.Name=report.Name;job.NextRun=report.NextRun;job.Active=true;
+     job.Name=report.Name;job.NextRun=report.NextRun;job.Active=!deleted.Contains(report.LocalId);
      if(report.LastRun is not {} run)continue;
      var stored=await db.Runs.SingleOrDefaultAsync(x=>x.JobId==job.Id&&x.LocalRunId==run.LocalRunId);
      if(stored is null){stored=new BackupRun{TenantId=d.TenantId,JobId=job.Id,LocalRunId=run.LocalRunId,Started=run.Started};db.Runs.Add(stored);}

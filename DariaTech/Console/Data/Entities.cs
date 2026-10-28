@@ -40,6 +40,8 @@ public sealed class Device : TenantEntity
  public DateTimeOffset? RetireRequested { get; set; } public DateTimeOffset? RetireConfirmed { get; set; }
  public DateTimeOffset? RetireManuallyConfirmed { get; set; } public string? RetireManuallyConfirmedBy { get; set; }
  public Guid? ReplacedByDeviceId { get; set; }
+ // Deleted by an administrator (not replaced): left out of all lists at once; its backups stay restorable.
+ public DateTimeOffset? Deleted { get; set; } public string? DeletedBy { get; set; }
  // Planned absence (holiday, device in storage): offline and overdue are not alerted until this time; failures
  // still are. After it ends normal monitoring applies again without any further action.
  public DateTimeOffset? AbsentUntil { get; set; } public string AbsenceNote { get; set; } = "";
@@ -122,6 +124,10 @@ public sealed class ManagedJob : TenantEntity
  public DateTimeOffset? UnreportedSince { get; set; }
  // Recovery copy of another device's job: same destination and passphrase, never backs up.
  public bool RestoreOnly { get; set; } public Guid? SourceManagedJobId { get; set; }
+ public bool RecoveryCopy=>SourceManagedJobId is not null;
+ // Deleted by an administrator: the device keeps it only for restores (no schedule, never backs up), it is left out of
+ // lists and monitoring, and the backups at the destination stay restorable from the customer page.
+ public DateTimeOffset? Deleted { get; set; } public string? DeletedBy { get; set; }
  // Taken over from this device: the configuration is held back until that device's stop is confirmed, so the
  // old and the new device never write into the same backup chain at the same time.
  public Guid? HandoverFromDeviceId { get; set; }

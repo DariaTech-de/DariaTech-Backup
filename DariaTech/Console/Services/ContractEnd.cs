@@ -12,7 +12,8 @@ public static class ContractEnd
  public sealed record DeviceStop(Device Device,string State);
  public static async Task<List<DeviceStop>> Devices(ManagementDb db,Customer c)=>
   (await db.Devices.Where(x=>x.TenantId==c.TenantId&&(x.RetireRequested!=null||db.Agents.Any(a=>a.DeviceId==x.Id&&!a.Revoked))).OrderBy(x=>x.Name).ToListAsync())
-  .Select(d=>new DeviceStop(d,d.RetireConfirmed is not null?"Stopp vom Gerät bestätigt":d.RetireManuallyConfirmed is not null?"Stopp manuell bestätigt (nicht technisch)":d.RetireRequested is not null?"Stopp angefordert – noch nicht bestätigt":"sichert weiter")).ToList();
+  .Select(d=>new DeviceStop(d,StopState(d))).ToList();
+ public static string StopState(Device d)=>d.RetireConfirmed is not null?"Stopp vom Gerät bestätigt":d.RetireManuallyConfirmed is not null?"Stopp manuell bestätigt (nicht technisch)":d.RetireRequested is not null?"Stopp angefordert – noch nicht bestätigt":"sichert weiter";
  static string Actor(HttpContext ctx)=>ctx.User.FindFirstValue(ClaimTypes.Name)??"";
  public static async Task<string?> Run(string step,Customer c,ManagementDb db,HttpContext ctx,DateOnly? end,DateOnly? retain,string? note)
  {

@@ -58,10 +58,12 @@ public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets,Command
  public bool IsWindows=>Platform.StartsWith("win",StringComparison.Ordinal)||Platform==""&&Device?.OperatingSystem.Contains("Windows",StringComparison.OrdinalIgnoreCase)==true;
  private async Task LoadPlatform()=>Platform=await db.Agents.Where(x=>x.DeviceId==DeviceId&&!x.Revoked).OrderByDescending(x=>x.Registered).Select(x=>x.Platform).FirstOrDefaultAsync()??"";
  public string? Error {get;private set;}
+ public ManagedJob? Existing {get;private set;}public Guid CustomerId {get;private set;}
  public async Task<IActionResult> OnGetAsync(Guid deviceId,Guid? id,string provider="Files")
  {
   DeviceId=deviceId;ManagedJobId=id;
-  if(await LoadPrevious() is {} previous)
+  // A deleted backup is no longer edited; it stays restorable from the customer page.
+  if(await LoadPrevious() is {} previous&&Existing?.Deleted is null)
   {
    Name=previous.Name;Sources=string.Join(Environment.NewLine,previous.Sources);TargetUrl=previous.TargetUrl;KeepVersions=previous.KeepVersions;
    FirstRun=previous.Schedule?.Start is {} start?Ui.ToLocal(start):null;
@@ -93,7 +95,7 @@ public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets,Command
  public async Task<IActionResult> OnPostAsync()
  {
   var previous=await LoadPrevious();
-  if(ManagedJobId is not null&&previous is null)return NotFound();
+  if(ManagedJobId is not null&&(previous is null||Existing?.Deleted is not null))return NotFound();
   Device=await db.Devices.SingleOrDefaultAsync(x=>x.Id==DeviceId&&x.Active)??null!;if(Device is null)return NotFound();
   await LoadPlatform();
   var validBinding=ModelState.IsValid;
@@ -240,6 +242,7 @@ public sealed class BackupEditModel(ManagementDb db,ISecretStore secrets,Command
   if(ManagedJobId is not {} id)return null;
   var job=await db.ManagedJobs.SingleOrDefaultAsync(x=>x.Id==id&&x.DeviceId==DeviceId);if(job is null)return null;
   if(HttpContext.Request.Method=="GET")Revision=job.LatestRevision;
+  Existing=job;CustomerId=await db.Customers.Where(x=>x.TenantId==job.TenantId).Select(x=>x.Id).SingleOrDefaultAsync();
   var revision=await db.ConfigurationRevisions.SingleAsync(x=>x.ManagedJobId==id&&x.Revision==job.LatestRevision);
   return ConfigurationApi.Read(secrets,revision);
  }
